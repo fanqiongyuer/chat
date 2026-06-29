@@ -31,38 +31,46 @@ const RedirectIfAuthenticated = ({ children }: { children: ReactElement }) => {
   return children;
 };
 
-const router = createBrowserRouter([
+const importMetaEnv = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env;
+const routerBaseName = importMetaEnv?.BASE_URL || '/';
+
+const router = createBrowserRouter(
+  [
+    {
+      path: '/login',
+      element: (
+        <RedirectIfAuthenticated>
+          <LoginPage />
+        </RedirectIfAuthenticated>
+      ),
+    },
+    {
+      path: '/',
+      element: (
+        <RequireAuth>
+          <Layout />
+        </RequireAuth>
+      ),
+      children: [
+        { index: true, element: <Navigate to="/chat/new" replace /> },
+        { path: 'chat/new', element: <ChatPage isNew={true} /> },
+        { path: 'chat/:id', element: <ChatPage isNew={false} /> },
+        { path: 'projects', element: <ProjectsPage /> },
+        { path: 'project/:id', element: <ProjectDetailPage /> },
+        { path: 'tools', element: <ToolsPage /> },
+        { path: 'tool/:id', element: <ToolPage /> },
+        { path: 'settings', element: <SettingsPage /> },
+      ]
+    },
+    {
+      path: '*',
+      element: <Navigate to="/" replace />,
+    }
+  ],
   {
-    path: '/login',
-    element: (
-      <RedirectIfAuthenticated>
-        <LoginPage />
-      </RedirectIfAuthenticated>
-    ),
-  },
-  {
-    path: '/',
-    element: (
-      <RequireAuth>
-        <Layout />
-      </RequireAuth>
-    ),
-    children: [
-      { index: true, element: <Navigate to="/chat/new" replace /> },
-      { path: 'chat/new', element: <ChatPage isNew={true} /> },
-      { path: 'chat/:id', element: <ChatPage isNew={false} /> },
-      { path: 'projects', element: <ProjectsPage /> },
-      { path: 'project/:id', element: <ProjectDetailPage /> },
-      { path: 'tools', element: <ToolsPage /> },
-      { path: 'tool/:id', element: <ToolPage /> },
-      { path: 'settings', element: <SettingsPage /> },
-    ]
-  },
-  {
-    path: '*',
-    element: <Navigate to="/" replace />,
+    basename: routerBaseName,
   }
-]);
+);
 
 export default function App() {
   return <RouterProvider router={router} />;
