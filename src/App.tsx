@@ -14,7 +14,8 @@ import SystemSettingsDetailPage from './pages/SystemSettingsDetailPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
-import { autoRecoverChats } from './utils/recoverChats';
+
+type ReactElement = any;
 
 const AUTH_STORAGE_KEY = 'deeptrace-authenticated';
 const AUTH_SESSION_KEY = 'deeptrace-authenticated-session';
@@ -100,8 +101,5 @@ const router = createBrowserRouter(
 );
 
 export default function App() {
-  // 应用启动时自动恢复历史对话
-  autoRecoverChats();
-  
   return <RouterProvider router={router} />;
 }
