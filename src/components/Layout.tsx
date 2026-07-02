@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { Plus, Folder, Wrench, Settings, Search, ChevronDown, ChevronRight, PanelLeftClose, Menu, SquarePen, MoreHorizontal, Pencil, Share2, Trash2 } from 'lucide-react';
+import { Plus, Folder, Clock3, Settings, Search, ChevronDown, ChevronRight, PanelLeftClose, Menu, SquarePen, MoreHorizontal, Pencil, Share2, Trash2, ArrowUpDown, Check, Pin } from 'lucide-react';
 import { mockProjects } from '../mock/projects';
 import { mockChats, type MockChat } from '../mock/chats';
 
@@ -16,6 +16,9 @@ const AUTH_STORAGE_KEY = 'deeptrace-authenticated';
 const AUTH_SESSION_KEY = 'deeptrace-authenticated-session';
 const CHATS_STORAGE_KEY = 'deeptrace-chats';
 const CHAT_MESSAGES_STORAGE_KEY = 'deeptrace-chat-messages';
+const SORT_MENU_WIDTH = 192;
+const SORT_MENU_HEIGHT = 116;
+const SORT_MENU_OFFSET = 6;
 
 function loadChatsFromStorage(): MockChat[] {
   if (typeof window === 'undefined') return mockChats;
@@ -35,8 +38,9 @@ function loadChatsFromStorage(): MockChat[] {
         const date = typeof chat.date === 'string' ? chat.date : '刚刚';
         const count = typeof chat.count === 'number' ? chat.count : 0;
         const projectId = typeof chat.projectId === 'string' ? chat.projectId : undefined;
+        const isPinned = chat.isPinned === true;
 
-        return { id, title, date, count, projectId } as MockChat;
+        return { id, title, date, count, projectId, isPinned } as MockChat;
       })
       .filter((chat) => chat.id && chat.title);
 
@@ -79,6 +83,10 @@ export default function Layout() {
   const [showSettings, setShowSettings] = useState(false);
   const [chats, setChats] = useState<MockChat[]>(() => loadChatsFromStorage());
   const [chatMenuOpenId, setChatMenuOpenId] = useState<string | null>(null);
+  const [sortMode, setSortMode] = useState<'time' | 'project'>('project');
+  const [showSortMenu, setShowSortMenu] = useState(false);
+  const [sortMenuPos, setSortMenuPos] = useState({ top: 0, left: 0 });
+  const sortButtonRef = useRef<HTMLButtonElement>(null);
 
   const handleLogout = () => {
     localStorage.removeItem(AUTH_STORAGE_KEY);
@@ -100,6 +108,23 @@ export default function Layout() {
     if (activeChatId === chatId) {
       navigate('/chat/new', { replace: true });
     }
+  };
+
+  const handleTogglePinChat = (chatId: string) => {
+    setChats((prev) => {
+      const target = prev.find((chat) => chat.id === chatId);
+      if (!target) return prev;
+
+      const toggledPinned = !target.isPinned;
+      const updated = prev.map((chat) =>
+        chat.id === chatId ? { ...chat, isPinned: toggledPinned } : chat,
+      );
+
+      const pinned = updated.filter((chat) => chat.isPinned);
+      const unpinned = updated.filter((chat) => !chat.isPinned);
+      return [...pinned, ...unpinned];
+    });
+    setChatMenuOpenId(null);
   };
 
   const handleResizeStart = (event: React.MouseEvent<HTMLDivElement>) => {
@@ -149,7 +174,7 @@ export default function Layout() {
 
   const navItems = [
     { label: '项目', icon: <Folder size={14} />, path: '/projects' },
-    { label: '工具', icon: <Wrench size={14} />, path: '/tools' }
+    { label: '任务', icon: <Clock3 size={14} />, path: '/tools' }
   ];
 
   const activeChat = useMemo(() => {
@@ -157,6 +182,11 @@ export default function Layout() {
     if (!matched) return null;
     return chats.find((chat) => chat.id === matched[1]) ?? null;
   }, [chats, location.pathname]);
+
+  const pinnedChats = useMemo(
+    () => chats.filter((chat) => chat.isPinned),
+    [chats],
+  );
 
   useEffect(() => {
     if (!activeChat) return;
@@ -223,30 +253,163 @@ export default function Layout() {
           </div>
 
           {/* 对话历史 */}
-          <div className="flex-1 overflow-y-auto px-0">
-            <div className="text-sm font-normal text-secondaryText opacity-60 px-4 mb-1 mt-0.5">近期对话</div>
+          <div className="flex-1 overflow-y-auto px-0 relative">
+            <div className="mx-[10px] mb-4 mt-0.5 flex items-center justify-between pl-[8px] pr-4 text-sm font-normal text-secondaryText group relative">
+              <span className="opacity-60">近期对话</span>
+              <div className="relative">
+                <button 
+                  ref={sortButtonRef}
+                  onClick={() => {
+                    if (!showSortMenu && sortButtonRef.current) {
+                      const rect = sortButtonRef.current.getBoundingClientRect();
+                      const preferredLeft = rect.right - SORT_MENU_WIDTH;
+                      const minLeft = 8;
+                      const maxLeft = window.innerWidth - SORT_MENU_WIDTH - 8;
+                      const left = Math.min(maxLeft, Math.max(minLeft, preferredLeft));
+
+                      const belowTop = rect.bottom + SORT_MENU_OFFSET;
+                      const aboveTop = rect.top - SORT_MENU_HEIGHT - SORT_MENU_OFFSET;
+                      const maxTop = window.innerHeight - SORT_MENU_HEIGHT - 8;
+                      const top = belowTop <= maxTop ? belowTop : Math.max(8, aboveTop);
+
+                      setSortMenuPos({ top, left });
+                    }
+                    setShowSortMenu(!showSortMenu);
+                  }}
+                  className={`flex h-[14px] w-5 items-center justify-center text-tertiaryText hover:text-secondaryText transition-opacity transition-colors ${showSortMenu ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                  title="排序方式"
+                >
+                  <ArrowUpDown size={14} />
+                </button>
+                {showSortMenu && (
+                  <>
+                    <div className="fixed inset-0 z-[90]" onClick={() => setShowSortMenu(false)}></div>
+                    <div className="fixed bg-white rounded-xl shadow-popover z-[100] overflow-hidden py-2 animate-in fade-in slide-in-from-bottom-2" style={{ width: `${SORT_MENU_WIDTH}px`, top: `${sortMenuPos.top}px`, left: `${sortMenuPos.left}px` }}>
+                      <div 
+                        onClick={() => {
+                          setSortMode('time');
+                          setShowSortMenu(false);
+                        }}
+                        className="px-4 py-2.5 text-base text-primaryText cursor-pointer transition-colors flex items-center gap-3 rounded-lg mx-2 hover:bg-bgLight"
+                      >
+                        <Menu size={16} className="shrink-0" />
+                        <span className="flex-1">按时间排序</span>
+                        {sortMode === 'time' && <Check size={14} className="shrink-0" />}
+                      </div>
+                      <div 
+                        onClick={() => {
+                          setSortMode('project');
+                          setShowSortMenu(false);
+                        }}
+                        className="px-4 py-2.5 text-base text-primaryText cursor-pointer transition-colors flex items-center gap-3 rounded-lg mx-2 hover:bg-bgLight"
+                      >
+                        <Folder size={16} className="shrink-0" />
+                        <span className="flex-1">按项目排序</span>
+                        {sortMode === 'project' && <Check size={14} className="shrink-0" />}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
             
-            {mockProjects.map(proj => {
-              const projChats = chats.filter(c => c.projectId === proj.id);
+            {pinnedChats.length > 0 && (
+              <div className="mb-1">
+                <div className="flex flex-col gap-0.5 mt-0.5">
+                  {pinnedChats.map((chat) => {
+                    const isActive = location.pathname === `/chat/${chat.id}`;
+                    const isMenuOpen = chatMenuOpenId === chat.id;
+
+                    return (
+                      <div key={chat.id} className="relative">
+                        <div
+                          onClick={() => navigate(`/chat/${chat.id}`)}
+                          className={`mx-[10px] text-sm pl-[10px] pr-4 py-1.5 rounded-full cursor-pointer transition-colors flex items-center justify-between group ${
+                            isActive ? 'text-primaryText bg-[#e1e5ea] font-normal' : 'text-secondaryText hover:text-primaryText hover:bg-[#e1e5ea] font-normal'
+                          }`}
+                        >
+                          <div className="flex min-w-0 items-center gap-2">
+                            <Pin size={14} className="shrink-0" />
+                            <span className="truncate">{chat.title}</span>
+                          </div>
+                          <div className="ml-2 shrink-0 flex h-[14px] w-5 items-center justify-center">
+                            <span className={`text-xs opacity-60 ${isMenuOpen ? 'hidden' : 'group-hover:hidden'}`}>{chat.count}</span>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setChatMenuOpenId(isMenuOpen ? null : chat.id);
+                              }}
+                              className={`flex items-center justify-center -mx-1 ${isMenuOpen ? 'block' : 'hidden group-hover:block'}`}
+                            >
+                              <MoreHorizontal size={14} />
+                            </button>
+                          </div>
+                        </div>
+                        {isMenuOpen && (
+                          <>
+                            <div className="fixed inset-0 z-30" onClick={() => setChatMenuOpenId(null)}></div>
+                            <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-xl shadow-popover z-40 overflow-hidden py-2 animate-in fade-in slide-in-from-bottom-2">
+                              <div className="px-4 py-2.5 text-base text-primaryText hover:bg-bgLight cursor-pointer transition-colors flex items-center gap-3 rounded-lg mx-2">
+                                <Pencil size={16} />
+                                <span>重命名</span>
+                              </div>
+                              <div className="px-4 py-2.5 text-base text-primaryText hover:bg-bgLight cursor-pointer transition-colors flex items-center gap-3 rounded-lg mx-2">
+                                <Share2 size={16} />
+                                <span>分享对话</span>
+                              </div>
+                              <div
+                                onClick={() => handleTogglePinChat(chat.id)}
+                                className="px-4 py-2.5 text-base text-primaryText hover:bg-bgLight cursor-pointer transition-colors flex items-center gap-3 rounded-lg mx-2"
+                              >
+                                <Pin size={16} />
+                                <span>{chat.isPinned ? '取消置顶' : '置顶对话'}</span>
+                              </div>
+                              <div
+                                onClick={() => handleDeleteChat(chat.id)}
+                                className="px-4 py-2.5 text-base text-red-600 hover:bg-red-50 cursor-pointer transition-colors flex items-center gap-3 rounded-lg mx-2"
+                              >
+                                <Trash2 size={16} />
+                                <span>删除</span>
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="ml-[20px] mr-[36px] my-2 border-t border-borderGray/80" />
+              </div>
+            )}
+
+            {sortMode === 'project' && mockProjects.map(proj => {
+              const projChats = chats.filter((c) => c.projectId === proj.id && !c.isPinned);
               const isExpanded = expandedProjects[proj.id] !== false;
               
               return (
                 <div key={proj.id} className="mb-0.5">
                   <div 
-                    className="mx-[10px] flex items-center gap-2 pl-[8px] pr-4 py-2 text-sm font-normal text-secondaryText cursor-pointer hover:text-primaryText rounded-full hover:bg-[#e1e5ea] transition-colors"
+                    className="group mx-[10px] flex items-center gap-2 pl-[8px] pr-4 py-2 text-sm font-normal text-secondaryText cursor-pointer hover:text-primaryText rounded-full hover:bg-[#e1e5ea] transition-colors"
                     onClick={() => toggleProject(proj.id)}
                   >
-                    {isExpanded ? (
-                      <ChevronDown size={14} className="text-secondaryText shrink-0" />
-                    ) : (
-                      <ChevronRight size={14} className="text-secondaryText shrink-0" />
-                    )}
+                    <div className="relative h-[14px] w-[14px] shrink-0">
+                      <Folder size={14} className="text-secondaryText transition-opacity group-hover:opacity-0" />
+                      <span className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100">
+                        {isExpanded ? (
+                          <ChevronDown size={14} className="text-secondaryText" />
+                        ) : (
+                          <ChevronRight size={14} className="text-secondaryText" />
+                        )}
+                      </span>
+                    </div>
                     <span className="truncate">{proj.name}</span>
                   </div>
                   
-                  {isExpanded && projChats.length > 0 && (
+                  {isExpanded && (
                     <div className="flex flex-col gap-0.5 mt-0.5">
-                      {projChats.map(chat => {
+                      {projChats.length === 0 ? (
+                        <div className="mx-[10px] text-sm pl-[30px] pr-4 py-1.5 text-tertiaryText/80">暂无对话</div>
+                      ) : projChats.map(chat => {
                         const isActive = location.pathname === `/chat/${chat.id}`;
                         const isMenuOpen = chatMenuOpenId === chat.id;
                         return (
@@ -258,7 +421,7 @@ export default function Layout() {
                               }`}
                             >
                               <span className="truncate">{chat.title}</span>
-                              <div className="ml-2 shrink-0 flex items-center h-[14px]">
+                              <div className="ml-2 shrink-0 flex h-[14px] w-5 items-center justify-center">
                                 <span className={`text-xs opacity-60 ${isMenuOpen ? 'hidden' : 'group-hover:hidden'}`}>{chat.count}</span>
                                 <button
                                   onClick={(e) => {
@@ -282,6 +445,13 @@ export default function Layout() {
                                   <div className="px-4 py-2.5 text-base text-primaryText hover:bg-bgLight cursor-pointer transition-colors flex items-center gap-3 rounded-lg mx-2">
                                     <Share2 size={16} />
                                     <span>分享对话</span>
+                                  </div>
+                                  <div
+                                    onClick={() => handleTogglePinChat(chat.id)}
+                                    className="px-4 py-2.5 text-base text-primaryText hover:bg-bgLight cursor-pointer transition-colors flex items-center gap-3 rounded-lg mx-2"
+                                  >
+                                    <Pin size={16} />
+                                    <span>{chat.isPinned ? '取消置顶' : '置顶对话'}</span>
                                   </div>
                                   <div
                                     onClick={() => handleDeleteChat(chat.id)}
@@ -303,28 +473,35 @@ export default function Layout() {
             })}
 
             {/* 未分组对话 */}
-            {(() => {
-              const unassignedChats = chats.filter(c => !c.projectId);
+            {sortMode === 'project' && (() => {
+              const unassignedChats = chats.filter((c) => !c.projectId && !c.isPinned);
               if (unassignedChats.length === 0) return null;
               const isExpanded = expandedProjects['unassigned'] !== false;
 
               return (
                 <div className="mb-0.5 mt-1">
                   <div 
-                    className="mx-[10px] flex items-center gap-2 pl-[8px] pr-4 py-2 text-sm font-normal text-secondaryText cursor-pointer hover:text-primaryText rounded-full hover:bg-[#e1e5ea] transition-colors"
+                    className="group mx-[10px] flex items-center gap-2 pl-[8px] pr-4 py-2 text-sm font-normal text-secondaryText cursor-pointer hover:text-primaryText rounded-full hover:bg-[#e1e5ea] transition-colors"
                     onClick={() => toggleProject('unassigned')}
                   >
-                    {isExpanded ? (
-                      <ChevronDown size={14} className="text-secondaryText shrink-0" />
-                    ) : (
-                      <ChevronRight size={14} className="text-secondaryText shrink-0" />
-                    )}
+                    <div className="relative h-[14px] w-[14px] shrink-0">
+                      <Folder size={14} className="text-secondaryText transition-opacity group-hover:opacity-0" />
+                      <span className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100">
+                        {isExpanded ? (
+                          <ChevronDown size={14} className="text-secondaryText" />
+                        ) : (
+                          <ChevronRight size={14} className="text-secondaryText" />
+                        )}
+                      </span>
+                    </div>
                     <span className="truncate">未分组对话</span>
                   </div>
                   
                   {isExpanded && (
                     <div className="flex flex-col gap-0.5 mt-0.5">
-                      {unassignedChats.map(chat => {
+                      {unassignedChats.length === 0 ? (
+                        <div className="mx-[10px] text-sm pl-[30px] pr-4 py-1.5 text-tertiaryText/80">暂无对话</div>
+                      ) : unassignedChats.map(chat => {
                         const isActive = location.pathname === `/chat/${chat.id}`;
                         const isMenuOpen = chatMenuOpenId === chat.id;
                         return (
@@ -336,7 +513,7 @@ export default function Layout() {
                               }`}
                             >
                               <span className="truncate">{chat.title}</span>
-                              <div className="ml-2 shrink-0 flex items-center h-[14px]">
+                              <div className="ml-2 shrink-0 flex h-[14px] w-5 items-center justify-center">
                                 <span className={`text-xs opacity-60 ${isMenuOpen ? 'hidden' : 'group-hover:hidden'}`}>{chat.count}</span>
                                 <button
                                   onClick={(e) => {
@@ -362,6 +539,13 @@ export default function Layout() {
                                     <span>分享对话</span>
                                   </div>
                                   <div
+                                    onClick={() => handleTogglePinChat(chat.id)}
+                                    className="px-4 py-2.5 text-base text-primaryText hover:bg-bgLight cursor-pointer transition-colors flex items-center gap-3 rounded-lg mx-2"
+                                  >
+                                    <Pin size={16} />
+                                    <span>{chat.isPinned ? '取消置顶' : '置顶对话'}</span>
+                                  </div>
+                                  <div
                                     onClick={() => handleDeleteChat(chat.id)}
                                     className="px-4 py-2.5 text-base text-red-600 hover:bg-red-50 cursor-pointer transition-colors flex items-center gap-3 rounded-lg mx-2"
                                   >
@@ -379,6 +563,76 @@ export default function Layout() {
                 </div>
               );
             })()}
+
+            {/* 按时间排序视图 */}
+            {sortMode === 'time' && (
+              <div className="flex flex-col gap-0.5">
+                {chats
+                  .filter((chat) => !chat.isPinned)
+                  .slice()
+                  .sort((a, b) => {
+                    // 按对话ID倒序排列（新的在前）
+                    return b.id.localeCompare(a.id);
+                  })
+                  .map(chat => {
+                  const isActive = location.pathname === `/chat/${chat.id}`;
+                  const isMenuOpen = chatMenuOpenId === chat.id;
+                  return (
+                    <div key={chat.id} className="relative">
+                      <div 
+                        onClick={() => navigate(`/chat/${chat.id}`)}
+                        className={`mx-[10px] text-sm pl-[10px] pr-4 py-1.5 rounded-full cursor-pointer transition-colors flex items-center justify-between group ${
+                          isActive ? 'text-primaryText bg-[#e1e5ea] font-normal' : 'text-secondaryText hover:text-primaryText hover:bg-[#e1e5ea] font-normal'
+                        }`}
+                      >
+                        <span className="truncate">{chat.title}</span>
+                        <div className="ml-2 shrink-0 flex h-[14px] w-5 items-center justify-center">
+                          <span className={`text-xs opacity-60 ${isMenuOpen ? 'hidden' : 'group-hover:hidden'}`}>{chat.count}</span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setChatMenuOpenId(isMenuOpen ? null : chat.id);
+                            }}
+                            className={`flex items-center justify-center -mx-1 ${isMenuOpen ? 'block' : 'hidden group-hover:block'}`}
+                          >
+                            <MoreHorizontal size={14} />
+                          </button>
+                        </div>
+                      </div>
+                      {isMenuOpen && (
+                        <>
+                          <div className="fixed inset-0 z-30" onClick={() => setChatMenuOpenId(null)}></div>
+                          <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-xl shadow-popover z-40 overflow-hidden py-2 animate-in fade-in slide-in-from-bottom-2">
+                            <div className="px-4 py-2.5 text-base text-primaryText hover:bg-bgLight cursor-pointer transition-colors flex items-center gap-3 rounded-lg mx-2">
+                              <Pencil size={16} />
+                              <span>重命名</span>
+                            </div>
+                            <div className="px-4 py-2.5 text-base text-primaryText hover:bg-bgLight cursor-pointer transition-colors flex items-center gap-3 rounded-lg mx-2">
+                              <Share2 size={16} />
+                              <span>分享对话</span>
+                            </div>
+                            <div
+                              onClick={() => handleTogglePinChat(chat.id)}
+                              className="px-4 py-2.5 text-base text-primaryText hover:bg-bgLight cursor-pointer transition-colors flex items-center gap-3 rounded-lg mx-2"
+                            >
+                              <Pin size={16} />
+                              <span>{chat.isPinned ? '取消置顶' : '置顶对话'}</span>
+                            </div>
+                            <div
+                              onClick={() => handleDeleteChat(chat.id)}
+                              className="px-4 py-2.5 text-base text-red-600 hover:bg-red-50 cursor-pointer transition-colors flex items-center gap-3 rounded-lg mx-2"
+                            >
+                              <Trash2 size={16} />
+                              <span>删除</span>
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* 用户区域 */}
@@ -438,22 +692,45 @@ export default function Layout() {
             onClick={e => e.stopPropagation()}
           >
             <div className="py-2 text-base text-primaryText font-normal space-y-1 px-2">
-              <div className="px-3 py-2.5 hover:bg-bgLight cursor-pointer transition-colors flex justify-between items-center rounded-lg">
-                <span>配置模型</span>
-                <span className="text-tertiaryText text-sm font-normal">DeepSeek-V3</span>
-              </div>
-              <div className="px-3 py-2.5 hover:bg-bgLight cursor-pointer transition-colors flex justify-between items-center rounded-lg">
-                <span>用量限额</span>
+              <button
+                onClick={() => {
+                  setShowSettings(false);
+                  navigate('/skills');
+                }}
+                className="w-full px-3 py-2.5 hover:bg-bgLight cursor-pointer transition-colors flex justify-between items-center rounded-lg"
+              >
+                <span>Skill</span>
+              </button>
+              <button
+                onClick={() => {
+                  setShowSettings(false);
+                  navigate('/ai-usage');
+                }}
+                className="w-full px-3 py-2.5 hover:bg-bgLight cursor-pointer transition-colors flex justify-between items-center rounded-lg"
+              >
+                <span>AI用量</span>
                 <span className="text-tertiaryText text-sm font-normal">剩余 89%</span>
-              </div>
-              <div className="px-3 py-2.5 hover:bg-bgLight cursor-pointer transition-colors flex justify-between items-center rounded-lg">
+              </button>
+              <button
+                onClick={() => {
+                  setShowSettings(false);
+                  navigate('/members');
+                }}
+                className="w-full px-3 py-2.5 hover:bg-bgLight cursor-pointer transition-colors flex justify-between items-center rounded-lg"
+              >
                 <span>成员管理</span>
                 <span className="text-tertiaryText text-sm font-normal">5 人</span>
-              </div>
-              <div className="px-3 py-2.5 text-primaryText hover:bg-bgLight cursor-pointer transition-colors flex justify-between items-center rounded-lg">
+              </button>
+              <button
+                onClick={() => {
+                  setShowSettings(false);
+                  navigate('/system-settings');
+                }}
+                className="w-full px-3 py-2.5 text-primaryText hover:bg-bgLight cursor-pointer transition-colors flex justify-between items-center rounded-lg"
+              >
                 <span>更多系统设置</span>
                 <Settings size={16} className="text-tertiaryText" />
-              </div>
+              </button>
               <button
                 onClick={handleLogout}
                 className="w-full text-left px-3 py-2.5 text-red-600 hover:bg-red-50 cursor-pointer transition-colors font-medium rounded-lg"

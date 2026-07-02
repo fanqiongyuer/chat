@@ -7,7 +7,13 @@ import ProjectDetailPage from './pages/ProjectDetailPage';
 import ToolsPage from './pages/ToolsPage';
 import ToolPage from './pages/ToolPage';
 import SettingsPage from './pages/SettingsPage';
+import MemberManagementPage from './pages/MemberManagementPage';
+import AiUsagePage from './pages/AiUsagePage';
+import SkillPage from './pages/SkillPage';
+import SystemSettingsDetailPage from './pages/SystemSettingsDetailPage';
 import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
 
 const AUTH_STORAGE_KEY = 'deeptrace-authenticated';
 const AUTH_SESSION_KEY = 'deeptrace-authenticated-session';
@@ -45,6 +51,22 @@ const router = createBrowserRouter(
       ),
     },
     {
+      path: '/register',
+      element: (
+        <RedirectIfAuthenticated>
+          <RegisterPage />
+        </RedirectIfAuthenticated>
+      ),
+    },
+    {
+      path: '/forgot-password',
+      element: (
+        <RedirectIfAuthenticated>
+          <ForgotPasswordPage />
+        </RedirectIfAuthenticated>
+      ),
+    },
+    {
       path: '/',
       element: (
         <RequireAuth>
@@ -59,6 +81,10 @@ const router = createBrowserRouter(
         { path: 'project/:id', element: <ProjectDetailPage /> },
         { path: 'tools', element: <ToolsPage /> },
         { path: 'tool/:id', element: <ToolPage /> },
+        { path: 'ai-usage', element: <AiUsagePage /> },
+        { path: 'skills', element: <SkillPage /> },
+        { path: 'system-settings', element: <SystemSettingsDetailPage /> },
+        { path: 'members', element: <MemberManagementPage /> },
         { path: 'settings', element: <SettingsPage /> },
       ]
     },
