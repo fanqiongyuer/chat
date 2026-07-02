@@ -1,13 +1,52 @@
 import json
+from typing import List
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from sse_starlette.sse import EventSourceResponse
+from sqlalchemy.orm import Session
 
 from app.agents.graph import run_agent
-from app.core.database import save_message, upsert_conversation
+from app.core.database import save_message, upsert_conversation, get_db, Conversation, Message
 from app.models.schemas import ChatRequest
+from app.core.security import EncryptionUtil
 
 router = APIRouter()
+
+
+@router.get("/conversations")
+def get_conversations(db: Session = Depends(get_db)) -> List[dict]:
+    """获取所有对话列表"""
+    conversations = db.query(Conversation).all()
+    result = []
+    for conv in conversations:
+        result.append({
+            "id": conv.id,
+            "project_id": conv.project_id,
+            "title": conv.title,
+            "created_at": conv.created_at.isoformat() if conv.created_at else None,
+            "updated_at": conv.updated_at.isoformat() if conv.updated_at else None,
+        })
+    return result
+
+
+@router.get("/conversations/{conv_id}/messages")
+def get_conversation_messages(conv_id: str, db: Session = Depends(get_db)) -> List[dict]:
+    """获取指定对话的所有消息"""
+    messages = db.query(Message).filter(Message.conv_id == conv_id).all()
+    result = []
+    for msg in messages:
+        try:
+            decrypted_content = EncryptionUtil.decrypt_text(msg.content) if msg.content else ""
+        except:
+            decrypted_content = msg.content or ""
+        
+        result.append({
+            "id": msg.id,
+            "role": msg.role,
+            "content": decrypted_content,
+            "timestamp": msg.timestamp.isoformat() if msg.timestamp else None,
+        })
+    return result
 
 
 @router.post("/chat/stream")

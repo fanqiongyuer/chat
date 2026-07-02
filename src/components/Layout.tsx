@@ -87,6 +87,49 @@ export default function Layout() {
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [sortMenuPos, setSortMenuPos] = useState({ top: 0, left: 0 });
   const sortButtonRef = useRef<HTMLButtonElement>(null);
+  const [hasLoadedFromBackend, setHasLoadedFromBackend] = useState(false);
+
+  // 从后端恢复对话数据
+  useEffect(() => {
+    if (hasLoadedFromBackend) return;
+    setHasLoadedFromBackend(true);
+
+    const loadChatsFromBackend = async () => {
+      try {
+        const importMetaEnv = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env;
+        const API_BASE_URL = importMetaEnv?.VITE_API_BASE_URL?.replace(/\/$/, '') || 'http://localhost:8000';
+        
+        const response = await fetch(`${API_BASE_URL}/api/v1/conversations`);
+        if (!response.ok) return;
+        
+        const backendConversations = await response.json();
+        
+        // 将后端对话转换为 MockChat 格式
+        const backendChats: MockChat[] = backendConversations.map((conv: any) => ({
+          id: conv.id,
+          title: conv.title || '新对话',
+          date: '历史对话',
+          count: 0,
+          projectId: conv.project_id,
+          isPinned: false,
+        }));
+        
+        // 合并后端数据和本地数据，优先使用后端数据
+        const existingIds = new Set(chats.map(c => c.id));
+        const newChats = backendChats.filter(c => !existingIds.has(c.id));
+        
+        if (newChats.length > 0) {
+          setChats(prev => [...prev, ...newChats]);
+        }
+      } catch (error) {
+        console.error('Failed to load conversations from backend:', error);
+      }
+    };
+
+    // 延迟加载，确保页面加载完成
+    const timer = setTimeout(loadChatsFromBackend, 500);
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem(AUTH_STORAGE_KEY);

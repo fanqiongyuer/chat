@@ -327,6 +327,44 @@ export default function ChatPage({ isNew }: { isNew?: boolean }) {
     shouldStickToBottomRef.current = true;
   }, [chatId, chatMessages]);
 
+  // 从后端加载特定对话的消息
+  useEffect(() => {
+    if (!chatId || chatMessages[chatId]) {
+      return;
+    }
+
+    const loadMessagesFromBackend = async () => {
+      try {
+        const importMetaEnv = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env;
+        const API_BASE_URL = importMetaEnv?.VITE_API_BASE_URL?.replace(/\/$/, '') || 'http://localhost:8000';
+        
+        const response = await fetch(`${API_BASE_URL}/api/v1/conversations/${chatId}/messages`);
+        if (!response.ok) return;
+        
+        const messages = await response.json();
+        
+        // 将后端消息转换为本地格式
+        const loadedMessages: Message[] = messages.map((msg: any) => ({
+          role: msg.role as 'user' | 'assistant',
+          content: msg.content,
+        }));
+        
+        if (loadedMessages.length > 0) {
+          setChatMessages(prev => ({
+            ...prev,
+            [chatId]: loadedMessages,
+          }));
+        }
+      } catch (error) {
+        console.error('Failed to load messages from backend:', error);
+      }
+    };
+
+    // 延迟加载，确保页面加载完成
+    const timer = setTimeout(loadMessagesFromBackend, 300);
+    return () => clearTimeout(timer);
+  }, [chatId, chatMessages]);
+
   useEffect(() => {
     window.localStorage.setItem(CHAT_MESSAGES_STORAGE_KEY, JSON.stringify(chatMessages));
   }, [chatMessages]);
