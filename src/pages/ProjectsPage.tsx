@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { mockProjects } from '../mock/projects';
-import { Plus, Menu } from 'lucide-react';
+import { Plus, Menu, Folder } from 'lucide-react';
 import { type LayoutOutletContext } from '../components/Layout';
 
 export default function ProjectsPage() {
@@ -24,28 +24,36 @@ export default function ProjectsPage() {
           <span>创建新项目</span>
         </button>
       </header>
-      <div className="flex-1 overflow-y-auto p-8 md:p-12">
-        <div className="max-w-[1000px] mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {mockProjects.map(proj => (
-            <div key={proj.id} className="card hover:shadow-lg">
-              <h3 className="font-medium text-xl mb-2 text-primaryText">{proj.name}</h3>
-              <p className="text-secondaryText text-base mb-6 line-clamp-2 min-h-[40px] leading-relaxed">{proj.desc}</p>
-              
-              <div className="mt-auto flex items-center gap-4 text-sm text-tertiaryText mb-6">
-                <span>{proj.count} 个对话</span>
-                <span>•</span>
-                <span>{proj.members} 名成员</span>
-              </div>
-              
-              <button 
-                onClick={() => navigate(`/project/${proj.id}`)} 
-                className="w-full bg-bgLight hover:bg-blue-50 text-primaryText hover:text-blue-700 font-medium py-2.5 rounded-xl transition-colors text-base"
+      <div className="flex-1 overflow-y-auto px-4 pb-12 pt-4 md:px-8 lg:px-10 md:pb-12 md:pt-6">
+        <div className="max-w-[1240px] mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {mockProjects.map((proj) => (
+              <button
+                key={proj.id}
+                type="button"
+                onClick={() => navigate(`/project/${proj.id}`)}
+                className="rounded-xl border border-[#e9edf2] bg-white p-4 text-left transition-all hover:shadow-sm hover:border-[#dde3ea]"
               >
-                进入研究
+                <div className="mb-3 inline-flex h-5 w-5 items-center justify-center rounded-md bg-[#f3f5f8] text-[#7f8995]">
+                  <Folder size={12} />
+                </div>
+
+                <div className="mb-1 flex items-center gap-2">
+                  <h3 className="truncate text-[17px] font-medium text-primaryText">{proj.name}</h3>
+                  <span className="shrink-0 rounded px-1.5 py-0.5 text-[11px] leading-none text-[#e46d5e] bg-[#fff1ef]">
+                    团队项目
+                  </span>
+                </div>
+
+                <p className="line-clamp-2 min-h-[38px] text-sm leading-5 text-secondaryText">{proj.desc}</p>
+
+                <div className="mt-3 flex items-center gap-2 text-xs text-tertiaryText">
+                  <span>{proj.count} 个对话</span>
+                  <span>·</span>
+                  <span>{proj.members} 名成员</span>
+                </div>
               </button>
-            </div>
-          ))}
+            ))}
           </div>
         </div>
       </div>

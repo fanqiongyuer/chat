@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useLayoutEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useParams, useOutletContext, useLocation } from 'react-router-dom';
-import { Menu, Folder, ChevronDown, ChevronRight, Plus, Send, FileText, FlaskConical, Pencil, CheckCircle2, LineChart, Search, X } from 'lucide-react';
+import { Menu, Folder, ChevronDown, ChevronRight, Plus, Send, FileText, FlaskConical, Pencil, CheckCircle2, LineChart, Search, X, Paperclip } from 'lucide-react';
 import MessageItem from '../components/chat/MessageItem';
 import InputArea from '../components/chat/InputArea';
 import QuickPrompts from '../components/chat/QuickPrompts';
@@ -832,7 +832,7 @@ export default function ChatPage({ isNew }: { isNew?: boolean }) {
             </button>
           )}
           {!isNewChat && (
-            <h1 className="text-xl font-medium text-primaryText truncate">
+            <h1 className="text-[15px] md:text-[16px] font-medium text-primaryText truncate">
               {currentChat?.title ?? ''}
             </h1>
           )}
@@ -938,12 +938,17 @@ export default function ChatPage({ isNew }: { isNew?: boolean }) {
                       <Plus size={16} />
                     </button>
                   </div>
-                  <button 
-                    onClick={() => handleSend(inputVal)}
-                    className={`w-9 h-9 rounded-full flex items-center justify-center transition-all mr-1 ${inputVal.trim() && !isTyping ? 'bg-green-600 text-white shadow-md hover:bg-green-700' : 'bg-tertiaryText text-white'}`}
-                  >
-                    <Send size={16} />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button className="w-8 h-8 rounded-full border border-borderGray flex items-center justify-center text-tertiaryText hover:bg-bgLight transition-colors bg-white">
+                      <Paperclip size={16} />
+                    </button>
+                    <button 
+                      onClick={() => handleSend(inputVal)}
+                      className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${inputVal.trim() && !isTyping ? 'bg-green-600 text-white shadow-md hover:bg-green-700' : 'bg-tertiaryText text-white'}`}
+                    >
+                      <Send size={16} />
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

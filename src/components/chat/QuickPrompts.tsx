@@ -5,10 +5,10 @@ interface QuickPromptsProps {
 }
 
 const PROMPTS = [
-  "整理试验记录",
-  "查找文献",
-  "生成周报",
-  "制作幻灯片"
+  "整理实验笔记",
+  "设计实验方案",
+  "文献解读",
+  "生成项目日报"
 ] as const;
 
 const QuickPrompts = ({ onSelect }: QuickPromptsProps) => {

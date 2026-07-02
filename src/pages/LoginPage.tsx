@@ -33,6 +33,8 @@ const createParticle = (width: number, height: number): Particle => {
 
 const baseConnectionColor = '80, 180, 120';
 
+type ForgotStep = 'email' | 'success';
+
 export default function LoginPage() {
   const navigate = useNavigate();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -42,6 +44,16 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showToast, setShowToast] = useState(false);
+  
+  // 忘记密码流程
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotStep, setForgotStep] = useState<ForgotStep>('email');
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotCode, setForgotCode] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [countdown, setCountdown] = useState(0);
+  const [forgotCodeSent, setForgotCodeSent] = useState(false);
 
   const canSubmit = useMemo(() => email.trim().length > 0 && password.trim().length > 0 && !isSubmitting, [
     email,
@@ -49,6 +61,14 @@ export default function LoginPage() {
     password,
   ]);
 
+  // 验证码倒计时
+  useEffect(() => {
+    if (countdown <= 0) return;
+    const timer = window.setTimeout(() => setCountdown((c) => c - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [countdown]);
+
+  // 粒子动画
   useEffect(() => {
     const canvas = canvasRef.current;
     const container = containerRef.current;
@@ -219,6 +239,44 @@ export default function LoginPage() {
     }, 900);
   };
 
+  // 忘记密码：发送验证码
+  const handleSendForgotCode = async () => {
+    if (!forgotEmail.trim() || countdown > 0) return;
+    setIsSubmitting(true);
+    await new Promise((r) => window.setTimeout(r, 1000));
+    setIsSubmitting(false);
+    setForgotCodeSent(true);
+    setCountdown(60);
+  };
+
+  // 忘记密码：提交
+  const handleForgotNext = async () => {
+    if (forgotStep === 'email') {
+      if (
+        !forgotEmail.trim() ||
+        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(forgotEmail) ||
+        !forgotCode.trim() ||
+        forgotCode.length < 6 ||
+        !newPassword.trim() ||
+        newPassword.length < 6 ||
+        newPassword !== confirmPassword
+      ) return;
+      setForgotStep('success');
+    }
+  };
+
+  // 忘记密码：返回登录
+  const handleBackToLogin = () => {
+    setShowForgotPassword(false);
+    setForgotStep('email');
+    setForgotEmail('');
+    setForgotCode('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setCountdown(0);
+    setForgotCodeSent(false);
+  };
+
   return (
     <div ref={containerRef} className="relative h-screen w-full overflow-hidden bg-[#f8fdf9] text-[#202124]">
       <div className="absolute inset-0 z-0">
@@ -231,14 +289,6 @@ export default function LoginPage() {
       <div className="relative z-10 mx-auto flex h-full w-full max-w-md items-center justify-center px-4">
         <div className="w-full rounded-3xl border border-white/90 bg-white/70 p-10 shadow-[0_20px_40px_rgba(0,0,0,0.05),0_1px_3px_rgba(0,0,0,0.02)] backdrop-blur-[20px]">
           <div className="mb-10 text-center">
-            <div className="mb-2 flex items-center justify-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-[#34a853]">
-              <span>Nexus 科研模型</span>
-              <span className="inline-flex items-center gap-1">
-                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#34a853]" />
-                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#1e8e3e] [animation-delay:0.2s]" />
-                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#0d652d] [animation-delay:0.4s]" />
-              </span>
-            </div>
             <h1 className="bg-[linear-gradient(135deg,#202124_0%,#5f6368_100%)] bg-clip-text text-4xl font-semibold tracking-[-0.02em] text-transparent">
               DepTrace
             </h1>
@@ -297,7 +347,7 @@ export default function LoginPage() {
                 </span>
                 <span className="text-sm text-gray-600 transition-colors group-hover:text-gray-900">记住我</span>
               </label>
-              <button type="button" className="text-sm font-medium text-[#5f6368] transition-colors hover:text-[#34a853]">
+              <button type="button" onClick={() => navigate('/forgot-password')} className="text-sm font-medium text-[#5f6368] transition-colors hover:text-[#34a853]">
                  忘记密码？
 
               </button>
@@ -327,14 +377,146 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="my-8 h-px bg-[linear-gradient(90deg,rgba(0,0,0,0)_0%,rgba(0,0,0,0.08)_50%,rgba(0,0,0,0)_100%)]" />
+          {!showForgotPassword && (
+            <p className="mt-6 text-center text-sm text-gray-500">
+              首次使用平台？
+              <button type="button" onClick={() => navigate('/register')} className="ml-1 font-medium text-green-500 transition-colors hover:text-green-600">
+                去注册
+              </button>
+            </p>
+          )}
 
-          <p className="text-center text-sm text-gray-500">
-            首次使用平台？
-            <button type="button" className="ml-1 font-medium text-green-500 transition-colors hover:text-green-600">
-              申请访问权限
-            </button>
-          </p>
+          {/* 忘记密码流程 */}
+          {showForgotPassword && (
+            <div className="space-y-6">
+              <div className="mb-6">
+                <button
+                  type="button"
+                  onClick={handleBackToLogin}
+                  className="text-sm font-medium text-[#5f6368] transition-colors hover:text-[#34a853]"
+                >
+                  ← 返回登录
+                </button>
+              </div>
+
+              {forgotStep === 'email' && (
+                <div className="space-y-5">
+                  <div className="mb-6">
+                    <h2 className="text-lg font-semibold text-[#202124]">重置密码</h2>
+                    <p className="mt-1 text-sm text-gray-500">输入邮箱并验证后，重新设置密码</p>
+                  </div>
+
+                  <label className="relative block">
+                    <input
+                      type="email"
+                      value={forgotEmail}
+                      onChange={(e) => setForgotEmail(e.target.value)}
+                      placeholder=" "
+                      autoComplete="off"
+                      className="peer h-14 w-full rounded-xl border border-black/10 bg-white px-5 py-4 text-base leading-none text-[#202124] shadow-[inset_0_1px_2px_rgba(0,0,0,0.02)] outline-none transition-all focus:border-[#34a853] focus:ring-4 focus:ring-[#34a853]/10"
+                    />
+                    <span className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-base text-[#80868b] transition-all peer-focus:left-4 peer-focus:top-0 peer-focus:-translate-y-1/2 peer-focus:rounded peer-focus:bg-white peer-focus:px-1.5 peer-focus:text-xs peer-focus:font-medium peer-focus:text-[#34a853] peer-[&:not(:placeholder-shown)]:left-4 peer-[&:not(:placeholder-shown)]:top-0 peer-[&:not(:placeholder-shown)]:-translate-y-1/2 peer-[&:not(:placeholder-shown)]:rounded peer-[&:not(:placeholder-shown)]:bg-white peer-[&:not(:placeholder-shown)]:px-1.5 peer-[&:not(:placeholder-shown)]:text-xs peer-[&:not(:placeholder-shown)]:font-medium peer-[&:not(:placeholder-shown)]:text-[#34a853]">
+                      邮箱
+                    </span>
+                  </label>
+
+                  <div className="flex gap-3">
+                    <label className="relative block flex-1">
+                      <input
+                        type="text"
+                        value={forgotCode}
+                        onChange={(e) => setForgotCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        placeholder=" "
+                        autoComplete="off"
+                        maxLength={6}
+                        className="peer h-14 w-full rounded-xl border border-black/10 bg-white px-5 py-4 text-base leading-none text-[#202124] shadow-[inset_0_1px_2px_rgba(0,0,0,0.02)] outline-none transition-all focus:border-[#34a853] focus:ring-4 focus:ring-[#34a853]/10"
+                      />
+                      <span className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-base text-[#80868b] transition-all peer-focus:left-4 peer-focus:top-0 peer-focus:-translate-y-1/2 peer-focus:rounded peer-focus:bg-white peer-focus:px-1.5 peer-focus:text-xs peer-focus:font-medium peer-focus:text-[#34a853] peer-[&:not(:placeholder-shown)]:left-4 peer-[&:not(:placeholder-shown)]:top-0 peer-[&:not(:placeholder-shown)]:-translate-y-1/2 peer-[&:not(:placeholder-shown)]:rounded peer-[&:not(:placeholder-shown)]:bg-white peer-[&:not(:placeholder-shown)]:px-1.5 peer-[&:not(:placeholder-shown)]:text-xs peer-[&:not(:placeholder-shown)]:font-medium peer-[&:not(:placeholder-shown)]:text-[#34a853]">
+                        验证码
+                      </span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleSendForgotCode}
+                      disabled={countdown > 0 || isSubmitting || !forgotEmail.trim()}
+                      className={`h-14 whitespace-nowrap rounded-xl px-4 py-2 text-sm font-medium transition-all ${
+                        countdown > 0
+                          ? 'border border-black/10 bg-white text-gray-400 cursor-not-allowed'
+                          : 'border border-black/10 bg-white text-gray-600'
+                      }`}
+                    >
+                      {countdown > 0 ? `${countdown}s后获取` : '获取验证码'}
+                    </button>
+                  </div>
+
+                  <label className="relative block">
+                    <input
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder=" "
+                      className="peer h-14 w-full rounded-xl border border-black/10 bg-white px-5 py-4 text-base leading-none text-[#202124] shadow-[inset_0_1px_2px_rgba(0,0,0,0.02)] outline-none transition-all focus:border-[#34a853] focus:ring-4 focus:ring-[#34a853]/10"
+                    />
+                    <span className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-base text-[#80868b] transition-all peer-focus:left-4 peer-focus:top-0 peer-focus:-translate-y-1/2 peer-focus:rounded peer-focus:bg-white peer-focus:px-1.5 peer-focus:text-xs peer-focus:font-medium peer-focus:text-[#34a853] peer-[&:not(:placeholder-shown)]:left-4 peer-[&:not(:placeholder-shown)]:top-0 peer-[&:not(:placeholder-shown)]:-translate-y-1/2 peer-[&:not(:placeholder-shown)]:rounded peer-[&:not(:placeholder-shown)]:bg-white peer-[&:not(:placeholder-shown)]:px-1.5 peer-[&:not(:placeholder-shown)]:text-xs peer-[&:not(:placeholder-shown)]:font-medium peer-[&:not(:placeholder-shown)]:text-[#34a853]">
+                      新密码
+                    </span>
+                  </label>
+
+                  <label className="relative block">
+                    <input
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder=" "
+                      className={`peer h-14 w-full rounded-xl border border-black/10 bg-white px-5 py-4 text-base leading-none text-[#202124] shadow-[inset_0_1px_2px_rgba(0,0,0,0.02)] outline-none transition-all focus:border-[#34a853] focus:ring-4 focus:ring-[#34a853]/10 ${
+                        confirmPassword.length > 0 && newPassword !== confirmPassword
+                          ? 'border-red-400 focus:border-red-400 focus:ring-red-400/10'
+                          : ''
+                      }`}
+                    />
+                    <span className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-base text-[#80868b] transition-all peer-focus:left-4 peer-focus:top-0 peer-focus:-translate-y-1/2 peer-focus:rounded peer-focus:bg-white peer-focus:px-1.5 peer-focus:text-xs peer-focus:font-medium peer-focus:text-[#34a853] peer-[&:not(:placeholder-shown)]:left-4 peer-[&:not(:placeholder-shown)]:top-0 peer-[&:not(:placeholder-shown)]:-translate-y-1/2 peer-[&:not(:placeholder-shown)]:rounded peer-[&:not(:placeholder-shown)]:bg-white peer-[&:not(:placeholder-shown)]:px-1.5 peer-[&:not(:placeholder-shown)]:text-xs peer-[&:not(:placeholder-shown)]:font-medium peer-[&:not(:placeholder-shown)]:text-[#34a853]">
+                      确认密码
+                    </span>
+                  </label>
+                  {confirmPassword.length > 0 && newPassword !== confirmPassword && (
+                    <span className="block text-xs text-red-500">两次输入的密码不一致</span>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={handleForgotNext}
+                    disabled={!forgotEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(forgotEmail) || !forgotCode.trim() || forgotCode.length < 6 || !newPassword.trim() || newPassword.length < 6 || newPassword !== confirmPassword}
+                    className="mt-2 inline-flex h-14 w-full items-center justify-center rounded-xl bg-[linear-gradient(135deg,#34a853_0%,#2b8c45_100%)] text-base font-semibold text-white shadow-[0_4px_14px_rgba(52,168,83,0.3)] transition-all hover:-translate-y-0.5 hover:shadow-[0_6px_20px_rgba(52,168,83,0.4)] disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:translate-y-0"
+                  >
+                    重置密码
+                  </button>
+                </div>
+              )}
+
+              {forgotStep === 'success' && (
+                <div className="flex flex-col items-center justify-center space-y-6">
+                  <div className="relative">
+                    <div className="absolute inset-0 animate-pulse rounded-full bg-green-100/50" />
+                    <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-green-50">
+                      <CheckCircle2 size={40} className="text-[#34a853]" />
+                    </div>
+                  </div>
+                  <div className="text-center">
+                    <h3 className="text-2xl font-bold text-[#202124]">密码重置成功</h3>
+                    <p className="mt-2 text-sm text-gray-500">请使用新密码登录</p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleBackToLogin}
+                    className="mt-4 inline-flex h-14 w-full items-center justify-center rounded-xl bg-[linear-gradient(135deg,#34a853_0%,#2b8c45_100%)] text-base font-semibold text-white shadow-[0_4px_14px_rgba(52,168,83,0.3)] transition-all hover:-translate-y-0.5 hover:shadow-[0_6px_20px_rgba(52,168,83,0.4)]"
+                  >
+                    返回登录
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

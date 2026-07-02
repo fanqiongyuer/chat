@@ -27,6 +27,29 @@ body {
   background: #a8aaaa;
 }
 
+.task-table-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #d4dae2 transparent;
+}
+
+.task-table-scroll::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.task-table-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.task-table-scroll::-webkit-scrollbar-thumb {
+  background: #d4dae2;
+  border-radius: 999px;
+}
+
+.task-table-scroll::-webkit-scrollbar-thumb:hover {
+  background: #c6ced8;
+}
+
 @layer components {
   /* 按钮组件 */
   .btn-primary {

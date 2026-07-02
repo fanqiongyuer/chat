@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { Plus, Send } from 'lucide-react';
+import { Plus, Send, Paperclip } from 'lucide-react';
 
 interface InputAreaProps {
   onSend: (val: string) => void;
@@ -35,13 +35,18 @@ const InputArea = ({ onSend, disabled }: InputAreaProps) => {
           <button className="w-8 h-8 rounded-full border border-borderGray flex items-center justify-center text-tertiaryText hover:bg-bgLight transition-colors bg-white">
             <Plus size={16} />
           </button>
-          <button
-            onClick={handleSend}
-            disabled={disabled || !val.trim()}
-            className={`w-9 h-9 rounded-full flex items-center justify-center transition-all mr-1 ${val.trim() && !disabled ? 'bg-green-600 text-white shadow-md hover:bg-green-700' : 'bg-tertiaryText text-white'}`}
-          >
-            <Send size={16} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button className="w-8 h-8 rounded-full border border-borderGray flex items-center justify-center text-tertiaryText hover:bg-bgLight transition-colors bg-white">
+              <Paperclip size={16} />
+            </button>
+            <button
+              onClick={handleSend}
+              disabled={disabled || !val.trim()}
+              className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${val.trim() && !disabled ? 'bg-green-600 text-white shadow-md hover:bg-green-700' : 'bg-tertiaryText text-white'}`}
+            >
+              <Send size={16} />
+            </button>
+          </div>
         </div>
       </div>
     </div>

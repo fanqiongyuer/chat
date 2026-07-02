@@ -4,6 +4,7 @@ export interface MockChat {
   date: string;
   count: number;
   projectId?: string;
+  isPinned?: boolean;
 }
 
 export const mockChats: MockChat[] = [
