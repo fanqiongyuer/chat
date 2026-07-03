@@ -28,7 +28,7 @@
 }
 
 .input-medium {
-  height: 44px;
+  height: 36px;
 }
 
 .input-large {
@@ -81,8 +81,8 @@
   border: none;
   outline: none;
   background: transparent;
-  font-size: 16px;
-  line-height: 24px;
+  font-size: 14px;
+  line-height: 20px;
   color: var(--color-text-primary);
   padding: 0;
   min-width: 0;

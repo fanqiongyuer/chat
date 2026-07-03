@@ -1,8 +1,8 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { Segmented } from 'antd';
-import { ChevronDown, Menu, X } from 'lucide-react';
+import { Menu } from 'lucide-react';
 import { type LayoutOutletContext } from '../components/Layout';
+import { BaseModal, BaseSelect, BaseSegmented, BaseTable, type BaseTableColumn } from '@/components';
 import { mockProjects } from '../mock/projects';
 
 type ViewTab = 'analysis' | 'users';
@@ -17,11 +17,35 @@ type MemberProfile = {
   weight: number;
 };
 
+type ProjectUsageRow = {
+  id: string;
+  name: string;
+  members: string;
+  usage: number;
+  ratio: string;
+};
+
+type MemberUsageRow = MemberProfile & {
+  usage: number;
+  ratio: string;
+};
+
 const memberProfiles: MemberProfile[] = [
   { id: 'mira', name: 'Mira', role: '管理员', weight: 1.25 },
   { id: 'maodan', name: '毛单', role: '成员', weight: 1.0 },
   { id: 'solit', name: 'Solit', role: '成员', weight: 0.92 },
   { id: 'zqj', name: '张庆杰', role: '成员', weight: 0.78 },
+];
+
+const memberSelectOptions = [
+  { label: '全部成员', value: 'all' },
+  ...memberProfiles.map((member) => ({ label: member.name, value: member.id })),
+];
+
+const slotSelectOptions = [
+  { label: '全部角色', value: 'all' },
+  { label: '工作时段', value: 'work' },
+  { label: '非工作时段', value: 'off' },
 ];
 
 const rangeLabelMap: Record<TimeRange, string> = {
@@ -153,6 +177,8 @@ function UsageTrendChart({
     y: number;
     offsetX: number;
     offsetY: number;
+    chartWidth: number;
+    chartHeight: number;
     value: number;
   } | null>(null);
 
@@ -195,6 +221,8 @@ function UsageTrendChart({
       y,
       offsetX: event.clientX - rect.left,
       offsetY: (y / viewHeight) * rect.height,
+      chartWidth: rect.width,
+      chartHeight: rect.height,
       value: Math.max(0, Math.round(interpolatedValue)),
     });
   };
@@ -202,6 +230,34 @@ function UsageTrendChart({
   const handleMouseLeave = () => {
     setHoverData(null);
   };
+
+  const tooltipStyle = useMemo(() => {
+    if (!hoverData) return undefined;
+
+    const tooltipWidth = 136;
+    const tooltipHeight = 56;
+    const edgePadding = 8;
+    const offset = 12;
+
+    let left = hoverData.offsetX + offset;
+    const maxLeft = Math.max(edgePadding, hoverData.chartWidth - tooltipWidth - edgePadding);
+
+    if (left > maxLeft) {
+      left = hoverData.offsetX - tooltipWidth - offset;
+    }
+
+    left = Math.max(edgePadding, Math.min(left, maxLeft));
+
+    let top = hoverData.offsetY - tooltipHeight - offset;
+    if (top < edgePadding) {
+      top = hoverData.offsetY + offset;
+    }
+
+    const maxTop = Math.max(edgePadding, hoverData.chartHeight - tooltipHeight - edgePadding);
+    top = Math.max(edgePadding, Math.min(top, maxTop));
+
+    return { left: `${left}px`, top: `${top}px` };
+  }, [hoverData]);
 
   return (
     <>
@@ -217,11 +273,11 @@ function UsageTrendChart({
             x2="1000"
             y1={guideLineY.toFixed(2)}
             y2={guideLineY.toFixed(2)}
-            stroke="#d8e0e8"
+            stroke="var(--color-line-subtle)"
             strokeDasharray="4 4"
             strokeWidth="1"
           />
-          <path d={trendPath} fill="none" stroke="#15b886" strokeWidth="3" strokeLinecap="round" />
+          <path d={trendPath} fill="none" stroke="var(--color-primary)" strokeWidth="3" strokeLinecap="round" />
           {hoverData && (
             <>
               <line
@@ -229,35 +285,31 @@ function UsageTrendChart({
                 y1="0"
                 x2={hoverData.x.toFixed(2)}
                 y2={viewHeight - viewPadding}
-                stroke="#15b886"
+                stroke="var(--color-primary)"
                 strokeDasharray="4 4"
                 strokeWidth="1"
               />
-              <circle cx={hoverData.x.toFixed(2)} cy={hoverData.y.toFixed(2)} r="6" fill="#15b886" fillOpacity="0.24" />
-              <circle cx={hoverData.x.toFixed(2)} cy={hoverData.y.toFixed(2)} r="3" fill="#15b886" />
+              <circle cx={hoverData.x.toFixed(2)} cy={hoverData.y.toFixed(2)} r="6" fill="var(--color-primary)" fillOpacity="0.24" />
+              <circle cx={hoverData.x.toFixed(2)} cy={hoverData.y.toFixed(2)} r="3" fill="var(--color-primary)" />
             </>
           )}
         </svg>
 
         {hoverData && (
           <div
-            className="pointer-events-none absolute z-20 rounded-lg bg-[#111111] px-2.5 py-2 text-base text-white shadow-md"
-            style={{
-              left: `${hoverData.offsetX + 12}px`,
-              top: `${hoverData.offsetY - 44}px`,
-              transform: 'translateY(-50%)',
-            }}
+            className="pointer-events-none absolute z-30 rounded-lg bg-gray-7 px-2.5 py-2 text-sm text-white shadow-md"
+            style={tooltipStyle}
           >
-            <div className="text-base text-[#999999]">当前时刻消耗</div>
-            <div className="font-semibold text-[#34D399]">
+            <div className="text-sm text-tertiaryText">当前时刻消耗</div>
+              <div className="font-semibold text-[var(--color-primary)]">
               {formatNumber(hoverData.value)}
-              <span className="ml-1 text-base font-normal text-white">Tokens</span>
+              <span className="ml-1 text-sm font-normal text-white">Tokens</span>
             </div>
           </div>
         )}
       </div>
 
-      <div className="-mt-1 flex items-center justify-between text-base text-tertiaryText">
+      <div className="-mt-1 flex items-center justify-between text-sm text-tertiaryText">
         <span>{leftLabel}</span>
         <span>{rightLabel}</span>
       </div>
@@ -309,7 +361,7 @@ export default function AiUsagePage() {
     return sourcePattern.map((point) => point * memberFactor * slotFactor[selectedSlot]);
   }, [memberWeightSum, selectedRange, selectedSlot, totalWeight]);
 
-  const projectRows = useMemo(() => {
+  const projectRows = useMemo<ProjectUsageRow[]>(() => {
     const totalProjectChats = mockProjects.reduce((sum, project) => sum + project.count, 0) || 1;
 
     return mockProjects.map((project) => {
@@ -324,7 +376,7 @@ export default function AiUsagePage() {
     });
   }, [currentTotal]);
 
-  const memberRows = useMemo(() => {
+  const memberRows = useMemo<MemberUsageRow[]>(() => {
     const rows = currentMembers.map((member) => {
       const usage = rangeBaseTotal[selectedRange] * (member.weight / totalWeight) * slotFactor[selectedSlot];
       return { ...member, usage };
@@ -364,6 +416,94 @@ export default function AiUsagePage() {
 
   const trendRangeLabel = selectedRange === 'yesterday' ? '00:00' : selectedRange === 'week' ? '7天前' : '30天前';
 
+  const projectTableColumns = useMemo<BaseTableColumn<ProjectUsageRow>[]>(
+    () => [
+      {
+        title: '项目',
+        dataIndex: 'name',
+        width: '34%',
+        render: (value: string) => <span className="block truncate">{value}</span>,
+      },
+      {
+        title: '成员数',
+        dataIndex: 'members',
+        width: '22%',
+        render: (value: string) => <span className="text-secondaryText">{value}</span>,
+      },
+      {
+        title: '消耗量',
+        dataIndex: 'usage',
+        width: '24%',
+        render: (value: number) => formatNumber(value),
+      },
+      {
+        title: '占比',
+        dataIndex: 'ratio',
+        width: '20%',
+      },
+    ],
+    [],
+  );
+
+  const memberTableColumns = useMemo<BaseTableColumn<MemberUsageRow>[]>(
+    () => [
+      {
+        title: '成员',
+        dataIndex: 'name',
+        width: '34%',
+        render: (value: string) => <span className="block truncate">{value}</span>,
+      },
+      {
+        title: '角色',
+        dataIndex: 'role',
+        width: '22%',
+        render: (value: MemberProfile['role']) => <span className="text-secondaryText">{value}</span>,
+      },
+      {
+        title: '消耗量',
+        dataIndex: 'usage',
+        width: '24%',
+        render: (value: number) => formatNumber(value),
+      },
+      {
+        title: '占比',
+        dataIndex: 'ratio',
+        width: '20%',
+      },
+    ],
+    [],
+  );
+
+  const detailTableColumns = useMemo<BaseTableColumn<MemberUsageRow>[]>(
+    () => [
+      {
+        title: '成员',
+        dataIndex: 'name',
+        width: '25%',
+      },
+      {
+        title: '角色',
+        dataIndex: 'role',
+        width: '20%',
+        render: (value: MemberProfile['role']) => <span className="text-secondaryText">{value}</span>,
+      },
+      {
+        title: '当前周期消耗',
+        dataIndex: 'usage',
+        width: '30%',
+        render: (value: number) => formatNumber(value),
+      },
+      {
+        title: '建议日上限',
+        dataIndex: 'usage',
+        key: 'dailyLimit',
+        width: '25%',
+        render: (value: number) => <span className="text-secondaryText">{formatNumber(value / 7)}</span>,
+      },
+    ],
+    [],
+  );
+
   return (
     <div className="flex h-full w-full flex-col bg-white">
       <header className="h-16 shrink-0 flex items-center px-6 bg-white/80 backdrop-blur-sm z-10">
@@ -385,24 +525,24 @@ export default function AiUsagePage() {
         <div className="max-w-[1240px] mx-auto space-y-5">
           <section className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
             {overviewCards.map((card) => (
-              <div key={card.title} className="rounded-xl border border-[#edf1f5] bg-white px-4 py-3.5">
-                <div className="text-base text-tertiaryText">{card.title}</div>
-                <div className="mt-[12px] text-[24px] leading-none font-semibold text-primaryText tracking-[-0.01em]">{card.value}</div>
-                <div className="mt-2 min-h-[18px] text-base text-tertiaryText">{card.helper}</div>
+              <div key={card.title} className="rounded-xl px-4 py-4" style={{ backgroundColor: 'rgba(242, 243, 245, 0.4)' }}>
+                <div className="text-sm text-tertiaryText">{card.title}</div>
+                <div className="mt-3 text-2xl leading-none font-semibold text-primaryText">{card.value}</div>
+                <div className="mt-2 min-h-5 text-sm text-tertiaryText">{card.helper}</div>
               </div>
             ))}
           </section>
 
           <section className="rounded-xl bg-white">
-            <div className="flex items-center justify-between border-b border-[#eef2f6] pl-0 pr-4 pt-3">
+            <div className="flex items-center justify-between border-b border-line-subtle pl-0 pr-0 pt-3">
               <div className="flex items-center gap-5">
                 <button
                   type="button"
                   onClick={() => setActiveTab('analysis')}
-                  className={`pb-2.5 text-base ${
+                  className={`pb-2.5 text-sm ${
                     activeTab === 'analysis'
-                      ? 'border-b-2 border-[#1cc08b] font-medium text-primaryText'
-                      : 'text-[#96a0aa]'
+                      ? 'border-b-2 border-[var(--color-primary)] font-medium text-primaryText'
+                      : 'text-tertiaryText'
                   }`}
                 >
                   消耗分析
@@ -410,8 +550,8 @@ export default function AiUsagePage() {
                 <button
                   type="button"
                   onClick={() => setActiveTab('users')}
-                  className={`pb-2.5 text-base ${
-                    activeTab === 'users' ? 'border-b-2 border-[#1cc08b] font-medium text-primaryText' : 'text-[#96a0aa]'
+                  className={`pb-2.5 text-sm ${
+                    activeTab === 'users' ? 'border-b-2 border-[var(--color-primary)] font-medium text-primaryText' : 'text-tertiaryText'
                   }`}
                 >
                   帐户明细
@@ -420,48 +560,33 @@ export default function AiUsagePage() {
               <button
                 type="button"
                 onClick={() => setShowRechargeModal(true)}
-                className="pb-2.5 text-base text-[#1cc08b] hover:text-[#15a076] transition-colors font-medium"
+                className="pb-2 text-sm text-[var(--color-primary)] hover:text-[var(--color-primary-hover)] transition-colors font-medium"
               >
                 充值记录
               </button>
             </div>
 
-            <div className="pl-0 pr-4 py-5">
-              <div className="flex flex-wrap items-center gap-2 text-base text-secondaryText">
-                <label className="relative inline-flex items-center">
-                  <select
-                    value={selectedMember}
-                    onChange={(event) => setSelectedMember(event.target.value)}
-                    className="appearance-none rounded-md border border-[borderGray] bg-white py-1.5 pl-2.5 pr-6 text-base text-secondaryText outline-none hover:bg-bgLight"
-                  >
-                    <option value="all">全部成员</option>
-                    {memberProfiles.map((member) => (
-                      <option key={member.id} value={member.id}>
-                        {member.name}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown size={12} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-tertiaryText" />
-                </label>
+            <div className="pl-0 pr-0 py-5">
+              <div className="flex flex-wrap items-center gap-2 text-sm text-secondaryText">
+                <BaseSelect
+                  options={memberSelectOptions}
+                  value={selectedMember}
+                  onChange={(value) => setSelectedMember(String(value))}
+                  size="medium"
+                />
 
-                <label className="relative inline-flex items-center">
-                  <select
-                    value={selectedSlot}
-                    onChange={(event) => setSelectedSlot(event.target.value as TimeSlot)}
-                    className="appearance-none rounded-md border border-[borderGray] bg-white py-1.5 pl-2.5 pr-6 text-base text-secondaryText outline-none hover:bg-bgLight"
-                  >
-                    <option value="all">全部角色</option>
-                    <option value="work">工作时段</option>
-                    <option value="off">非工作时段</option>
-                  </select>
-                  <ChevronDown size={12} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-tertiaryText" />
-                </label>
+                <BaseSelect
+                  options={slotSelectOptions}
+                  value={selectedSlot}
+                  onChange={(value) => setSelectedSlot(value as TimeSlot)}
+                  size="medium"
+                />
 
-                <Segmented
+                <BaseSegmented
                   options={rangeOptions}
                   value={selectedRange}
                   onChange={(value) => setSelectedRange(value as TimeRange)}
-                  className="!rounded-lg"
+                  size="middle"
                 />
 
                 <span className="ml-1 text-tertiaryText">{rangeDateText}</span>
@@ -470,11 +595,14 @@ export default function AiUsagePage() {
 
             {activeTab === 'analysis' ? (
               <>
-                <div className="pl-0 pr-4 py-4">
+                <div className="pl-0 pr-0 py-4">
                   <div className="text-base font-medium text-primaryText">消耗趋势</div>
-                  <div className="mt-2 rounded-lg bg-[#fcfdfd] px-4 py-3.5">
-                    <div className="text-base text-tertiaryText">总消耗</div>
-                    <div className="mt-[12px] text-[24px] leading-none font-semibold text-primaryText">{formatNumber(currentTotal)}</div>
+                  <div
+                    className="mt-2 rounded-xl px-4 py-4"
+                    style={{ backgroundColor: 'rgba(242, 243, 245, 0.4)' }}
+                  >
+                    <div className="text-sm text-tertiaryText">总消耗</div>
+                    <div className="mt-3 text-2xl leading-none font-semibold text-primaryText">{formatNumber(currentTotal)}</div>
 
                     <UsageTrendChart
                       points={trendPoints}
@@ -484,89 +612,44 @@ export default function AiUsagePage() {
                   </div>
                 </div>
 
-                <div className="pl-0 pr-4 py-3.5">
+                <div className="pl-0 pr-0 py-3.5">
                   <div className="mb-3 flex items-center gap-6">
                     <h3 className="text-base font-medium text-primaryText">消耗占比</h3>
-                    <Segmented
+                    <BaseSegmented
                       options={ratioOptions}
                       value={ratioView}
                       onChange={(value) => setRatioView(value as RatioView)}
-                      size="middle"
-                      className="!rounded-lg"
                     />
                   </div>
 
-                  <div className="task-table-scroll overflow-x-auto border-b border-[borderGray] bg-white">
-                    <div className="min-w-[760px]">
-                      <div className="grid grid-cols-[1.35fr_0.9fr_1fr_0.7fr] border-b border-[#edf1f5] pl-0 pr-0 py-2 text-base text-[#8a94a0]">
-                        {ratioView === 'project' ? (
-                          <>
-                            <span>项目</span>
-                            <span>成员数</span>
-                            <span>消耗量</span>
-                            <span>占比</span>
-                          </>
-                        ) : (
-                          <>
-                            <span>成员</span>
-                            <span>角色</span>
-                            <span>消耗量</span>
-                            <span>占比</span>
-                          </>
-                        )}
-                      </div>
-
-                      {ratioView === 'project'
-                        ? projectRows.map((row) => (
-                            <div
-                              key={row.id}
-                              className="grid grid-cols-[1.35fr_0.9fr_1fr_0.7fr] items-center gap-2 border-b border-[#f1f4f7] pl-0 pr-0 py-2.5 text-base last:border-b-0"
-                            >
-                              <span className="truncate text-primaryText">{row.name}</span>
-                              <span className="text-secondaryText">{row.members}</span>
-                              <span className="text-primaryText">{formatNumber(row.usage)}</span>
-                              <span className="text-primaryText">{row.ratio}</span>
-                            </div>
-                          ))
-                        : memberRows.map((row) => (
-                            <div
-                              key={row.id}
-                              className="grid grid-cols-[1.35fr_0.9fr_1fr_0.7fr] items-center gap-2 border-b border-[#f1f4f7] pl-0 pr-0 py-2.5 text-base last:border-b-0"
-                            >
-                              <span className="truncate text-primaryText">{row.name}</span>
-                              <span className="text-secondaryText">{row.role}</span>
-                              <span className="text-primaryText">{formatNumber(row.usage)}</span>
-                              <span className="text-primaryText">{row.ratio}</span>
-                            </div>
-                          ))}
-                    </div>
+                  <div className="border-b border-borderGray bg-white">
+                    {ratioView === 'project' ? (
+                      <BaseTable
+                        className="task-table-scroll min-w-[760px]"
+                        columns={projectTableColumns}
+                        dataSource={projectRows}
+                        rowKey="id"
+                      />
+                    ) : (
+                      <BaseTable
+                        className="task-table-scroll min-w-[760px]"
+                        columns={memberTableColumns}
+                        dataSource={memberRows}
+                        rowKey="id"
+                      />
+                    )}
                   </div>
                 </div>
               </>
             ) : (
-              <div className="pl-0 pr-4 py-5">
-                <div className="mb-3 text-base font-medium text-primaryText">ToKen流水</div>
-                <div className="task-table-scroll overflow-x-auto border-b border-[borderGray] bg-white">
-                  <div className="min-w-[760px]">
-                    <div className="grid grid-cols-[1fr_0.8fr_1.2fr_1fr] border-b border-[#edf1f5] pl-0 pr-0 py-2 text-base text-[#8a94a0]">
-                      <span>成员</span>
-                      <span>角色</span>
-                      <span>当前周期消耗</span>
-                      <span>建议日上限</span>
-                    </div>
-
-                    {memberRows.map((row) => (
-                      <div
-                        key={row.id}
-                        className="grid grid-cols-[1fr_0.8fr_1.2fr_1fr] items-center gap-2 border-b border-[#f1f4f7] pl-0 pr-0 py-2.5 text-base last:border-b-0"
-                      >
-                        <span className="text-primaryText">{row.name}</span>
-                        <span className="text-secondaryText">{row.role}</span>
-                        <span className="text-primaryText">{formatNumber(row.usage)}</span>
-                        <span className="text-secondaryText">{formatNumber(row.usage / 7)}</span>
-                      </div>
-                    ))}
-                  </div>
+              <div className="pl-0 pr-0 -mt-2 pb-5">
+                <div className="border-b border-borderGray bg-white">
+                  <BaseTable
+                    className="task-table-scroll min-w-[760px]"
+                    columns={detailTableColumns}
+                    dataSource={memberRows}
+                    rowKey="id"
+                  />
                 </div>
               </div>
             )}
@@ -579,65 +662,39 @@ export default function AiUsagePage() {
         <>
           <div className="fixed inset-0 z-40 bg-black/20" onClick={() => setShowRechargeModal(false)} />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div
-              className="w-full max-w-[600px] rounded-lg bg-white shadow-popover"
-              onClick={(event) => event.stopPropagation()}
+            <BaseModal
+              visible={showRechargeModal}
+              title="充值记录"
+              okText="充值"
+              cancelText="关闭"
+              onConfirm={() => setShowRechargeModal(false)}
+              onCancel={() => setShowRechargeModal(false)}
+              width={600}
+              maskClosable
             >
-              <div className="flex items-center justify-between border-b border-[borderGray] px-6 py-3.5">
-                <div>
-                  <h3 className="text-[17px] font-semibold text-primaryText">充值记录</h3>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowRechargeModal(false)}
-                  className="rounded-full p-2 text-secondaryText transition-colors hover:bg-bgLight hover:text-primaryText"
-                  aria-label="关闭弹窗"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              <div className="px-6 py-4 max-h-[calc(100vh-200px)] overflow-y-auto">
-                <div className="space-y-3">
-                  {[
-                    { date: '2024.01.15', amount: '￥100', tokens: '+10,000 Tokens', status: '已到账' },
-                    { date: '2024.01.10', amount: '￥50', tokens: '+5,000 Tokens', status: '已到账' },
-                    { date: '2024.01.05', amount: '￥200', tokens: '+20,000 Tokens', status: '已到账' },
-                    { date: '2024.12.28', amount: '￥150', tokens: '+15,000 Tokens', status: '已到账' },
-                  ].map((record, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center justify-between p-3.5 rounded-lg border border-[#f1f4f7] hover:border-[borderGray] transition-colors"
-                    >
-                      <div className="flex-1">
-                        <div className="text-base font-medium text-primaryText">{record.amount}</div>
-                        <div className="text-sm text-tertiaryText mt-1">{record.date}</div>
-                      </div>
-                      <div className="flex-1 text-right">
-                        <div className="text-base text-primaryText">{record.tokens}</div>
-                        <div className="text-sm text-green-600 mt-1">{record.status}</div>
-                      </div>
+              <div className="max-h-[calc(100vh-200px)] overflow-y-auto space-y-3">
+                {[
+                  { date: '2024.01.15', amount: '￥100', tokens: '+10,000 Tokens', status: '已到账' },
+                  { date: '2024.01.10', amount: '￥50', tokens: '+5,000 Tokens', status: '已到账' },
+                  { date: '2024.01.05', amount: '￥200', tokens: '+20,000 Tokens', status: '已到账' },
+                  { date: '2024.12.28', amount: '￥150', tokens: '+15,000 Tokens', status: '已到账' },
+                ].map((record, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between p-3 rounded-lg border border-line-soft hover:border-borderGray transition-colors"
+                  >
+                    <div className="flex-1">
+                      <div className="text-sm font-medium text-primaryText">{record.amount}</div>
+                      <div className="text-sm text-tertiaryText mt-1">{record.date}</div>
                     </div>
-                  ))}
-                </div>
+                    <div className="flex-1 text-right">
+                      <div className="text-sm text-primaryText">{record.tokens}</div>
+                      <div className="text-sm text-success mt-1">{record.status}</div>
+                    </div>
+                  </div>
+                ))}
               </div>
-
-              <div className="flex items-center justify-end gap-3 border-t border-[borderGray] px-6 py-4">
-                <button
-                  type="button"
-                  onClick={() => setShowRechargeModal(false)}
-                  className="rounded-full border border-[#d8e0ea] px-5 py-2 text-sm font-medium text-secondaryText transition-colors hover:bg-bgLight"
-                >
-                  关闭
-                </button>
-                <button
-                  type="button"
-                  className="rounded-full bg-[#1cc08b] px-5 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
-                >
-                  充值
-                </button>
-              </div>
-            </div>
+            </BaseModal>
           </div>
         </>
       )}

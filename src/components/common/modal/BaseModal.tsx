@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo } from 'react';
 import { BaseModalProps } from './BaseModal.types';
+import { BaseButton } from '../button';
 import styles from './BaseModal.module.css';
 import classNames from 'classnames';
 
@@ -95,23 +96,28 @@ export const BaseModal: React.FC<BaseModalProps> = ({
     if (footer === null) return null; // 显式隐藏footer
     if (footer) return footer; // 自定义footer
 
+    const { type: _cancelType, ...safeCancelButtonProps } = cancelButtonProps ?? {};
+    const { type: _okType, ...safeOkButtonProps } = okButtonProps ?? {};
+
     return (
       <div className={styles.modalFooter}>
-        <button
-          className={classNames(styles.btn, styles.btnDefault)}
+        <BaseButton
+          type="secondary"
+          size="medium"
           onClick={handleCancel}
-          {...cancelButtonProps}
+          {...safeCancelButtonProps}
         >
           {cancelText}
-        </button>
-        <button
-          className={classNames(styles.btn, styles.btnPrimary)}
+        </BaseButton>
+        <BaseButton
+          type="primary"
+          size="medium"
+          isLoading={confirmLoading}
           onClick={handleConfirm}
-          disabled={confirmLoading}
-          {...okButtonProps}
+          {...safeOkButtonProps}
         >
           {confirmLoading ? '加载中...' : okText}
-        </button>
+        </BaseButton>
       </div>
     );
   }, [footer, okText, cancelText, confirmLoading, handleConfirm, handleCancel, okButtonProps, cancelButtonProps]);

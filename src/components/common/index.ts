@@ -24,6 +24,12 @@ export type { BaseSelectProps, BaseSelectOption } from './select';
 export { BaseUpload } from './upload';
 export type { BaseUploadProps } from './upload';
 
+export { BaseActionMenu } from './action-menu';
+export type { BaseActionMenuProps, BaseActionMenuItem } from './action-menu';
+
+export { BaseSegmented } from './segmented';
+export type { BaseSegmentedProps, BaseSegmentedOption, BaseSegmentedSize } from './segmented';
+
 // 容器组件
 export { BaseModal } from './modal';
 export type { BaseModalProps } from './modal';
