@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { Menu, Plus, X, HelpCircle, AlertCircle, ShieldCheck } from 'lucide-react';
+import { BaseButton } from '@/components';
 import { type LayoutOutletContext } from '../components/Layout';
 
 type MemberRole = '管理员' | '成员';
@@ -298,7 +299,7 @@ export default function MemberManagementPage() {
   return (
     <div className="flex h-full w-full flex-col bg-white">
       {/* 头部标题栏 */}
-      <header className="h-16 shrink-0 flex items-center px-6 justify-between bg-white z-10">
+      <header className="z-10 flex h-16 shrink-0 items-center justify-between bg-white/80 px-4 backdrop-blur-sm">
         <div className="flex items-center gap-3 min-w-0">
           {!isSidebarOpen && (
             <button
@@ -311,13 +312,16 @@ export default function MemberManagementPage() {
           )}
           <h1 className="text-xl font-medium text-primaryText">成员管理</h1>
         </div>
-        <button
+        <BaseButton
+          type="primary"
+          size="small"
+          rounded="large"
+          icon={<Plus size={14} />}
+          className="shrink-0"
           onClick={handleOpenInvite}
-          className="shrink-0 px-4 py-2 bg-bgLight hover:bg-[bgLight] text-primaryText text-sm font-medium rounded-full transition-colors flex items-center gap-2"
         >
-          <Plus size={14} />
-          <span>邀请新成员</span>
-        </button>
+          邀请新成员
+        </BaseButton>
       </header>
 
       {/* 主体内容区 */}

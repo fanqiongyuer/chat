@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { mockProjects } from '../mock/projects';
 import { Plus, Menu, Folder } from 'lucide-react';
+import { BaseButton } from '@/components';
 import { type LayoutOutletContext } from '../components/Layout';
 
 export default function ProjectsPage() {
@@ -10,7 +11,7 @@ export default function ProjectsPage() {
   
   return (
     <div className="flex h-full w-full flex-col bg-white">
-      <header className="h-16 shrink-0 flex items-center px-6 justify-between bg-white/80 backdrop-blur-sm z-10">
+      <header className="z-10 flex h-16 shrink-0 items-center justify-between bg-white/80 px-4 backdrop-blur-sm">
         <div className="flex items-center gap-3 min-w-0">
           {!isSidebarOpen && (
             <button onClick={() => setIsSidebarOpen(true)} className="p-2 -ml-2 text-secondaryText hover:bg-bgLight rounded-full transition-colors" title="展开边栏">
@@ -19,10 +20,15 @@ export default function ProjectsPage() {
           )}
           <h1 className="text-xl font-medium text-primaryText">科研项目</h1>
         </div>
-        <button className="shrink-0 px-4 py-2 bg-bgLight hover:bg-[bgLight] text-primaryText text-sm font-medium rounded-full transition-colors flex items-center gap-2">
-          <Plus size={14} />
-          <span>创建新项目</span>
-        </button>
+        <BaseButton
+          type="primary"
+          size="small"
+          rounded="large"
+          icon={<Plus size={14} />}
+          className="shrink-0"
+        >
+          创建新项目
+        </BaseButton>
       </header>
       <div className="flex-1 overflow-y-auto px-4 pb-12 pt-4 md:px-8 lg:px-10 md:pb-12 md:pt-6">
         <div className="max-w-[1240px] mx-auto">

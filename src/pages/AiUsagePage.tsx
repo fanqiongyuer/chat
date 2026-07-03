@@ -506,7 +506,7 @@ export default function AiUsagePage() {
 
   return (
     <div className="flex h-full w-full flex-col bg-white">
-      <header className="h-16 shrink-0 flex items-center px-6 bg-white/80 backdrop-blur-sm z-10">
+      <header className="z-10 flex h-16 shrink-0 items-center bg-white/80 px-4 backdrop-blur-sm">
         <div className="flex items-center gap-3 min-w-0">
           {!isSidebarOpen && (
             <button
@@ -539,10 +539,10 @@ export default function AiUsagePage() {
                 <button
                   type="button"
                   onClick={() => setActiveTab('analysis')}
-                  className={`pb-2.5 text-sm ${
+                  className={`pb-2.5 text-sm font-medium border-b-2 transition-colors ${
                     activeTab === 'analysis'
-                      ? 'border-b-2 border-[var(--color-primary)] font-medium text-primaryText'
-                      : 'text-tertiaryText'
+                      ? 'border-[var(--color-primary)] text-primaryText'
+                      : 'border-transparent text-tertiaryText'
                   }`}
                 >
                   消耗分析
@@ -550,8 +550,8 @@ export default function AiUsagePage() {
                 <button
                   type="button"
                   onClick={() => setActiveTab('users')}
-                  className={`pb-2.5 text-sm ${
-                    activeTab === 'users' ? 'border-b-2 border-[var(--color-primary)] font-medium text-primaryText' : 'text-tertiaryText'
+                  className={`pb-2.5 text-sm font-medium border-b-2 transition-colors ${
+                    activeTab === 'users' ? 'border-[var(--color-primary)] text-primaryText' : 'border-transparent text-tertiaryText'
                   }`}
                 >
                   帐户明细

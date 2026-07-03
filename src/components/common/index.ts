@@ -30,6 +30,9 @@ export type { BaseActionMenuProps, BaseActionMenuItem } from './action-menu';
 export { BaseSegmented } from './segmented';
 export type { BaseSegmentedProps, BaseSegmentedOption, BaseSegmentedSize } from './segmented';
 
+export { BaseToggle } from './toggle';
+export type { BaseToggleProps, BaseToggleSize } from './toggle';
+
 // 容器组件
 export { BaseModal } from './modal';
 export type { BaseModalProps } from './modal';

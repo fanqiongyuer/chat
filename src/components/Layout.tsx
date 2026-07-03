@@ -666,7 +666,7 @@ export default function Layout() {
 
       {/* 主内容区 */}
       <main className={`flex-1 h-full overflow-hidden relative p-2 md:p-3 transition-all duration-300 ${isSidebarOpen ? 'pl-0 md:pl-0' : 'pl-2 md:pl-3'}`}>
-        <div className="bg-white rounded-2xl md:rounded-3xl w-full h-full shadow-sm overflow-hidden border border-borderGray/50 relative">
+        <div className="bg-white rounded-xl md:rounded-2xl w-full h-full shadow-sm overflow-hidden border border-borderGray/50 relative">
           <div className="flex h-full w-full">
             {/* 展开侧边栏按钮 */}
             {!isSidebarOpen && (

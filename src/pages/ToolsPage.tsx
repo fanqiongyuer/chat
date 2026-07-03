@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { Menu, Plus, MoreHorizontal, Pencil, Copy, Trash2, X, Check, ChevronDown, ChevronRight, CalendarDays, Clock3, Folder } from 'lucide-react';
 import { mockProjects } from '../mock/projects';
+import { BaseButton } from '@/components';
 import { type LayoutOutletContext } from '../components/Layout';
 
 interface TaskTemplate {
@@ -374,7 +375,7 @@ export default function ToolsPage() {
 
   return (
     <div className="flex h-full w-full flex-col bg-white">
-      <header className="h-16 shrink-0 flex items-center px-6 justify-between bg-white/80 backdrop-blur-sm z-10">
+      <header className="z-10 flex h-16 shrink-0 items-center justify-between bg-white/80 px-4 backdrop-blur-sm">
         <div className="flex items-center gap-3 min-w-0">
           {!isSidebarOpen && (
             <button
@@ -387,13 +388,16 @@ export default function ToolsPage() {
           )}
           <h1 className="text-xl font-medium text-primaryText">任务管理</h1>
         </div>
-        <button
+        <BaseButton
+          type="primary"
+          size="small"
+          rounded="large"
+          icon={<Plus size={14} />}
+          className="shrink-0"
           onClick={handleCreateCustomTask}
-          className="shrink-0 px-4 py-2 bg-bgLight hover:bg-[bgLight] text-primaryText text-sm font-medium rounded-full transition-colors flex items-center gap-2"
         >
-          <Plus size={14} />
-          <span>新建任务</span>
-        </button>
+          新建任务
+        </BaseButton>
       </header>
 
       <div className="flex-1 overflow-y-auto px-4 pb-12 pt-4 md:px-8 lg:px-10 md:pb-12 md:pt-6">

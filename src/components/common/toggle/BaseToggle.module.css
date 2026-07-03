@@ -1,0 +1,79 @@
+.toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  padding: 2px;
+  flex-shrink: 0;
+}
+
+.toggle:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* 尺寸 */
+.toggleSmall {
+  width: 32px;
+  height: 18px;
+}
+
+.toggleMedium {
+  width: 40px;
+  height: 22px;
+}
+
+/* 未选中态 */
+.toggleOff {
+  background-color: var(--color-gray-3);
+}
+
+/* 选中态 */
+.toggleOn {
+  background-color: var(--color-primary);
+}
+
+/* 禁用态 */
+.toggleDisabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 滑块 */
+.thumb {
+  display: block;
+  border-radius: 50%;
+  background: var(--color-white);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  transition: transform 0.2s ease;
+}
+
+.thumbSmall {
+  width: 14px;
+  height: 14px;
+}
+
+.thumbMedium {
+  width: 18px;
+  height: 18px;
+}
+
+/* 滑块位置 */
+.thumbOffSmall {
+  transform: translateX(0);
+}
+
+.thumbOnSmall {
+  transform: translateX(14px);
+}
+
+.thumbOffMedium {
+  transform: translateX(0);
+}
+
+.thumbOnMedium {
+  transform: translateX(18px);
+}
