@@ -1,0 +1,501 @@
+# 全局样式强制约束规则（禁止自由发挥自定义视觉参数）
+
+所有AI生成组件、页面、样式、交互必须严格遵守以下规则，违反规则的代码将被拒绝。
+
+---
+
+## 一、设计Token硬性约束（根治色值/间距/圆角混乱）
+
+### 1. 颜色规则
+
+- **禁止手写硬编码** #xxx、rgb、rgba，全部使用项目tailwind预设色板 / 全局css变量
+- **主色、辅助色、中性色统一从** tailwind.config.ts 读取，新增颜色必须先配置到配置文件再使用
+- **文字对比度最低标准**：
+  - 正文文字：4.5:1
+  - 大标题：3:1
+  - 禁止浅灰配白底看不清的配色
+- **禁止随意加渐变、杂色、霓虹色**，全局渐变仅允许1套业务规范渐变
+
+**违反示例** ❌：
+```
+className="text-[#96a0aa]"  // 硬编码色值
+style={{ color: '#1cc08b' }}  // 内联RGB
+```
+
+**正确做法** ✅：
+```
+className="text-gray-6"  // 使用tailwind预设
+className="text-primary"  // 使用主色变量
+```
+
+### 2. 间距 scale（只允许以下数值，其余一律禁用）
+
+**允许的间距值：**
+```
+2 / 4 / 8 / 12 / 16 / 20 / 24 / 32 / 40 / 48
+```
+
+**禁止** ❌：
+- 5px、7px、13px、18px、22px 这类非标间距
+- p-[5px]、m-[13px] 自定义任意数值
+
+**正确做法** ✅：
+```
+className="p-4 m-2"  // 使用标准scale
+className="px-8 py-4"  // 组合允许值
+```
+
+### 3. 圆角 scale（仅允许）
+
+**允许的圆角值：**
+```
+rounded-sm      (4px)
+rounded-md      (8px)
+rounded-lg      (12px)
+rounded-xl      (16px)
+rounded-full    (100%)
+```
+
+**禁止** ❌：
+- rounded-[5px]、rounded-[11px] 自定义任意圆角
+- border-radius: 6px 内联样式
+
+**正确做法** ✅：
+```
+className="rounded-md"  // 使用标准scale
+className="rounded-lg"  // 组件卡片推荐
+```
+
+### 4. 阴影（全局仅3档，不许手写box-shadow）
+
+**允许的阴影值：**
+```
+shadow-sm   // 浅阴影，用于hover效果
+shadow-md   // 标准阴影，用于弹窗/卡片
+shadow-lg   // 深阴影，用于顶层悬浮元素
+```
+
+**禁止** ❌：
+- 多层叠加阴影、彩色阴影
+- box-shadow: 0 10px 30px rgba(...) 自定义任意阴影
+- 同时使用2种以上阴影
+
+**正确做法** ✅：
+```
+className="shadow-md"  // 单层标准阴影
+className="shadow-lg"  // 重要元素用深阴影
+```
+
+### 5. 字体与字号
+
+**固定层级，禁止** ❌ **text-[13px] 自定义尺寸：**
+
+**允许的字号层级：**
+```
+text-xs      (12px)  // 辅助文字、提示
+text-sm      (14px)  // 次级文字
+text-base    (16px)  // 正文、主体内容
+text-lg      (18px)  // 小标题
+text-xl      (20px)  // 标题
+text-2xl     (24px)  // 大标题
+text-3xl     (28px)  // 页面标题
+text-4xl     (32px)  // 超大标题
+text-5xl     (36px)  // 特大标题
+```
+
+- **行高跟随tailwind默认**，不随意自定义 leading
+- **字重使用标准值**：font-normal / font-medium / font-semibold / font-bold
+
+**正确做法** ✅：
+```
+<h1 className="text-2xl font-semibold">标题</h1>
+<p className="text-base text-gray-6">正文</p>
+<span className="text-xs text-gray-5">辅助文字</span>
+```
+
+---
+
+## 二、组件复用规则（杜绝重复样式、页面割裂）
+
+### 1. 业务通用控件必须复用全局组件
+
+**强制复用** src/components/ui 下的封装组件：
+- Button / ButtonGroup
+- Input / InputGroup / TextArea
+- Select / SelectGroup
+- Modal / Drawer
+- Card / CardGroup
+- Table / TablePagination
+- Pagination
+- Tooltip / Popover
+- Tabs / TabsPanel
+- Badge / Tag
+- Checkbox / Radio / Switch
+
+**禁止** ❌：
+- 页面内重复写一套按钮样式
+- 自定义卡片替代Card组件
+- 多套Modal实现方案
+
+**正确做法** ✅：
+```tsx
+import { Button, Card, Modal } from '@/components/ui';
+
+<Button variant="primary">保存</Button>
+<Card className="p-4">内容</Card>
+<Modal open={open} onClose={close}>弹窗</Modal>
+```
+
+### 2. 页面布局容器统一使用全局Layout
+
+- **页面布局统一使用** Layout / PageContainer 组件
+- **页面不重复写宽高、边距、居中逻辑**
+- **顶部Header、左侧Sidebar、主内容区统一由Layout管理**
+
+**禁止** ❌：
+```jsx
+<div className="w-full h-screen flex flex-col">
+  <div className="w-[1240px] mx-auto px-8">内容</div>
+</div>
+```
+
+**正确做法** ✅：
+```jsx
+<Layout>
+  <PageContainer>页面内容</PageContainer>
+</Layout>
+```
+
+### 3. 若现有组件无法满足需求，优先扩展组件props
+
+**优先级：**
+1. 优先扩展组件 props 参数
+2. 其次修改组件内部样式
+3. 最后才在页面做大量自定义样式覆盖
+
+**禁止** ❌：
+```jsx
+// 页面内大量覆盖组件样式
+<Button className="!text-purple-500 !bg-blue-200 !rounded-[5px]">按钮</Button>
+```
+
+**正确做法** ✅：
+```jsx
+// 先在组件定义支持的variant
+export const Button = ({ variant = 'primary', ...props }) => {
+  const variantStyles = {
+    primary: 'bg-primary text-white',
+    secondary: 'bg-gray-2 text-gray-9'
+  };
+  return <button className={variantStyles[variant]} {...props} />;
+};
+
+// 页面使用简单props
+<Button variant="secondary">按钮</Button>
+```
+
+### 4. 样式分层优先级
+
+```
+优先级从高到低：
+┌─ 全局组件默认样式（最优先）
+├─ 页面传参控制（variant / size 等props）
+├─ 组件slot插槽定制
+└─ 少量业务局部微调（最后手段）
+```
+
+### 5. 页面内仅允许少量差异化margin/padding
+
+- **卡片、边框、hover、active等基础状态统一放在公共组件**
+- **页面仅做布局差异化**（如grid列数、间距调整）
+- **禁止页面覆盖组件的视觉状态**
+
+**正确做法** ✅：
+```jsx
+// 页面仅调整间距、布局
+<div className="grid grid-cols-3 gap-6">
+  <Card>内容</Card>
+  <Card>内容</Card>
+  <Card>内容</Card>
+</div>
+
+// 卡片的背景、圆角、阴影、hover全在Card组件定义
+```
+
+---
+
+## 三、代码样式写法规范
+
+### 1. 静态视觉全部用Tailwind类，内联style仅用于动态计算
+
+**禁止** ❌：
+```jsx
+// 静态样式用内联style
+<div style={{ 
+  backgroundColor: '#f5f5f5',
+  padding: '16px',
+  borderRadius: '8px'
+}}>内容</div>
+
+// 硬编码尺寸
+style={{ width: '320px', height: '240px' }}
+```
+
+**正确做法** ✅：
+```jsx
+// 静态样式用Tailwind
+<div className="bg-gray-1 p-4 rounded-lg">内容</div>
+
+// 动态样式用内联style（如动画、计算值）
+<div style={{ 
+  transform: `translateX(${offsetX}px)`,
+  opacity: progress,
+  width: `${calculatedWidth}px`
+}}>动态内容</div>
+```
+
+### 2. 不允许大量写module.css / scss自定义样式
+
+- **统一收敛到全局tailwind配置**
+- **复杂样式先评估是否需要加到tailwind.config.ts**
+- **避免CSS文件分散、样式难以维护**
+
+**禁止** ❌：
+```jsx
+// CustomCard.module.scss
+.card {
+  padding: 13px;
+  border-radius: 5px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+```
+
+**正确做法** ✅：
+```jsx
+// 直接用Tailwind
+<div className="p-4 rounded-lg shadow-md bg-white">卡片</div>
+
+// 需要渐变时，先配置到tailwind.config.ts
+<div className="bg-gradient-primary">卡片</div>
+```
+
+### 3. class命名有序
+
+**标准顺序：**
+```
+布局尺寸 → 间距 → 背景文字颜色 → 边框圆角 → 阴影 → 交互hover
+```
+
+**示例** ✅：
+```jsx
+className="
+  flex items-center justify-between       // 布局
+  w-full h-16                              // 尺寸
+  px-6 py-4                                // 间距
+  bg-white text-gray-9                     // 背景文字
+  border border-gray-3 rounded-lg          // 边框圆角
+  shadow-sm                                // 阴影
+  hover:bg-gray-1 hover:shadow-md          // 交互
+  transition-all duration-200              // 动画
+"
+```
+
+### 4. 禁用杂乱嵌套div，层级不超过3层
+
+**禁止** ❌：
+```jsx
+<div>
+  <div>
+    <div>
+      <div>
+        <div>内容</div>
+      </div>
+    </div>
+  </div>
+</div>
+```
+
+**正确做法** ✅：
+```jsx
+// 使用Flexbox/Grid替代多层div
+<div className="flex flex-col gap-4">
+  <div>内容1</div>
+  <div>内容2</div>
+</div>
+```
+
+---
+
+## 四、AI禁止生成的UI反模式（自动拦截廉价混乱界面）
+
+### 禁止列表 ❌
+
+1. **多层嵌套卡片、多重叠加阴影、杂乱多色渐变**
+   ```jsx
+   // 禁止
+   <div className="shadow-sm shadow-md shadow-lg">
+   <div className="bg-gradient-to-r from-purple-500 via-pink-500 to-blue-500">
+   ```
+
+2. **尺寸参差不齐的按钮、宽窄不一输入框、不统一分割线**
+   ```jsx
+   // 禁止
+   <Button className="px-4 py-2">A</Button>
+   <Button className="px-8 py-4">B</Button>
+   <hr className="border-t border-[#ddd]" />
+   ```
+
+3. **文字层级混乱：大标题过小、辅助文字对比度太低**
+   ```jsx
+   // 禁止
+   <h1 className="text-sm">标题</h1>
+   <p className="text-xs text-gray-3">看不清的辅助文字</p>
+   ```
+
+4. **无hover、active、disabled交互状态的基础控件**
+   ```jsx
+   // 禁止
+   <button className="bg-primary text-white">按钮</button>
+   // 需要有
+   <button className="bg-primary text-white hover:bg-primary-dark active:opacity-90 disabled:opacity-50">按钮</button>
+   ```
+
+5. **页面之间配色、圆角、阴影风格不统一**
+   ```jsx
+   // 禁止：某页用rounded-md某页用rounded-[7px]
+   // 禁止：某页用shadow-md某页用box-shadow: 0 4px 6px rgba(...)
+   ```
+
+### 推荐做法 ✅
+
+- 使用全局色板、标准间距、标准圆角、标准阴影
+- 所有交互都有完整的hover/active/disabled/loading状态
+- 文字对比度充分（最低4.5:1），易读易用
+- 页面风格统一，提供一致的用户体验
+- 简洁设计，避免过度装饰
+
+---
+
+## 五、存量代码修改约束
+
+### 1. 修改已有页面/组件前，先理解现有设计
+
+**必须执行步骤：**
+1. 读取同目录其他组件样式
+2. 理解现有设计语言、交互规范
+3. 保持视觉完全对齐
+
+**示例：**
+```jsx
+// 修改Button前，先看项目其他Button样式
+// 修改Card前，先看项目现有卡片实现
+// 新增页面前，看同类页面的设计规范
+```
+
+### 2. 发现硬编码色值、非标间距、自定义圆角，自动替换
+
+**发现** ❌ **→ 替换** ✅：
+```
+#1cc08b       → var(--color-primary) / bg-primary
+px-[13px]     → px-4 或 px-3 (选择最接近的标准值)
+rounded-[5px] → rounded-sm
+box-shadow: 0 2px 4px rgba(...) → shadow-sm
+```
+
+### 3. 新增页面视觉标准必须和现有系统保持一致
+
+- **禁止自创一套设计风格**
+- **颜色、间距、圆角、字体层级全部遵循现有token**
+- **如需扩展，先在tailwind.config.ts添加，再使用**
+
+### 4. 全项目统一交互逻辑
+
+**必须统一的交互：**
+
+| 交互元素 | 统一规范 |
+|--------|--------|
+| 弹窗弹出 | 使用 `animate-in fade-in zoom-in-95` |
+| 按钮点击 | `hover:opacity-90 active:scale-95 transition-all` |
+| 列表hover | `hover:bg-gray-1 transition-colors` |
+| 加载动画 | 统一加载spinner，禁止自定义动画 |
+| 错误提示 | 统一使用Toast/Alert组件 |
+| 禁用状态 | `disabled:opacity-50 disabled:cursor-not-allowed` |
+
+**正确做法** ✅：
+```jsx
+// 全局Button组件已定义所有交互
+<Button>保存</Button>
+
+// 全局Modal组件已定义弹出动画
+<Modal open={open}>内容</Modal>
+
+// 全局Toast处理错误提示
+toast.error('操作失败');
+```
+
+---
+
+## 六、代码审查检查清单
+
+在提交代码前，自检以下项目（✓ 全部通过才能提交）：
+
+- [ ] **颜色**：是否有硬编码 #xxx、rgb、rgba？全部使用tailwind色板或CSS变量？
+- [ ] **间距**：是否有非标间距 5px、7px、13px、18px？全部使用2/4/8/12/16/20/24/32/40/48？
+- [ ] **圆角**：是否有 rounded-[5px]、rounded-[11px]？仅使用 sm/md/lg/xl/full？
+- [ ] **阴影**：是否有多层阴影、自定义box-shadow？仅使用 shadow-sm/md/lg？
+- [ ] **字号**：是否有 text-[13px]、自定义font-size？仅使用xs/sm/base/lg/xl/2xl/3xl？
+- [ ] **组件**：Button/Input/Modal/Card是否复用了ui组件？
+- [ ] **布局**：是否使用了全局Layout/PageContainer？
+- [ ] **内联style**：是否有大量静态样式内联style？应转移到Tailwind类？
+- [ ] **嵌套层级**：div嵌套是否超过3层？
+- [ ] **交互状态**：Button/Input是否有hover/active/disabled状态？
+- [ ] **对比度**：文字对比度是否充分（≥4.5:1）？
+- [ ] **风格一致**：新页面样式是否与现有系统保持一致？
+- [ ] **反模式**：是否有多重阴影、渐变霓虹色、参差按钮等禁止模式？
+
+---
+
+## 七、快速参考
+
+### tailwind色板（最常用）
+```
+primary / secondary / danger / warning / success / info
+gray-1 ~ gray-9（从浅到深）
+white / black / transparent
+```
+
+### 标准间距
+```
+2 / 4 / 8 / 12 / 16 / 20 / 24 / 32 / 40 / 48
+简写：px-4 py-4 / gap-6 / mt-8 等
+```
+
+### 圆角
+```
+rounded-sm(4px) / rounded-md(8px) / rounded-lg(12px) / rounded-xl(16px) / rounded-full
+```
+
+### 字体层级
+```
+text-xs(12px) / text-sm(14px) / text-base(16px) / text-lg(18px) / text-xl(20px) / text-2xl(24px) / text-3xl(30px)
+```
+
+### 阴影
+```
+shadow-sm / shadow-md / shadow-lg
+```
+
+### 通用组件位置
+```
+src/components/ui/Button.tsx
+src/components/ui/Input.tsx
+src/components/ui/Modal.tsx
+src/components/ui/Card.tsx
+src/components/ui/Table.tsx
+...
+```
+
+---
+
+**最后提醒：这不是建议，这是强制约束。违反规则的代码将被拒绝。**

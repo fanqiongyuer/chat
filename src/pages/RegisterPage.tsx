@@ -243,12 +243,12 @@ export default function RegisterPage() {
 
   // ---- 输入框通用样式 ----
   const inputClass =
-    'peer h-14 w-full rounded-xl border border-black/10 bg-white px-5 py-4 text-base leading-none text-[#202124] shadow-[inset_0_1px_2px_rgba(0,0,0,0.02)] outline-none transition-all focus:border-[#34a853] focus:ring-4 focus:ring-[#34a853]/10';
+    'peer h-14 w-full rounded-xl border border-black/10 bg-surface px-5 py-4 text-base leading-none text-primaryText shadow-sm outline-none transition-all focus:border-success focus:ring-4 focus:ring-success/10';
   const labelClass =
-    'pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-base text-[#80868b] transition-all peer-focus:left-4 peer-focus:top-0 peer-focus:-translate-y-1/2 peer-focus:rounded peer-focus:bg-white peer-focus:px-1.5 peer-focus:text-xs peer-focus:font-medium peer-focus:text-[#34a853] peer-[&:not(:placeholder-shown)]:left-4 peer-[&:not(:placeholder-shown)]:top-0 peer-[&:not(:placeholder-shown)]:-translate-y-1/2 peer-[&:not(:placeholder-shown)]:rounded peer-[&:not(:placeholder-shown)]:bg-white peer-[&:not(:placeholder-shown)]:px-1.5 peer-[&:not(:placeholder-shown)]:text-xs peer-[&:not(:placeholder-shown)]:font-medium peer-[&:not(:placeholder-shown)]:text-[#34a853]';
+    'pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-base text-tertiaryText transition-all peer-focus:left-4 peer-focus:top-0 peer-focus:-translate-y-1/2 peer-focus:rounded peer-focus:bg-surface peer-focus:px-1.5 peer-focus:text-xs peer-focus:font-medium peer-focus:text-success peer-[&:not(:placeholder-shown)]:left-4 peer-[&:not(:placeholder-shown)]:top-0 peer-[&:not(:placeholder-shown)]:-translate-y-1/2 peer-[&:not(:placeholder-shown)]:rounded peer-[&:not(:placeholder-shown)]:bg-surface peer-[&:not(:placeholder-shown)]:px-1.5 peer-[&:not(:placeholder-shown)]:text-xs peer-[&:not(:placeholder-shown)]:font-medium peer-[&:not(:placeholder-shown)]:text-success';
 
   return (
-    <div ref={containerRef} className="relative h-screen w-full overflow-hidden bg-[#f8fdf9] text-[#202124]">
+    <div ref={containerRef} className="relative h-screen w-full overflow-hidden bg-bgLight text-primaryText">
       {/* 粒子背景 */}
       <div className="absolute inset-0 z-0">
         <canvas ref={canvasRef} className="h-full w-full" />
@@ -257,10 +257,10 @@ export default function RegisterPage() {
       <div className="pointer-events-none absolute bottom-[-20%] right-[-10%] z-[1] h-[60vh] w-[60vw] bg-[radial-gradient(circle,rgba(15,157,88,0.05)_0%,rgba(255,255,255,0)_60%)]" />
 
       <div className="relative z-10 mx-auto flex h-full w-full max-w-md items-center justify-center px-4">
-        <div className="w-full rounded-3xl border border-white/90 bg-white/70 p-10 shadow-[0_20px_40px_rgba(0,0,0,0.05),0_1px_3px_rgba(0,0,0,0.02)] backdrop-blur-[20px]">
+        <div className="w-full rounded-3xl border border-white/90 bg-surface/70 p-10 shadow-lg backdrop-blur-[20px]">
           {/* 头部 */}
           <div className="mb-8 text-center">
-            <h1 className="bg-[linear-gradient(135deg,#202124_0%,#5f6368_100%)] bg-clip-text text-4xl font-semibold tracking-[-0.02em] text-transparent">
+            <h1 className="bg-[linear-gradient(135deg,primaryText_0%,#5f6368_100%)] bg-clip-text text-4xl font-semibold tracking-[-0.02em] text-transparent">
               DepTrace
             </h1>
             <p className="mt-2 text-sm text-gray-500">注册账号，开启科研工作台。</p>
@@ -269,8 +269,8 @@ export default function RegisterPage() {
 
           {/* 步骤标题与描述 */}
           <div className="mb-6">
-            <h2 className="text-lg font-semibold text-[#202124]">{stepTitle[step]}</h2>
-            {stepDesc[step] && <p className="mt-1 text-sm text-gray-500">{stepDesc[step]}</p>}
+            <h2 className="text-lg font-semibold text-primaryText">{stepTitle[step]}</h2>
+            {stepDesc[step] && <p className="mt-1 text-sm text-tertiaryText">{stepDesc[step]}</p>}
           </div>
 
           {/* 步骤表单 */}
@@ -372,7 +372,7 @@ export default function RegisterPage() {
               <button
                 type="submit"
                 disabled={!canSubmitStep}
-                className="inline-flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-[linear-gradient(135deg,#34a853_0%,#2b8c45_100%)] text-base font-semibold text-white shadow-[0_4px_14px_rgba(52,168,83,0.3)] transition-all hover:-translate-y-0.5 hover:shadow-[0_6px_20px_rgba(52,168,83,0.4)] disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:translate-y-0 pt-2"
+                className="inline-flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-success text-base font-semibold text-white shadow-md transition-all hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:shadow-md pt-2"
               >
                 <span>{isSubmitting ? '处理中...' : step === 'password' ? '完成注册' : '下一步'}</span>
                 {isSubmitting && (
@@ -398,14 +398,14 @@ export default function RegisterPage() {
           {step === 'success' && (
             <div className="flex flex-col items-center justify-center space-y-6">
               <div className="relative">
-                <div className="absolute inset-0 animate-pulse rounded-full bg-green-100/50" />
-                <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-green-50">
-                  <CheckCircle2 size={40} className="text-[#34a853]" />
+                <div className="absolute inset-0 animate-pulse rounded-full bg-success/10" />
+                <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-success/5">
+                  <CheckCircle2 size={40} className="text-success" />
                 </div>
               </div>
               <div className="text-center">
-                <h3 className="text-2xl font-bold text-[#202124]">注册成功</h3>
-                <p className="mt-2 text-sm text-gray-500">欢迎加入科研工作台</p>
+                <h3 className="text-2xl font-bold text-primaryText">注册成功</h3>
+                <p className="mt-2 text-sm text-tertiaryText">欢迎加入科研工作台</p>
               </div>
 
               <button
@@ -415,7 +415,7 @@ export default function RegisterPage() {
                     navigate('/chat/new', { replace: true });
                   }, 1000);
                 }}
-                className="mt-4 inline-flex h-14 w-full items-center justify-center rounded-xl bg-[linear-gradient(135deg,#34a853_0%,#2b8c45_100%)] text-base font-semibold text-white shadow-[0_4px_14px_rgba(52,168,83,0.3)] transition-all hover:-translate-y-0.5 hover:shadow-[0_6px_20px_rgba(52,168,83,0.4)]"
+                className="mt-4 inline-flex h-14 w-full items-center justify-center rounded-xl bg-success text-base font-semibold text-white shadow-md transition-all hover:shadow-lg"
               >
                 进入工作台
               </button>
@@ -423,12 +423,12 @@ export default function RegisterPage() {
           )}
 
           {step !== 'success' && (
-            <p className="mt-6 text-center text-sm text-gray-500">
+            <p className="mt-6 text-center text-sm text-tertiaryText">
               已有账号？
               <button
                 type="button"
                 onClick={() => navigate('/login')}
-                className="ml-1 font-medium text-green-500 transition-colors hover:text-green-600"
+                className="ml-1 font-medium text-success transition-colors hover:text-success"
               >
                 返回登录
               </button>

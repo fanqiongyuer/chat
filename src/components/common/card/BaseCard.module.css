@@ -1,0 +1,51 @@
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.card.cardHoverable:hover {
+  box-shadow: 0 3px 6px -4px rgba(0, 0, 0, 0.12);
+  border-color: transparent;
+}
+
+.card.cardHoverable {
+  cursor: pointer;
+}
+
+.card.cardLoading {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.card.cardBordered {
+  border: 1px solid var(--color-border);
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  border-bottom: 1px solid var(--color-line-soft);
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.cardExtra {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.cardBody {
+  padding: 16px;
+  color: var(--color-text-primary);
+}

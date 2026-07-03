@@ -21,7 +21,7 @@ export default function SkillPage() {
           )}
           <h1 className="text-xl font-medium text-primaryText">Skill</h1>
         </div>
-        <button className="shrink-0 px-4 py-2 bg-bgLight hover:bg-[#e1e5ea] text-primaryText text-sm font-medium rounded-full transition-colors flex items-center gap-2">
+        <button className="shrink-0 px-4 py-2 bg-bgLight hover:bg-[bgLight] text-primaryText text-sm font-medium rounded-full transition-colors flex items-center gap-2">
           <Plus size={14} />
           <span>新建 Skill</span>
         </button>

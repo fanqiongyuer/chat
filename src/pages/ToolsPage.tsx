@@ -389,7 +389,7 @@ export default function ToolsPage() {
         </div>
         <button
           onClick={handleCreateCustomTask}
-          className="shrink-0 px-4 py-2 bg-bgLight hover:bg-[#e1e5ea] text-primaryText text-sm font-medium rounded-full transition-colors flex items-center gap-2"
+          className="shrink-0 px-4 py-2 bg-bgLight hover:bg-[bgLight] text-primaryText text-sm font-medium rounded-full transition-colors flex items-center gap-2"
         >
           <Plus size={14} />
           <span>新建任务</span>
@@ -419,7 +419,7 @@ export default function ToolsPage() {
               <h2 className="text-[15px] font-medium text-primaryText">已设置任务</h2>
             </div>
 
-            <div className="task-table-scroll overflow-x-auto border-b border-[#e8ecf1] bg-white">
+            <div className="task-table-scroll overflow-x-auto border-b border-[borderGray] bg-white">
               <div className="min-w-[940px]">
                 <div className="grid grid-cols-[1.05fr_2.2fr_0.85fr_0.95fr_72px_44px] border-b border-[#edf1f5] pl-0 pr-3 py-2 text-sm text-[#8a94a0]">
                   <span>任务名称</span>
@@ -517,7 +517,7 @@ export default function ToolsPage() {
               className="w-full max-w-[600px] rounded-lg bg-white shadow-popover"
               onClick={(event) => event.stopPropagation()}
             >
-              <div className="flex items-center justify-between border-b border-[#edf2f7] px-6 py-3.5">
+              <div className="flex items-center justify-between border-b border-[borderGray] px-6 py-3.5">
                 <div>
                   <h3 className="text-[17px] font-semibold text-primaryText">{modalTitle}</h3>
                 </div>
@@ -550,7 +550,7 @@ export default function ToolsPage() {
                       }))
                     }
                     placeholder={activeModalTemplateId === 'template-meeting-brief' ? '例：每周工作总结' : '例：EGFR resistance'}
-                    className="w-full rounded-lg border border-[#e3e9f1] px-3.5 py-2.5 text-sm text-primaryText outline-none transition-colors placeholder:text-tertiaryText focus:border-[#34D399]"
+                    className="w-full rounded-lg border border-[borderGray] px-3.5 py-2.5 text-sm text-primaryText outline-none transition-colors placeholder:text-tertiaryText focus:border-[#34D399]"
                   />
                 </div>
 
@@ -559,7 +559,7 @@ export default function ToolsPage() {
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <div>
                         <div className="mb-1.5 text-sm font-medium text-primaryText">任务周期</div>
-                        <div className="relative flex h-11 items-center gap-2 rounded-lg border border-[#e3e9f1] bg-white px-3.5">
+                        <div className="relative flex h-11 items-center gap-2 rounded-lg border border-[borderGray] bg-white px-3.5">
                           <input
                             type="date"
                             value={weeklyScheduleForm.startDate}
@@ -599,7 +599,7 @@ export default function ToolsPage() {
                                   repeatMode: event.target.value as RepeatMode,
                                 }))
                               }
-                              className="h-11 w-full appearance-none rounded-lg border border-[#e3e9f1] bg-white px-3.5 pr-9 text-sm text-primaryText outline-none transition-colors focus:border-[#34D399]"
+                              className="h-11 w-full appearance-none rounded-lg border border-[borderGray] bg-white px-3.5 pr-9 text-sm text-primaryText outline-none transition-colors focus:border-[#34D399]"
                             >
                               {repeatModeOptions.map((option) => (
                                 <option key={option.value} value={option.value}>
@@ -610,7 +610,7 @@ export default function ToolsPage() {
                             <ChevronRight size={16} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[#98A2B3]" />
                           </div>
 
-                          <div className="relative flex h-11 items-center rounded-lg border border-[#e3e9f1] bg-white px-3 pr-9">
+                          <div className="relative flex h-11 items-center rounded-lg border border-[borderGray] bg-white px-3 pr-9">
                             <span className="mr-2 shrink-0 text-sm font-medium text-primaryText">
                               {repeatModeTimePrefix[weeklyScheduleForm.repeatMode]}
                             </span>
@@ -647,7 +647,7 @@ export default function ToolsPage() {
                           }
                           placeholder="输入任何内容，使用 '/' 选择技能或 '@' 引用资源..."
                           rows={5}
-                          className="w-full resize-none rounded-lg border border-[#e3e9f1] px-3.5 pb-10 pt-2.5 text-sm text-primaryText outline-none transition-colors placeholder:text-tertiaryText focus:border-[#34D399]"
+                          className="w-full resize-none rounded-lg border border-[borderGray] px-3.5 pb-10 pt-2.5 text-sm text-primaryText outline-none transition-colors placeholder:text-tertiaryText focus:border-[#34D399]"
                         />
                         <div className="absolute bottom-2.5 left-3 z-20">
                           <button
@@ -780,7 +780,7 @@ export default function ToolsPage() {
                               }))
                             }
                             disabled={!weeklyScheduleForm.notifyByEmail}
-                            className="h-8 min-w-[96px] appearance-none rounded-lg border border-[#e3e9f1] bg-white px-2.5 pr-7 text-[13px] text-primaryText outline-none transition-colors focus:border-[#34D399] disabled:cursor-not-allowed disabled:bg-[#f8fafc] disabled:text-tertiaryText"
+                            className="h-8 min-w-[96px] appearance-none rounded-lg border border-[borderGray] bg-white px-2.5 pr-7 text-[13px] text-primaryText outline-none transition-colors focus:border-[#34D399] disabled:cursor-not-allowed disabled:bg-[#f8fafc] disabled:text-tertiaryText"
                           >
                             {emailRecipientOptions.map((recipient) => (
                               <option key={recipient} value={recipient}>
@@ -831,7 +831,7 @@ export default function ToolsPage() {
                           }))
                         }
                         placeholder="30"
-                        className="w-full rounded-lg border border-[#e3e9f1] px-3.5 py-2.5 text-sm text-primaryText outline-none transition-colors placeholder:text-tertiaryText focus:border-[#34D399]"
+                        className="w-full rounded-lg border border-[borderGray] px-3.5 py-2.5 text-sm text-primaryText outline-none transition-colors placeholder:text-tertiaryText focus:border-[#34D399]"
                       />
                     </div>
                   </div>
@@ -854,7 +854,7 @@ export default function ToolsPage() {
                               className={`rounded-lg border px-3.5 py-3 text-left transition-colors ${
                                 selected
                                   ? 'border-[#34D399] bg-[#ECFDF5]'
-                                  : 'border-[#e3e9f1] bg-white hover:border-[#cad6e5]'
+                                  : 'border-[borderGray] bg-white hover:border-[#cad6e5]'
                               }`}
                             >
                               <div className="mb-1 flex items-center justify-between gap-2">
@@ -880,7 +880,7 @@ export default function ToolsPage() {
                           }))
                         }
                         placeholder="例：CRISPR, prime editing, base editor"
-                        className="w-full rounded-lg border border-[#e3e9f1] px-3.5 py-2.5 text-sm text-primaryText outline-none transition-colors placeholder:text-tertiaryText focus:border-[#34D399]"
+                        className="w-full rounded-lg border border-[borderGray] px-3.5 py-2.5 text-sm text-primaryText outline-none transition-colors placeholder:text-tertiaryText focus:border-[#34D399]"
                       />
                     </div>
 
@@ -912,7 +912,7 @@ export default function ToolsPage() {
                 )}
               </div>
 
-              <div className="flex items-center justify-end gap-3 border-t border-[#edf2f7] px-6 py-4">
+              <div className="flex items-center justify-end gap-3 border-t border-[borderGray] px-6 py-4">
                 <button
                   type="button"
                   onClick={closeTaskConfigModal}

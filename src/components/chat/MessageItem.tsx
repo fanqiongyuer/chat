@@ -100,9 +100,8 @@ const loadMermaidApi = async (): Promise<MermaidApi> => {
       securityLevel: 'loose',
       suppressErrorRendering: true,
       themeVariables: {
-        background: '#ffffff',
-        primaryColor: '#4f6ef7',
-        primaryBorderColor: '#4f6ef7',
+        primaryColor: '#14B886',
+        primaryBorderColor: '#14B886',
       },
     });
 
@@ -150,20 +149,20 @@ const PdfPreviewCard: React.FC<{ href: string; label: string }> = ({ href, label
   }, [href, label]);
 
   return (
-    <div className="group not-prose my-2 inline-flex w-[340px] max-w-full items-center gap-3 rounded-xl border border-[#E6ECF2] bg-white px-3 py-2 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-[#FF5A1F] text-[11px] font-semibold tracking-wide text-white">
+    <div className="group not-prose my-2 inline-flex w-[340px] max-w-full items-center gap-3 rounded-xl border border-borderGray bg-surface px-3 py-2 shadow-sm">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-warning text-xs font-semibold tracking-wide text-white">
         PDF
       </div>
       <div className="min-w-0 flex-1">
-        <p className="m-0 truncate text-[15px] font-medium text-[#111827]">{displayName}</p>
-        <p className="m-0 text-[12px] text-[#6B7280]">PDF 文档</p>
+        <p className="m-0 truncate text-base font-medium text-primaryText">{displayName}</p>
+        <p className="m-0 text-xs text-secondaryText">PDF 文档</p>
       </div>
       <a
         href={href}
         target="_blank"
         rel="noreferrer"
         aria-label="新窗口打开 PDF"
-        className="shrink-0 rounded-md p-1 text-[#6B7280] opacity-0 transition-opacity group-hover:opacity-100 hover:bg-[#F3F4F6] focus:opacity-100"
+        className="shrink-0 rounded-md p-1 text-secondaryText opacity-0 transition-opacity group-hover:opacity-100 hover:bg-bgLight focus:opacity-100"
       >
         <ArrowRight size={14} />
       </a>
@@ -323,23 +322,23 @@ const MessageItem: React.FC<MessageItemProps> = ({
   const markdownComponents = useMemo<Components>(
     () => ({
       table: ({ node: _node, ...props }) => (
-        <div className="my-2 overflow-x-auto rounded-xl border border-[#E6ECF3] bg-white">
-          <table className="!my-0 min-w-full border-collapse text-[14px] leading-6" {...props} />
+        <div className="my-2 overflow-x-auto rounded-xl border border-borderGray bg-surface">
+          <table className="!my-0 min-w-full border-collapse text-sm leading-6" {...props} />
         </div>
       ),
-      tr: ({ node: _node, ...props }) => <tr className="border-b border-[#E9EEF5] last:border-b-0" {...props} />,
+      tr: ({ node: _node, ...props }) => <tr className="border-b border-borderGray last:border-b-0" {...props} />,
       th: ({ node: _node, ...props }) => (
         <th
-          className="border-r border-[#E6ECF3] bg-[#F7F9FC] px-4 py-2.5 text-left text-[13px] font-medium text-[#5F6B7A] last:border-r-0"
+          className="border-r border-borderGray bg-bgLight px-4 py-2.5 text-left text-xs font-medium text-tertiaryText last:border-r-0"
           {...props}
         />
       ),
       td: ({ node: _node, ...props }) => (
-        <td className="border-r border-[#EDF2F7] px-4 py-2.5 text-[14px] text-[#1F2937] last:border-r-0" {...props} />
+        <td className="border-r border-borderGray px-4 py-2.5 text-sm text-primaryText last:border-r-0" {...props} />
       ),
       blockquote: ({ node: _node, ...props }) => (
         <blockquote
-          className="my-3 rounded-r-md border-l-2 border-[#D8DEE8] bg-transparent py-0.5 pl-4 text-[15px] leading-7 text-[#4B5563] font-normal [&>*]:my-0 [&>*]:!font-normal"
+          className="my-3 rounded-r-md border-l-2 border-borderGray bg-transparent py-0.5 pl-4 text-base leading-7 text-tertiaryText font-normal [&>*]:my-0 [&>*]:!font-normal"
           {...props}
         />
       ),
@@ -350,7 +349,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
               type="checkbox"
               checked={Boolean(checked)}
               disabled
-              className="mr-2 accent-blue-500"
+              className="mr-2 accent-primary"
               {...props}
             />
           );
@@ -386,7 +385,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
               href={href}
               target="_blank"
               rel="noreferrer"
-              className="text-[13px] font-medium text-blue-700 no-underline hover:underline"
+              className="text-[13px] font-medium text-primary no-underline hover:underline"
               {...props}
             />
           );
@@ -433,7 +432,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 
         return (
           <code
-            className="inline-flex items-center rounded-md bg-[#F5F7FA] px-2.5 py-[3px] text-[14px] leading-[1.6] !font-normal tracking-[0.01em] text-[#374151]"
+            className="inline-flex items-center rounded-md bg-bgLight px-2.5 py-1 text-sm leading-[1.6] !font-normal tracking-[0.01em] text-primaryText"
             {...props}
           >
             {children}
@@ -486,7 +485,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
           <div className="flex w-full max-w-[85%] flex-col items-start gap-2">
           <div
             ref={markdownContainerRef}
-            className="prose prose-slate max-w-none text-primaryText prose-p:my-3 prose-p:text-[15px] md:prose-p:text-[16px] prose-p:leading-[1.8] prose-li:text-[15px] md:prose-li:text-[16px] prose-li:leading-[1.75] prose-headings:text-primaryText prose-headings:tracking-[-0.01em] prose-h1:mt-6 prose-h1:mb-3 prose-h1:text-[26px] md:prose-h1:text-[28px] prose-h1:leading-[1.3] prose-h1:font-semibold prose-h2:mt-7 prose-h2:mb-3 prose-h2:text-[20px] md:prose-h2:text-[22px] prose-h2:leading-[1.35] prose-h2:font-semibold prose-h3:mt-6 prose-h3:mb-2 prose-h3:text-[17px] md:prose-h3:text-[18px] prose-h3:leading-[1.45] prose-h3:font-semibold prose-strong:text-primaryText prose-code:font-normal prose-code:before:content-none prose-code:after:content-none prose-hr:my-6 prose-li:my-1 prose-li:marker:text-secondaryText prose-ol:pl-6 prose-ul:pl-6 prose-a:text-blue-700 prose-a:no-underline hover:prose-a:underline"
+            className="prose prose-slate max-w-none text-primaryText prose-p:my-3 prose-p:text-[15px] md:prose-p:text-[16px] prose-p:leading-[1.8] prose-li:text-[15px] md:prose-li:text-[16px] prose-li:leading-[1.75] prose-headings:text-primaryText prose-headings:tracking-[-0.01em] prose-h1:mt-6 prose-h1:mb-3 prose-h1:text-[20px] md:prose-h1:text-[22px] prose-h1:leading-[1.3] prose-h1:font-semibold prose-h2:mt-7 prose-h2:mb-3 prose-h2:text-[18px] md:prose-h2:text-[20px] prose-h2:leading-[1.35] prose-h2:font-semibold prose-h3:mt-6 prose-h3:mb-2 prose-h3:text-[16px] md:prose-h3:text-[17px] prose-h3:leading-[1.45] prose-h3:font-semibold prose-strong:text-primaryText prose-code:font-normal prose-code:before:content-none prose-code:after:content-none prose-hr:my-6 prose-li:my-1 prose-li:marker:text-secondaryText prose-ol:pl-6 prose-ul:pl-6 prose-a:text-primary prose-a:no-underline hover:prose-a:underline"
           >
             <ReactMarkdown
               remarkPlugins={remarkPlugins}

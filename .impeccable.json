@@ -1,0 +1,400 @@
+{
+  "projectName": "DeepTrace AI Chat",
+  "designSystem": "impeccable",
+  "version": "1.0.0",
+  "technology": {
+    "css": "Tailwind CSS",
+    "configFile": "tailwind.config.js",
+    "cssEntry": "src/index.css",
+    "componentLibrary": "src/components/ui"
+  },
+  "spacing": {
+    "description": "允许的间距 scale，禁止其他任何值",
+    "allowed": [2, 4, 8, 12, 16, 20, 24, 32, 40, 48],
+    "unit": "px",
+    "tailwindClasses": ["p-0.5", "p-1", "p-2", "p-3", "p-4", "p-5", "p-6", "p-8", "p-10", "p-12"],
+    "examples": {
+      "padding": "p-4, px-8, py-4",
+      "margin": "m-4, mt-8, mb-6",
+      "gap": "gap-4, gap-8",
+      "incorrect": ["p-[5px]", "m-[13px]", "gap-3.5"]
+    },
+    "enforcement": "STRICT - 任何非标间距将被拒绝"
+  },
+  "borderRadius": {
+    "description": "圆角规格，仅允许以下值",
+    "allowed": {
+      "rounded-sm": "4px",
+      "rounded-md": "8px",
+      "rounded-lg": "12px",
+      "rounded-xl": "16px",
+      "rounded-2xl": "24px",
+      "rounded-3xl": "32px",
+      "rounded-full": "999px"
+    },
+    "examples": {
+      "button": "rounded-full",
+      "card": "rounded-lg",
+      "input": "rounded-md",
+      "incorrect": ["rounded-[5px]", "rounded-[11px]", "border-radius: 6px"]
+    },
+    "enforcement": "STRICT - 禁止自定义圆角值"
+  },
+  "shadow": {
+    "description": "阴影仅保留三档，禁止自定义阴影",
+    "allowed": {
+      "shadow-sm": "0 2px 8px rgba(0,0,0,0.02)",
+      "shadow-md": "0 4px 20px rgba(0,0,0,0.05)",
+      "shadow-lg": "0 8px 30px rgba(0,0,0,0.08)"
+    },
+    "deprecated": ["shadow-xl", "shadow-popover"],
+    "customShadows": "FORBIDDEN",
+    "examples": {
+      "hover": "hover:shadow-md",
+      "elevated": "shadow-lg",
+      "subtle": "shadow-sm",
+      "incorrect": ["box-shadow: 0 10px 30px rgba(...)", "shadow-md shadow-lg (多层)"]
+    },
+    "enforcement": "STRICT - 禁止多层叠加阴影、彩色阴影、自定义box-shadow"
+  },
+  "colors": {
+    "description": "所有颜色取自 tailwind.config.js，禁用硬编码色值",
+    "source": "tailwind.config.js theme.extend.colors",
+    "predefined": {
+      "background": {
+        "bgLight": "#f0f4f9",
+        "surface": "#ffffff"
+      },
+      "text": {
+        "primaryText": "#1f1f1f",
+        "secondaryText": "#444746",
+        "tertiaryText": "#747775"
+      },
+      "functional": {
+        "primary": "#14B886",
+        "success": "#00b42a",
+        "warning": "#ff7d00",
+        "danger": "#f53f3f",
+        "borderGray": "#e0e0e0"
+      }
+    },
+    "forbiddenPatterns": [
+      "#1cc08b",
+      "#edf2f7",
+      "#96a0aa",
+      "#f0f4f9",
+      "rgb(...)",
+      "rgba(...)"
+    ],
+    "rules": [
+      "禁止手写硬编码 #xxx、rgb、rgba",
+      "新增颜色必须先配置到 tailwind.config.js",
+      "使用 Tailwind 预设或自定义 CSS 变量"
+    ],
+    "contrastRequirement": {
+      "bodyText": "4.5:1 最低对比度（正文）",
+      "largeText": "3:1 最低对比度（大标题）",
+      "validation": "MANDATORY - 低对比度配色将被拒绝"
+    },
+    "examples": {
+      "correct": ["text-primaryText", "bg-bgLight", "text-gray-6"],
+      "incorrect": ["text-[#96a0aa]", "bg-[#f0f4f9]", "style={{ color: '#1cc08b' }}"]
+    },
+    "enforcement": "STRICT"
+  },
+  "typography": {
+    "description": "字体层级固定，禁止自定义 font-size",
+      "fontSizes": {
+        "text-xs": ["12px", "16px"],
+        "text-sm": ["14px", "20px"],
+        "text-base": ["16px", "24px"],
+        "text-lg": ["18px", "26px"],
+        "text-xl": ["20px", "28px"],
+        "text-2xl": ["24px", "32px"],
+        "text-3xl": ["28px", "36px"],
+        "text-4xl": ["32px", "40px"],
+        "text-5xl": ["36px", "44px"]
+      },
+    "fontWeights": {
+      "font-normal": 400,
+      "font-medium": 500,
+      "font-semibold": 600,
+      "font-bold": 700
+    },
+    "lineHeightPolicy": "跟随 tailwind 默认，不随意自定义 leading",
+    "examples": {
+      "heading": "<h1 className='text-3xl font-semibold'>标题</h1>",
+      "body": "<p className='text-base text-primaryText'>正文</p>",
+      "helper": "<span className='text-xs text-tertiaryText'>辅助文字</span>",
+      "incorrect": ["text-[13px]", "font-size: 15px", "line-height: 1.8"]
+    },
+    "enforcement": "STRICT"
+  },
+  "components": {
+    "description": "公共组件统一在 src/components/ui，新增页面必须复用基础控件",
+    "coreComponents": [
+      "Button",
+      "Input",
+      "Select",
+      "Modal",
+      "Card",
+      "Table",
+      "Pagination",
+      "Tabs",
+      "Badge",
+      "Toast",
+      "Dropdown",
+      "Tooltip",
+      "Popover",
+      "Checkbox",
+      "Radio",
+      "Switch"
+    ],
+    "componentLocation": "src/components/ui/",
+    "rules": [
+      "Button、Input、Select、Modal、Card、Table 等必须复用 ui 组件",
+      "禁止页面内重复写一套样式",
+      "若现有组件无法满足需求，优先扩展组件 props，不在页面做大量覆盖",
+      "样式分层优先级：全局组件默认样式 > 页面传参控制 > 少量业务局部微调"
+    ],
+    "enforcement": "MANDATORY"
+  },
+  "interactionStates": {
+    "description": "全局统一交互 hover/active/disabled 状态，不允许页面单独自定义",
+    "button": {
+      "default": "bg-primary text-white",
+      "hover": "hover:opacity-90",
+      "active": "active:scale-95",
+      "disabled": "disabled:opacity-50 disabled:cursor-not-allowed",
+      "transition": "transition-all duration-200"
+    },
+    "input": {
+      "default": "border border-borderGray rounded-md",
+      "focus": "focus:border-primary focus:ring-1 focus:ring-primary",
+      "disabled": "disabled:bg-gray-1 disabled:cursor-not-allowed disabled:opacity-50",
+      "transition": "transition-colors"
+    },
+    "card": {
+      "default": "bg-surface border border-borderGray rounded-lg",
+      "hover": "hover:shadow-md hover:border-transparent",
+      "transition": "transition-all duration-200"
+    },
+    "list_item": {
+      "default": "bg-transparent",
+      "hover": "hover:bg-bgLight",
+      "active": "bg-primary-soft",
+      "transition": "transition-colors duration-150"
+    },
+    "animation": {
+      "dialog_appear": "animate-in fade-in zoom-in-95",
+      "dialog_disappear": "animate-out fade-out zoom-out-95",
+      "slide_in": "animate-in slide-in-from-bottom-2",
+      "duration": "duration-200"
+    },
+    "rules": [
+      "所有按钮必须有 hover/active/disabled 状态",
+      "所有交互元素必须有 transition 动画",
+      "弹窗弹出统一使用 animate-in fade-in zoom-in-95",
+      "禁止页面单独自定义交互样式"
+    ],
+    "enforcement": "STRICT"
+  },
+  "antiPatterns": {
+    "description": "禁止生成以下UI反模式",
+    "forbidden": [
+      "多层嵌套卡片、多重叠加阴影、杂乱多色渐变",
+      "尺寸参差不齐的按钮、宽窄不一输入框、不统一分割线",
+      "文字层级混乱：大标题过小、辅助文字对比度太低",
+      "无 hover、active、disabled 交互状态的基础控件",
+      "页面之间配色、圆角、阴影风格不统一",
+      "过度装饰的视觉元素、渐变霓虹色、杂乱多色搭配"
+    ]
+  },
+  "codeStyle": {
+    "description": "代码样式写法规范",
+    "rules": [
+      "静态视觉全部用 Tailwind 类，内联 style 仅用于 JS 动态计算样式",
+      "不允许大量写 module.css / scss 自定义样式，统一收敛到全局 tailwind",
+      "class 命名有序：布局尺寸 → 间距 → 背景文字颜色 → 边框圆角 → 阴影 → 交互hover",
+      "禁用杂乱嵌套 div，层级不超过 3 层"
+    ],
+    "classNameOrder": [
+      "display / layout (flex, grid, etc)",
+      "width / height (w-full, h-16, etc)",
+      "padding / margin (p-4, m-2, etc)",
+      "background / text color (bg-surface, text-primaryText, etc)",
+      "border / border-radius (border, rounded-lg, etc)",
+      "shadow (shadow-md, etc)",
+      "hover / active states (hover:bg-gray-1, active:scale-95, etc)",
+      "transition / animation (transition-all, duration-200, etc)"
+    ],
+    "examples": {
+      "correct": "className='flex items-center justify-between w-full h-16 px-6 py-4 bg-surface text-primaryText border border-borderGray rounded-lg shadow-sm hover:shadow-md hover:bg-bgLight transition-all'",
+      "incorrect": "className='p-4 bg-[#f0f4f9] rounded-[5px] shadow-sm shadow-md hover:shadow-lg'"
+    }
+  },
+  "codeReviewChecklist": {
+    "description": "提交代码前自检清单",
+    "items": [
+      {
+        "check": "颜色",
+        "description": "是否有硬编码 #xxx、rgb、rgba？全部使用 tailwind 色板或 CSS 变量？",
+        "action": "替换为预设色值"
+      },
+      {
+        "check": "间距",
+        "description": "是否有非标间距 5px、7px、13px、18px？全部使用 2/4/8/12/16/20/24/32/40/48？",
+        "action": "替换为标准 scale"
+      },
+      {
+        "check": "圆角",
+        "description": "是否有 rounded-[5px]、rounded-[11px]？仅使用 sm/md/lg/xl/full？",
+        "action": "替换为标准圆角值"
+      },
+      {
+        "check": "阴影",
+        "description": "是否有多层阴影、自定义 box-shadow？仅使用 shadow-sm/md/lg？",
+        "action": "统一为三档阴影"
+      },
+      {
+        "check": "字号",
+        "description": "是否有 text-[13px]、自定义 font-size？仅使用 xs/sm/base/lg/xl/2xl/3xl？",
+        "action": "替换为固定层级"
+      },
+      {
+        "check": "组件复用",
+        "description": "Button/Input/Modal/Card 是否复用了 ui 组件？",
+        "action": "调用全局组件"
+      },
+      {
+        "check": "布局",
+        "description": "是否使用了全局 Layout/PageContainer？",
+        "action": "使用全局布局组件"
+      },
+      {
+        "check": "内联样式",
+        "description": "是否有大量静态样式内联 style？应转移到 Tailwind 类？",
+        "action": "迁移到 Tailwind class"
+      },
+      {
+        "check": "嵌套深度",
+        "description": "div 嵌套是否超过 3 层？",
+        "action": "简化 DOM 结构"
+      },
+      {
+        "check": "交互状态",
+        "description": "Button/Input 是否有 hover/active/disabled 状态？",
+        "action": "补充交互状态"
+      },
+      {
+        "check": "对比度",
+        "description": "文字对比度是否充分（≥4.5:1）？",
+        "action": "调整颜色对比度"
+      },
+      {
+        "check": "风格一致",
+        "description": "新页面样式是否与现有系统保持一致？",
+        "action": "对齐设计系统"
+      },
+      {
+        "check": "反模式",
+        "description": "是否有多重阴影、渐变霓虹色、参差按钮等禁止模式？",
+        "action": "去除反模式"
+      }
+    ]
+  },
+  "auditRules": {
+    "description": "audit 检查规则",
+    "enabled": true,
+    "checks": [
+      {
+        "name": "硬编码色值检查",
+        "pattern": "#[0-9a-fA-F]{6}|rgb\\(|rgba\\(",
+        "severity": "ERROR",
+        "message": "禁止硬编码色值，使用 tailwind 预设色板"
+      },
+      {
+        "name": "非标间距检查",
+        "pattern": "[mp]-(3\\.5|5|7|9|11|13|14|15|18|22|26|28|36)",
+        "severity": "ERROR",
+        "message": "非标间距，使用允许的 scale: 2/4/8/12/16/20/24/32/40/48"
+      },
+      {
+        "name": "自定义圆角检查",
+        "pattern": "rounded-\\[[0-9]+px\\]",
+        "severity": "ERROR",
+        "message": "禁止自定义圆角，仅使用 sm/md/lg/xl/full"
+      },
+      {
+        "name": "多层阴影检查",
+        "pattern": "shadow-.*\\s+shadow-",
+        "severity": "ERROR",
+        "message": "禁止多层阴影叠加，仅使用单一阴影"
+      },
+      {
+        "name": "自定义字号检查",
+        "pattern": "text-\\[[0-9]+px\\]",
+        "severity": "ERROR",
+        "message": "禁止自定义字号，使用固定层级 xs/sm/base/lg/xl/2xl/3xl"
+      },
+      {
+        "name": "交互状态检查",
+        "pattern": "<button[^>]*>(?!.*hover)",
+        "severity": "WARN",
+        "message": "button 元素缺少 hover 状态"
+      },
+      {
+        "name": "DOM 深度检查",
+        "pattern": "<div><div><div><div>",
+        "severity": "WARN",
+        "message": "DOM 嵌套超过 3 层，应简化结构"
+      },
+      {
+        "name": "文字对比度检查",
+        "pattern": "text-tertiaryText.*bg-bgLight",
+        "severity": "WARN",
+        "message": "文字对比度可能不足，检查是否 ≥4.5:1"
+      }
+    ]
+  },
+  "polishRules": {
+    "description": "polish 完善规则",
+    "enabled": true,
+    "actions": [
+      {
+        "name": "补充交互状态",
+        "description": "为 button/input/card 自动补充 hover/active/disabled 状态",
+        "auto": true
+      },
+      {
+        "name": "规范化间距",
+        "description": "将非标间距自动替换为最接近的标准 scale",
+        "auto": true
+      },
+      {
+        "name": "统一阴影",
+        "description": "将自定义阴影统一为 sm/md/lg",
+        "auto": true
+      },
+      {
+        "name": "规范化圆角",
+        "description": "将自定义圆角统一为 sm/md/lg/xl/full",
+        "auto": true
+      },
+      {
+        "name": "颜色标准化",
+        "description": "将硬编码色值替换为预设色值",
+        "auto": true
+      }
+    ]
+  },
+  "initialized": true,
+  "initDate": "2026-07-03T02:14:00Z",
+  "lastUpdated": "2026-07-03T02:14:00Z",
+  "maintainer": "design-system-team",
+  "documentation": {
+    "baseUrl": "/.catpaw/specs/",
+    "rulesFile": ".catpawrules",
+    "designTokens": "tailwind.config.js"
+  }
+}

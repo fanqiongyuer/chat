@@ -39,7 +39,7 @@ const STEP_META: Record<
 > = {
   knowledge: {
     icon: <BookOpen size={13} />,
-    colorClass: 'text-blue-500',
+    colorClass: 'text-primary',
   },
   web: {
     icon: <Globe size={13} />,
@@ -75,9 +75,9 @@ const ThinkingIndicator: React.FC<ThinkingIndicatorProps> = ({
         {/* 旋转动画图标 */}
         <span className="relative flex h-4 w-4 items-center justify-center">
           {phase === 'generating' ? (
-            <Sparkles size={14} className="text-blue-500 animate-pulse" />
+            <Sparkles size={14} className="text-primary animate-pulse" />
           ) : (
-            <Loader2 size={14} className="animate-spin text-blue-500" />
+            <Loader2 size={14} className="animate-spin text-primary" />
           )}
         </span>
 

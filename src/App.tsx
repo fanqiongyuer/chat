@@ -14,6 +14,7 @@ import SystemSettingsDetailPage from './pages/SystemSettingsDetailPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import ComponentShowcase from './pages/ComponentShowcase';
 
 type ReactElement = any;
 
@@ -88,6 +89,7 @@ const router = createBrowserRouter(
         { path: 'system-settings', element: <SystemSettingsDetailPage /> },
         { path: 'members', element: <MemberManagementPage /> },
         { path: 'settings', element: <SettingsPage /> },
+        { path: 'showcase', element: <ComponentShowcase /> },
       ]
     },
     {

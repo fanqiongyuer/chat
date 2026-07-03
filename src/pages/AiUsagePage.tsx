@@ -1,7 +1,7 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { Segmented } from 'antd';
-import { ChevronDown, Menu } from 'lucide-react';
+import { ChevronDown, Menu, X } from 'lucide-react';
 import { type LayoutOutletContext } from '../components/Layout';
 import { mockProjects } from '../mock/projects';
 
@@ -272,6 +272,7 @@ export default function AiUsagePage() {
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot>('all');
   const [selectedRange, setSelectedRange] = useState<TimeRange>('yesterday');
   const [ratioView, setRatioView] = useState<RatioView>('project');
+  const [showRechargeModal, setShowRechargeModal] = useState(false);
 
   const currentMembers = useMemo(() => {
     if (selectedMember === 'all') return memberProfiles;
@@ -393,26 +394,35 @@ export default function AiUsagePage() {
           </section>
 
           <section className="rounded-xl bg-white">
-            <div className="flex items-center gap-5 border-b border-[#eef2f6] pl-0 pr-4 pt-3">
+            <div className="flex items-center justify-between border-b border-[#eef2f6] pl-0 pr-4 pt-3">
+              <div className="flex items-center gap-5">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('analysis')}
+                  className={`pb-2.5 text-base ${
+                    activeTab === 'analysis'
+                      ? 'border-b-2 border-[#1cc08b] font-medium text-primaryText'
+                      : 'text-[#96a0aa]'
+                  }`}
+                >
+                  消耗分析
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('users')}
+                  className={`pb-2.5 text-base ${
+                    activeTab === 'users' ? 'border-b-2 border-[#1cc08b] font-medium text-primaryText' : 'text-[#96a0aa]'
+                  }`}
+                >
+                  帐户明细
+                </button>
+              </div>
               <button
                 type="button"
-                onClick={() => setActiveTab('analysis')}
-                className={`pb-2.5 text-base ${
-                  activeTab === 'analysis'
-                    ? 'border-b-2 border-[#1cc08b] font-medium text-primaryText'
-                    : 'text-[#96a0aa]'
-                }`}
+                onClick={() => setShowRechargeModal(true)}
+                className="pb-2.5 text-base text-[#1cc08b] hover:text-[#15a076] transition-colors font-medium"
               >
-                消耗分析
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('users')}
-                className={`pb-2.5 text-base ${
-                  activeTab === 'users' ? 'border-b-2 border-[#1cc08b] font-medium text-primaryText' : 'text-[#96a0aa]'
-                }`}
-              >
-                帐户明细
+                充值记录
               </button>
             </div>
 
@@ -422,7 +432,7 @@ export default function AiUsagePage() {
                   <select
                     value={selectedMember}
                     onChange={(event) => setSelectedMember(event.target.value)}
-                    className="appearance-none rounded-md border border-[#e5ebf2] bg-white py-1.5 pl-2.5 pr-6 text-base text-secondaryText outline-none hover:bg-bgLight"
+                    className="appearance-none rounded-md border border-[borderGray] bg-white py-1.5 pl-2.5 pr-6 text-base text-secondaryText outline-none hover:bg-bgLight"
                   >
                     <option value="all">全部成员</option>
                     {memberProfiles.map((member) => (
@@ -438,7 +448,7 @@ export default function AiUsagePage() {
                   <select
                     value={selectedSlot}
                     onChange={(event) => setSelectedSlot(event.target.value as TimeSlot)}
-                    className="appearance-none rounded-md border border-[#e5ebf2] bg-white py-1.5 pl-2.5 pr-6 text-base text-secondaryText outline-none hover:bg-bgLight"
+                    className="appearance-none rounded-md border border-[borderGray] bg-white py-1.5 pl-2.5 pr-6 text-base text-secondaryText outline-none hover:bg-bgLight"
                   >
                     <option value="all">全部角色</option>
                     <option value="work">工作时段</option>
@@ -486,7 +496,7 @@ export default function AiUsagePage() {
                     />
                   </div>
 
-                  <div className="task-table-scroll overflow-x-auto border-b border-[#e8ecf1] bg-white">
+                  <div className="task-table-scroll overflow-x-auto border-b border-[borderGray] bg-white">
                     <div className="min-w-[760px]">
                       <div className="grid grid-cols-[1.35fr_0.9fr_1fr_0.7fr] border-b border-[#edf1f5] pl-0 pr-0 py-2 text-base text-[#8a94a0]">
                         {ratioView === 'project' ? (
@@ -536,7 +546,7 @@ export default function AiUsagePage() {
             ) : (
               <div className="pl-0 pr-4 py-5">
                 <div className="mb-3 text-base font-medium text-primaryText">ToKen流水</div>
-                <div className="task-table-scroll overflow-x-auto border-b border-[#e8ecf1] bg-white">
+                <div className="task-table-scroll overflow-x-auto border-b border-[borderGray] bg-white">
                   <div className="min-w-[760px]">
                     <div className="grid grid-cols-[1fr_0.8fr_1.2fr_1fr] border-b border-[#edf1f5] pl-0 pr-0 py-2 text-base text-[#8a94a0]">
                       <span>成员</span>
@@ -563,6 +573,74 @@ export default function AiUsagePage() {
           </section>
         </div>
       </div>
+
+      {/* 充值记录弹窗 */}
+      {showRechargeModal && (
+        <>
+          <div className="fixed inset-0 z-40 bg-black/20" onClick={() => setShowRechargeModal(false)} />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div
+              className="w-full max-w-[600px] rounded-lg bg-white shadow-popover"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="flex items-center justify-between border-b border-[borderGray] px-6 py-3.5">
+                <div>
+                  <h3 className="text-[17px] font-semibold text-primaryText">充值记录</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowRechargeModal(false)}
+                  className="rounded-full p-2 text-secondaryText transition-colors hover:bg-bgLight hover:text-primaryText"
+                  aria-label="关闭弹窗"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="px-6 py-4 max-h-[calc(100vh-200px)] overflow-y-auto">
+                <div className="space-y-3">
+                  {[
+                    { date: '2024.01.15', amount: '￥100', tokens: '+10,000 Tokens', status: '已到账' },
+                    { date: '2024.01.10', amount: '￥50', tokens: '+5,000 Tokens', status: '已到账' },
+                    { date: '2024.01.05', amount: '￥200', tokens: '+20,000 Tokens', status: '已到账' },
+                    { date: '2024.12.28', amount: '￥150', tokens: '+15,000 Tokens', status: '已到账' },
+                  ].map((record, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between p-3.5 rounded-lg border border-[#f1f4f7] hover:border-[borderGray] transition-colors"
+                    >
+                      <div className="flex-1">
+                        <div className="text-base font-medium text-primaryText">{record.amount}</div>
+                        <div className="text-sm text-tertiaryText mt-1">{record.date}</div>
+                      </div>
+                      <div className="flex-1 text-right">
+                        <div className="text-base text-primaryText">{record.tokens}</div>
+                        <div className="text-sm text-green-600 mt-1">{record.status}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 border-t border-[borderGray] px-6 py-4">
+                <button
+                  type="button"
+                  onClick={() => setShowRechargeModal(false)}
+                  className="rounded-full border border-[#d8e0ea] px-5 py-2 text-sm font-medium text-secondaryText transition-colors hover:bg-bgLight"
+                >
+                  关闭
+                </button>
+                <button
+                  type="button"
+                  className="rounded-full bg-[#1cc08b] px-5 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+                >
+                  充值
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

@@ -313,7 +313,7 @@ export default function MemberManagementPage() {
         </div>
         <button
           onClick={handleOpenInvite}
-          className="shrink-0 px-4 py-2 bg-bgLight hover:bg-[#e1e5ea] text-primaryText text-sm font-medium rounded-full transition-colors flex items-center gap-2"
+          className="shrink-0 px-4 py-2 bg-bgLight hover:bg-[bgLight] text-primaryText text-sm font-medium rounded-full transition-colors flex items-center gap-2"
         >
           <Plus size={14} />
           <span>邀请新成员</span>
@@ -350,7 +350,7 @@ export default function MemberManagementPage() {
 
           {/* 表格区域 */}
           <section className="space-y-3">
-            <div className="task-table-scroll overflow-x-auto border-b border-[#e8ecf1] bg-white">
+            <div className="task-table-scroll overflow-x-auto border-b border-[borderGray] bg-white">
               <div className="min-w-[940px]">
                 {/* 表格标题行 */}
                 <div className="grid grid-cols-[1.5fr_1fr_1fr_2.5fr_0.75fr_0.75fr] border-b border-[#edf1f5] pl-0 pr-3 py-2 text-[13px] text-[#8a94a0]">
@@ -441,7 +441,7 @@ export default function MemberManagementPage() {
               className="w-[340px] max-w-[calc(100vw-32px)] rounded-lg bg-white shadow-popover overflow-hidden animate-in fade-in zoom-in-95 duration-200"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="flex items-center justify-between border-b border-[#edf2f7] px-6 py-3.5">
+              <div className="flex items-center justify-between border-b border-[borderGray] px-6 py-3.5">
                 <h3 className="text-[17px] font-semibold text-primaryText">邀请新成员</h3>
                 <button
                   type="button"
@@ -500,7 +500,7 @@ export default function MemberManagementPage() {
               className="w-full max-w-[560px] rounded-2xl bg-white shadow-popover overflow-hidden animate-in fade-in zoom-in-95 duration-200"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="flex items-center justify-between border-b border-[#edf2f7] px-6 py-4">
+              <div className="flex items-center justify-between border-b border-[borderGray] px-6 py-4">
                 <h3 className="text-base font-semibold text-primaryText">编辑成员信息</h3>
                 <button
                   type="button"
@@ -520,7 +520,7 @@ export default function MemberManagementPage() {
                       value={formName}
                       onChange={(e) => setFormName(e.target.value)}
                       placeholder="请输入成员姓名"
-                      className="w-full rounded-xl border border-[#e3e9f1] px-3.5 py-2.5 text-sm text-primaryText outline-none transition-colors focus:border-black"
+                      className="w-full rounded-xl border border-[borderGray] px-3.5 py-2.5 text-sm text-primaryText outline-none transition-colors focus:border-black"
                     />
                   </div>
 
@@ -531,7 +531,7 @@ export default function MemberManagementPage() {
                       value={formEmail}
                       onChange={(e) => setFormEmail(e.target.value)}
                       placeholder="name@company.com"
-                      className="w-full rounded-xl border border-[#e3e9f1] px-3.5 py-2.5 text-sm text-primaryText outline-none transition-colors focus:border-black"
+                      className="w-full rounded-xl border border-[borderGray] px-3.5 py-2.5 text-sm text-primaryText outline-none transition-colors focus:border-black"
                     />
                   </div>
 
@@ -541,7 +541,7 @@ export default function MemberManagementPage() {
                       <select
                         value={formRole}
                         onChange={(e) => setFormRole(e.target.value as MemberRole)}
-                        className="w-full rounded-xl border border-[#e3e9f1] bg-white px-3.5 py-2.5 text-sm text-primaryText outline-none focus:border-black"
+                        className="w-full rounded-xl border border-[borderGray] bg-white px-3.5 py-2.5 text-sm text-primaryText outline-none focus:border-black"
                       >
                         <option value="成员">成员</option>
                         <option value="管理员">管理员</option>
@@ -553,7 +553,7 @@ export default function MemberManagementPage() {
                       <select
                         value={formDailyToken}
                         onChange={(e) => setFormDailyToken(e.target.value)}
-                        className="w-full rounded-xl border border-[#e3e9f1] bg-white px-3.5 py-2.5 text-sm text-primaryText outline-none focus:border-black"
+                        className="w-full rounded-xl border border-[borderGray] bg-white px-3.5 py-2.5 text-sm text-primaryText outline-none focus:border-black"
                       >
                         <option value="30w">30w</option>
                         <option value="50w">50w</option>
@@ -573,7 +573,7 @@ export default function MemberManagementPage() {
                       value={formProjects}
                       onChange={(e) => setFormProjects(e.target.value)}
                       placeholder="例：CRISPR实验优化"
-                      className="w-full rounded-xl border border-[#e3e9f1] px-3.5 py-2.5 text-sm text-primaryText outline-none transition-colors focus:border-black"
+                      className="w-full rounded-xl border border-[borderGray] px-3.5 py-2.5 text-sm text-primaryText outline-none transition-colors focus:border-black"
                     />
                   </div>
 
@@ -582,7 +582,7 @@ export default function MemberManagementPage() {
                   )}
                 </div>
 
-                <div className="flex items-center justify-end gap-3 border-t border-[#edf2f7] px-6 py-4">
+                <div className="flex items-center justify-end gap-3 border-t border-[borderGray] px-6 py-4">
                   <button
                     type="button"
                     onClick={() => setShowEditModal(false)}
@@ -619,7 +619,7 @@ export default function MemberManagementPage() {
                 </p>
               </div>
 
-              <div className="flex items-center justify-end gap-3 bg-[#f9fafb] px-6 py-3.5 border-t border-[#edf2f7]">
+              <div className="flex items-center justify-end gap-3 bg-[#f9fafb] px-6 py-3.5 border-t border-[borderGray]">
                 <button
                   type="button"
                   onClick={() => setShowDeleteConfirm(false)}

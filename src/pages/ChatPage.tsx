@@ -222,7 +222,7 @@ const getExperimentStatusMeta = (status: ExperimentStatus) => {
     case '创建试验方案':
       return {
         icon: <Plus size={10} strokeWidth={2.6} />,
-        className: 'bg-blue-50 text-blue-600',
+        className: 'bg-primary-soft text-primary',
       };
     case '修改试验方案':
       return {

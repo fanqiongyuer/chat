@@ -1,0 +1,134 @@
+.inputContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.inputLabel {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  margin-bottom: 8px;
+}
+
+.inputWrapper {
+  display: flex;
+  align-items: center;
+  background: white;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+  padding: 0 20px;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+.input-small {
+  height: 32px;
+}
+
+.input-medium {
+  height: 44px;
+}
+
+.input-large {
+  height: 56px;
+}
+
+.inputWrapper:hover:not(.input-disabled) {
+  border-color: var(--color-gray-3);
+}
+
+.inputWrapper.input-focused:not(.input-disabled) {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--ring-primary), 0 2px 8px rgba(0, 0, 0, 0.02);
+}
+
+.inputWrapper.input-error {
+  border-color: var(--color-danger);
+}
+
+.inputWrapper.input-error.input-focused {
+  box-shadow: 0 0 0 2px var(--ring-danger);
+}
+
+.inputWrapper.input-disabled {
+  background: var(--color-surface-muted);
+  cursor: not-allowed;
+}
+
+.inputPrefix {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+  margin-right: 8px;
+}
+
+.inputSuffix {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+
+.input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 16px;
+  line-height: 24px;
+  color: var(--color-text-primary);
+  padding: 0;
+  min-width: 0;
+}
+
+.input::placeholder {
+  color: transparent;
+}
+
+.input-with-prefix {
+  margin-left: 0;
+}
+
+.input-with-suffix {
+  margin-right: 0;
+}
+
+.input:disabled {
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+}
+
+.clearButton {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  transition: color 0.2s;
+}
+
+.clearButton:hover {
+  color: var(--color-text-primary);
+}
+
+.helperText {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+.helperText.helperError {
+  color: var(--color-danger);
+}

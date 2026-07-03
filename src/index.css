@@ -2,10 +2,54 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --color-primary: #14B886;
+  --color-primary-hover: #0d9e6d;
+  --color-success: #00b42a;
+  --color-warning: #ff7d00;
+  --color-danger: #f53f3f;
+  --color-danger-hover: #d32f2f;
+
+  --color-white: #ffffff;
+  --color-black: #000000;
+
+  --color-text-primary: #1f1f1f;
+  --color-text-secondary: #444746;
+  --color-text-tertiary: #747775;
+  --color-text-muted: #8c8c8c;
+  --color-text-header: #8a94a0;
+
+  --color-border: #e0e0e0;
+  --color-border-soft: #d9d9d9;
+  --color-line-subtle: #edf1f5;
+  --color-line-soft: #f1f4f7;
+
+  --color-gray-1: #f2f3f5;
+  --color-gray-2: #e5e6eb;
+  --color-gray-3: #c9cdd4;
+  --color-gray-4: #86909c;
+  --color-gray-5: #4e5969;
+  --color-gray-6: #272e3b;
+  --color-gray-7: #1d2129;
+
+  --color-surface: #ffffff;
+  --color-surface-muted: #f5f5f5;
+  --color-primary-soft: #f0f9f6;
+  --color-primary-soft-strong: #e8f7f2;
+  --color-success-soft: #edf9f0;
+  --color-warning-soft: #fff5e8;
+  --color-danger-soft: #fff1f0;
+
+  --ring-primary: rgba(20, 184, 134, 0.1);
+  --ring-danger: rgba(245, 63, 63, 0.1);
+  --overlay-mask: rgba(0, 0, 0, 0.45);
+  --overlay-surface-80: rgba(255, 255, 255, 0.8);
+}
+
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  color: #1f1f1f;
+  color: var(--color-text-primary);
   background-color: #f0f4f9;
 }
 
@@ -50,97 +94,97 @@ body {
   background: #c6ced8;
 }
 
+.action-link {
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  transition: color 0.2s ease;
+}
+
+.action-link:hover {
+  color: var(--color-primary);
+}
+
+.action-link-danger {
+  cursor: pointer;
+  color: var(--color-danger);
+  transition: color 0.2s ease;
+}
+
+.action-link-danger:hover {
+  color: var(--color-danger-hover);
+}
+
 @layer components {
   /* 按钮组件 */
   .btn-primary {
-    @apply bg-black text-white px-6 py-2.5 rounded-full text-base font-medium hover:opacity-90 transition-opacity flex items-center gap-2;
+    @apply bg-primary text-white px-6 py-2.5 rounded-full text-base font-medium hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2;
   }
 
   .btn-secondary {
-    background-color: #f0f4f9;
-    color: #1f1f1f;
-    @apply hover:bg-[#e1e5ea] px-6 py-2.5 rounded-full text-base font-medium transition-colors flex items-center gap-2;
+    @apply bg-bgLight text-primaryText hover:bg-[bgLight] px-6 py-2.5 rounded-full text-base font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2;
   }
 
   .btn-ghost {
-    background-color: transparent;
-    color: #444746;
-    @apply hover:bg-[#f0f4f9] px-4 py-2 rounded-full text-base font-medium transition-colors flex items-center gap-2;
+    @apply bg-transparent text-secondaryText hover:bg-bgLight px-4 py-2 rounded-full text-base font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2;
   }
 
   /* 导航项目 */
   .nav-item {
     width: calc(100% - 20px);
-    @apply mx-[10px] flex items-center gap-2 pl-[8px] pr-4 py-1.5 text-left rounded-full text-sm font-normal transition-colors;
+    @apply mx-2.5 flex items-center gap-2 pl-2 pr-4 py-1.5 text-left rounded-full text-sm font-normal text-secondaryText transition-colors;
   }
 
   .nav-item-active {
-    background-color: #e1e5ea;
-    color: #1f1f1f;
+    @apply bg-bgLight text-primaryText;
   }
 
   .nav-item-inactive {
-    color: #444746;
-  }
-
-  .nav-item-inactive:hover {
-    background-color: #e1e5ea;
-    color: #1f1f1f;
+    @apply text-secondaryText hover:bg-bgLight hover:text-primaryText;
   }
 
   /* 卡片 */
   .card {
-    border-color: #e0e0e0;
-    @apply border rounded-2xl p-6 hover:shadow-md hover:border-transparent transition-all;
+    @apply border border-borderGray rounded-lg p-6 bg-surface hover:shadow-md hover:border-transparent transition-all;
   }
 
   /* 输入框 */
   .input-base {
-    border-color: #e0e0e0;
-    @apply w-full border rounded-2xl p-4 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-base transition-all resize-none;
+    @apply w-full border border-borderGray rounded-lg p-4 text-base text-primaryText outline-none bg-surface transition-all resize-none focus:border-primary focus:ring-1 focus:ring-primary;
   }
 
   /* 消息气泡 */
   .message-bubble-user {
-    background-color: #f0f4f9;
-    color: #1f1f1f;
-    @apply px-5 py-3 rounded-3xl rounded-tr-sm max-w-[85%] text-lg leading-relaxed font-medium;
+    @apply bg-bgLight text-primaryText px-5 py-3 rounded-3xl rounded-tr-sm max-w-[85%] text-base leading-relaxed font-medium;
   }
 
   .message-bubble-ai {
-    @apply max-w-[85%] text-lg;
+    @apply max-w-[85%];
   }
 
   /* 代码块 */
   .code-block {
-    border-color: #e0e0e0;
-    @apply my-4 rounded-2xl overflow-hidden border bg-[#f8f9fa];
+    @apply border border-borderGray rounded-lg overflow-hidden bg-[#f8f9fa] my-4;
   }
 
   .code-block-header {
-    background-color: #f0f4f9;
-    color: #444746;
-    border-bottom-color: #e0e0e0;
-    @apply px-4 py-2 text-xs font-medium border-b;
+    @apply bg-bgLight text-secondaryText border-b border-borderGray px-4 py-2 text-xs font-medium;
   }
 
   .code-block-content {
-    color: #1f1f1f;
-    @apply p-4 overflow-x-auto font-mono text-sm;
+    @apply text-primaryText p-4 overflow-x-auto font-mono text-sm;
   }
 
   /* 下拉菜单 */
   .dropdown-menu {
-    @apply absolute bottom-full left-0 mb-2 w-60 bg-white rounded-2xl shadow-popover z-40 overflow-hidden py-2;
+    @apply absolute bottom-full left-0 mb-2 w-60 bg-surface rounded-lg shadow-md z-40 overflow-hidden py-2;
   }
 
   .dropdown-item {
-    color: #1f1f1f;
-    @apply px-4 py-2.5 text-base hover:bg-[#f0f4f9] cursor-pointer flex items-center justify-between transition-colors;
+    @apply text-primaryText px-4 py-2.5 text-base hover:bg-bgLight cursor-pointer flex items-center justify-between transition-colors;
   }
 
   .dropdown-item-active {
-    @apply after:content-[''] after:w-1.5 after:h-1.5 after:rounded-full after:bg-blue-600;
+    @apply after:content-[''] after:w-1.5 after:h-1.5 after:rounded-full after:bg-primary;
   }
 }
 
@@ -180,7 +224,7 @@ body {
   border-radius: 12px;
   overflow: hidden;
   border: 1px solid #E6ECF2;
-  background-color: #FFFFFF;
+  background-color: surface;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 
@@ -192,7 +236,7 @@ body {
   background-color: #F7F9FC;
   border-bottom: 1px solid #E6ECF2;
   font-size: 12px;
-  color: #5F6B7A;
+  color: tertiaryText;
   font-family: "SF Mono", "Menlo", "Monaco", "Consolas", monospace;
 }
 
@@ -203,7 +247,7 @@ body {
   padding: 3px 8px;
   border-radius: 6px;
   border: 1px solid #DCE4EE;
-  background-color: #FFFFFF;
+  background-color: surface;
   color: #4B5563;
   font-size: 12px;
   cursor: pointer;
@@ -227,8 +271,8 @@ body {
   padding: 2px 8px;
   border-radius: 999px;
   border: 1px solid #DCE4EE;
-  background-color: #FFFFFF;
-  color: #5F6B7A;
+  background-color: surface;
+  color: tertiaryText;
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.02em;
@@ -241,7 +285,7 @@ body {
 }
 
 .diagram-block-body {
-  background-color: #FFFFFF;
+  background-color: surface;
 }
 
 .diagram-block-body .mermaid svg {

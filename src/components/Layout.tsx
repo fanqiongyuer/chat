@@ -215,10 +215,10 @@ export default function Layout() {
 <span className="text-[18px] font-bold text-primaryText tracking-tight truncate leading-none">DepTrace</span>
 </div>
             <div className="flex items-center gap-0 shrink-0">
-              <button className="p-2 text-secondaryText hover:bg-[#e1e5ea] rounded-full transition-colors" title="搜索">
+              <button className="p-2 text-secondaryText hover:bg-bgLight rounded-full transition-colors" title="搜索">
                 <Search size={16} />
               </button>
-              <button onClick={() => setIsSidebarOpen(false)} className="p-2 text-secondaryText hover:bg-[#e1e5ea] rounded-full transition-colors">
+              <button onClick={() => setIsSidebarOpen(false)} className="p-2 text-secondaryText hover:bg-bgLight rounded-full transition-colors">
                 <PanelLeftClose size={16} />
               </button>
             </div>
@@ -284,7 +284,7 @@ export default function Layout() {
                 {showSortMenu && (
                   <>
                     <div className="fixed inset-0 z-[90]" onClick={() => setShowSortMenu(false)}></div>
-                    <div className="fixed bg-white rounded-xl shadow-popover z-[100] overflow-hidden py-2 animate-in fade-in slide-in-from-bottom-2" style={{ width: `${SORT_MENU_WIDTH}px`, top: `${sortMenuPos.top}px`, left: `${sortMenuPos.left}px` }}>
+                    <div className="fixed bg-white rounded-xl shadow-lg z-[100] overflow-hidden py-2 animate-in fade-in slide-in-from-bottom-2" style={{ width: `${SORT_MENU_WIDTH}px`, top: `${sortMenuPos.top}px`, left: `${sortMenuPos.left}px` }}>
                       <div 
                         onClick={() => {
                           setSortMode('time');
@@ -325,7 +325,7 @@ export default function Layout() {
                         <div
                           onClick={() => navigate(`/chat/${chat.id}`)}
                           className={`mx-[10px] text-sm pl-[10px] pr-4 py-1.5 rounded-full cursor-pointer transition-colors flex items-center justify-between group ${
-                            isActive ? 'text-primaryText bg-[#e1e5ea] font-normal' : 'text-secondaryText hover:text-primaryText hover:bg-[#e1e5ea] font-normal'
+                            isActive ? 'text-primaryText bg-bgLight font-normal' : 'text-secondaryText hover:text-primaryText hover:bg-bgLight font-normal'
                           }`}
                         >
                           <div className="flex min-w-0 items-center gap-2">
@@ -348,7 +348,7 @@ export default function Layout() {
                         {isMenuOpen && (
                           <>
                             <div className="fixed inset-0 z-30" onClick={() => setChatMenuOpenId(null)}></div>
-                            <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-xl shadow-popover z-40 overflow-hidden py-2 animate-in fade-in slide-in-from-bottom-2">
+                            <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-xl shadow-lg z-40 overflow-hidden py-2 animate-in fade-in slide-in-from-bottom-2">
                               <div className="px-4 py-2.5 text-base text-primaryText hover:bg-bgLight cursor-pointer transition-colors flex items-center gap-3 rounded-lg mx-2">
                                 <Pencil size={16} />
                                 <span>重命名</span>
@@ -389,7 +389,7 @@ export default function Layout() {
               return (
                 <div key={proj.id} className="mb-0.5">
                   <div 
-                    className="group mx-[10px] flex items-center gap-2 pl-[8px] pr-4 py-2 text-sm font-normal text-secondaryText cursor-pointer hover:text-primaryText rounded-full hover:bg-[#e1e5ea] transition-colors"
+                    className="group mx-[10px] flex items-center gap-2 pl-[8px] pr-4 py-2 text-sm font-normal text-secondaryText cursor-pointer hover:text-primaryText rounded-full hover:bg-bgLight transition-colors"
                     onClick={() => toggleProject(proj.id)}
                   >
                     <div className="relative h-[14px] w-[14px] shrink-0">
@@ -417,7 +417,7 @@ export default function Layout() {
                             <div 
                               onClick={() => navigate(`/chat/${chat.id}`)}
                               className={`mx-[10px] text-sm pl-[30px] pr-4 py-1.5 rounded-full cursor-pointer transition-colors flex items-center justify-between group ${
-                                isActive ? 'text-primaryText bg-[#e1e5ea] font-normal' : 'text-secondaryText hover:text-primaryText hover:bg-[#e1e5ea] font-normal'
+                                isActive ? 'text-primaryText bg-bgLight font-normal' : 'text-secondaryText hover:text-primaryText hover:bg-bgLight font-normal'
                               }`}
                             >
                               <span className="truncate">{chat.title}</span>
@@ -437,7 +437,7 @@ export default function Layout() {
                             {isMenuOpen && (
                               <>
                                 <div className="fixed inset-0 z-30" onClick={() => setChatMenuOpenId(null)}></div>
-                                <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-xl shadow-popover z-40 overflow-hidden py-2 animate-in fade-in slide-in-from-bottom-2">
+                                <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-xl shadow-lg z-40 overflow-hidden py-2 animate-in fade-in slide-in-from-bottom-2">
                                   <div className="px-4 py-2.5 text-base text-primaryText hover:bg-bgLight cursor-pointer transition-colors flex items-center gap-3 rounded-lg mx-2">
                                     <Pencil size={16} />
                                     <span>重命名</span>
@@ -481,7 +481,7 @@ export default function Layout() {
               return (
                 <div className="mb-0.5 mt-1">
                   <div 
-                    className="group mx-[10px] flex items-center gap-2 pl-[8px] pr-4 py-2 text-sm font-normal text-secondaryText cursor-pointer hover:text-primaryText rounded-full hover:bg-[#e1e5ea] transition-colors"
+                    className="group mx-[10px] flex items-center gap-2 pl-[8px] pr-4 py-2 text-sm font-normal text-secondaryText cursor-pointer hover:text-primaryText rounded-full hover:bg-bgLight transition-colors"
                     onClick={() => toggleProject('unassigned')}
                   >
                     <div className="relative h-[14px] w-[14px] shrink-0">
@@ -509,7 +509,7 @@ export default function Layout() {
                             <div 
                               onClick={() => navigate(`/chat/${chat.id}`)}
                               className={`mx-[10px] text-sm pl-[30px] pr-4 py-1.5 rounded-full cursor-pointer transition-colors flex items-center justify-between group ${
-                                isActive ? 'text-primaryText bg-[#e1e5ea] font-normal' : 'text-secondaryText hover:text-primaryText hover:bg-[#e1e5ea] font-normal'
+                                isActive ? 'text-primaryText bg-bgLight font-normal' : 'text-secondaryText hover:text-primaryText hover:bg-bgLight font-normal'
                               }`}
                             >
                               <span className="truncate">{chat.title}</span>
@@ -529,7 +529,7 @@ export default function Layout() {
                             {isMenuOpen && (
                               <>
                                 <div className="fixed inset-0 z-30" onClick={() => setChatMenuOpenId(null)}></div>
-                                <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-xl shadow-popover z-40 overflow-hidden py-2 animate-in fade-in slide-in-from-bottom-2">
+                                <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-xl shadow-lg z-40 overflow-hidden py-2 animate-in fade-in slide-in-from-bottom-2">
                                   <div className="px-4 py-2.5 text-base text-primaryText hover:bg-bgLight cursor-pointer transition-colors flex items-center gap-3 rounded-lg mx-2">
                                     <Pencil size={16} />
                                     <span>重命名</span>
@@ -582,7 +582,7 @@ export default function Layout() {
                       <div 
                         onClick={() => navigate(`/chat/${chat.id}`)}
                         className={`mx-[10px] text-sm pl-[10px] pr-4 py-1.5 rounded-full cursor-pointer transition-colors flex items-center justify-between group ${
-                          isActive ? 'text-primaryText bg-[#e1e5ea] font-normal' : 'text-secondaryText hover:text-primaryText hover:bg-[#e1e5ea] font-normal'
+                          isActive ? 'text-primaryText bg-bgLight font-normal' : 'text-secondaryText hover:text-primaryText hover:bg-bgLight font-normal'
                         }`}
                       >
                         <span className="truncate">{chat.title}</span>
@@ -602,7 +602,7 @@ export default function Layout() {
                       {isMenuOpen && (
                         <>
                           <div className="fixed inset-0 z-30" onClick={() => setChatMenuOpenId(null)}></div>
-                          <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-xl shadow-popover z-40 overflow-hidden py-2 animate-in fade-in slide-in-from-bottom-2">
+                          <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-xl shadow-lg z-40 overflow-hidden py-2 animate-in fade-in slide-in-from-bottom-2">
                             <div className="px-4 py-2.5 text-base text-primaryText hover:bg-bgLight cursor-pointer transition-colors flex items-center gap-3 rounded-lg mx-2">
                               <Pencil size={16} />
                               <span>重命名</span>
@@ -639,7 +639,7 @@ export default function Layout() {
           <div className="p-3 mt-auto">
             <div 
               onClick={() => setShowSettings(true)}
-              className="flex items-center justify-between p-2 rounded-full hover:bg-[#e1e5ea] transition-colors cursor-pointer text-secondaryText"
+              className="flex items-center justify-between p-2 rounded-full hover:bg-bgLight transition-colors cursor-pointer text-secondaryText"
             >
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center text-white text-sm font-medium">
@@ -688,7 +688,7 @@ export default function Layout() {
         <>
           <div className="fixed inset-0 z-40" onClick={() => setShowSettings(false)}></div>
           <div 
-            className="absolute left-4 bottom-[72px] z-50 bg-white w-64 rounded-xl shadow-popover overflow-hidden animate-in fade-in zoom-in-95 duration-200 origin-bottom-left"
+            className="absolute left-4 bottom-[72px] z-50 bg-white w-64 rounded-xl shadow-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200 origin-bottom-left"
             onClick={e => e.stopPropagation()}
           >
             <div className="py-2 text-base text-primaryText font-normal space-y-1 px-2">

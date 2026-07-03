@@ -1,0 +1,67 @@
+.tableWrapper {
+  width: 100%;
+  overflow-x: auto;
+  position: relative;
+  background: var(--color-surface);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  background: var(--color-surface);
+}
+
+.tableBordered {
+  border: none;
+}
+
+.tableBordered thead tr {
+  border-bottom: 1px solid var(--color-line-subtle);
+}
+
+.tableBordered tbody tr {
+  border-bottom: 1px solid var(--color-line-soft);
+}
+
+.tableBordered tbody tr:last-child {
+  border-bottom: none;
+}
+
+.tableStriped tbody tr:nth-child(odd) {
+  background: var(--color-surface);
+}
+
+.table thead th {
+  background: transparent;
+  color: var(--color-text-header);
+  font-weight: 400;
+  text-align: left;
+  padding: 12px 16px;
+  white-space: nowrap;
+}
+
+.table tbody td {
+  padding: 18px 16px;
+  color: var(--color-text-primary);
+}
+
+.tableEmpty {
+  text-align: center;
+  padding: 48px 16px;
+  color: var(--color-text-muted);
+}
+
+.loadingMask {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--overlay-surface-80);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
+  z-index: 10;
+}
