@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { Menu, KeyRound, Upload } from 'lucide-react';
+import { Menu } from 'lucide-react';
 import { type LayoutOutletContext } from '../components/Layout';
 import { BaseButton, BaseInput, BaseModal, BaseSelect, BaseToggle } from '@/components';
 
@@ -66,20 +66,20 @@ interface SettingRowProps {
 
 function SettingRow({ label, description, children }: SettingRowProps) {
   return (
-    <div className="flex items-center justify-between gap-6 py-4">
-      <div className="min-w-0 flex-1">
-        <div className="text-sm text-[var(--color-text-primary)]">{label}</div>
+    <div className="flex items-center justify-between gap-6 py-5">
+      <div className="min-w-0 pr-4">
+        <div className="text-sm font-medium text-[var(--color-text-primary)]">{label}</div>
         {description && (
-          <div className="mt-1 text-xs text-[var(--color-text-tertiary)]">{description}</div>
+          <div className="mt-1.5 text-xs leading-relaxed text-[var(--color-text-tertiary)]">{description}</div>
         )}
       </div>
-      <div className="shrink-0">{children}</div>
+      <div className="flex shrink-0 items-center justify-end">{children}</div>
     </div>
   );
 }
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <h3 className="pb-2 text-sm font-medium text-[var(--color-text-primary)]">{children}</h3>;
+  return <h3 className="mb-2 mt-4 text-base font-semibold text-[var(--color-text-primary)]">{children}</h3>;
 }
 
 export default function SystemSettingsDetailPage() {
@@ -134,7 +134,6 @@ export default function SystemSettingsDetailPage() {
                 rounded="large"
                 onClick={() => setShowPasswordModal(true)}
               >
-                <KeyRound size={14} />
                 修改
               </BaseButton>
             </SettingRow>
@@ -149,16 +148,10 @@ export default function SystemSettingsDetailPage() {
                   rounded="large"
                   onClick={handleAvatarUploadClick}
                 >
-                  <Upload size={14} />
                   上传
                 </BaseButton>
               </div>
             </SettingRow>
-          </div>
-          <div className="border-t border-[var(--color-line-subtle)] px-0 py-3">
-            <div className="text-xs text-[var(--color-text-tertiary)]">
-              当前头像文件：{settings.avatarFileName}
-            </div>
           </div>
           <input
             ref={avatarInputRef}
@@ -310,12 +303,16 @@ export default function SystemSettingsDetailPage() {
               <Menu size={20} />
             </button>
           )}
-          <h1 className="text-xl font-medium text-primaryText">系统设置</h1>
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-tertiaryText">系统设置</span>
+            <span className="text-tertiaryText">/</span>
+            <span className="font-medium text-primaryText">更多设置</span>
+          </div>
         </div>
       </header>
 
       <div className="flex-1 overflow-y-auto px-4 pb-12 pt-4 md:px-8 lg:px-10 md:pb-12 md:pt-6">
-        <div className="w-full py-0">
+        <div className="mx-auto max-w-[720px] py-0">
           <div className="mb-6 border-b border-[var(--color-line-subtle)]">
             <div className="flex items-center gap-6">
               {tabOptions.map((tab) => {

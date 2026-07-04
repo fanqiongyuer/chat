@@ -310,7 +310,11 @@ export default function MemberManagementPage() {
               <Menu size={20} />
             </button>
           )}
-          <h1 className="text-xl font-medium text-primaryText">成员管理</h1>
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-tertiaryText">系统设置</span>
+            <span className="text-tertiaryText">/</span>
+            <span className="font-medium text-primaryText">成员管理</span>
+          </div>
         </div>
         <BaseButton
           type="primary"

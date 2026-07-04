@@ -517,7 +517,11 @@ export default function AiUsagePage() {
               <Menu size={20} />
             </button>
           )}
-          <h1 className="text-xl font-medium text-primaryText">AI用量</h1>
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-tertiaryText">系统设置</span>
+            <span className="text-tertiaryText">/</span>
+            <span className="font-medium text-primaryText">AI用量</span>
+          </div>
         </div>
       </header>
 

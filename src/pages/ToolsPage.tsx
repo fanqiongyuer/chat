@@ -386,7 +386,11 @@ export default function ToolsPage() {
               <Menu size={20} />
             </button>
           )}
-          <h1 className="text-xl font-medium text-primaryText">任务管理</h1>
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-tertiaryText">系统设置</span>
+            <span className="text-tertiaryText">/</span>
+            <span className="font-medium text-primaryText">任务</span>
+          </div>
         </div>
         <BaseButton
           type="primary"
