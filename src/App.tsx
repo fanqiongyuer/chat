@@ -4,6 +4,7 @@ import Layout from './components/Layout';
 import ChatPage from './pages/ChatPage';
 import ProjectsPage from './pages/ProjectsPage';
 import ProjectDetailPage from './pages/ProjectDetailPage';
+import ExperimentDetailPage from './pages/ExperimentDetailPage';
 import ToolsPage from './pages/ToolsPage';
 import ToolPage from './pages/ToolPage';
 import SettingsPage from './pages/SettingsPage';
@@ -82,6 +83,7 @@ const router = createBrowserRouter(
         { path: 'chat/:id', element: <ChatPage isNew={false} /> },
         { path: 'projects', element: <ProjectsPage /> },
         { path: 'project/:id', element: <ProjectDetailPage /> },
+        { path: 'project/:projectId/experiment/:experimentId', element: <ExperimentDetailPage /> },
         { path: 'tools', element: <ToolsPage /> },
         { path: 'tool/:id', element: <ToolPage /> },
         { path: 'ai-usage', element: <AiUsagePage /> },
