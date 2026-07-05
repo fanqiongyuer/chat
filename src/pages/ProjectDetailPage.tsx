@@ -107,15 +107,15 @@ export default function ProjectDetailPage() {
   const displayList =
     activeTab === 'experiment' ? filteredExperiments : filteredKnowledge;
 
-  const memberSummary = useMemo(() => {
-    if (projectMembers.length === 0) return '暂无';
-    const preview = projectMembers.slice(0, 4).map((m) => m.name).join('、');
-    const remain = projectMembers.length - 4;
-    if (remain > 0) {
-      return `${preview}等 ${projectMembers.length} 名成员`;
+  const memberCount = projectMembers.length;
+
+  const projectTypeLabel = useMemo(() => {
+    if (!project) return '项目';
+    if (project.visibility === 'private') {
+      return project.privateType === 'team' ? '团队项目' : '个人项目';
     }
-    return preview;
-  }, [projectMembers]);
+    return '公开项目';
+  }, [project]);
 
   const statusStyleMap: Record<string, React.CSSProperties> = {
     进行中: { backgroundColor: 'rgba(236, 253, 245, 1)', color: '#059669' },
@@ -186,9 +186,14 @@ export default function ProjectDetailPage() {
                 项目的描述，您可查看私有项目的对话，并编辑里面的知识内容
               </p>
 
-              <div className="mt-4 flex items-center gap-1.5 text-sm text-[var(--color-text-muted)]">
-                <Users size={14} className="text-[var(--color-text-muted)]" />
-                <span>{memberSummary}</span>
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-[#f1f4f7] px-2.5 py-0.5 text-[13px] font-medium text-secondaryText">
+                  <Users size={13} className="text-secondaryText" />
+                  <span>成员 {memberCount} 人</span>
+                </span>
+                <span className="inline-flex items-center rounded-full bg-[#f1f4f7] px-2.5 py-0.5 text-[13px] font-medium text-secondaryText">
+                  {projectTypeLabel}
+                </span>
               </div>
 
               <div className="mt-10 border-b border-[var(--color-line-subtle)]">

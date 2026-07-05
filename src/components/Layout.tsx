@@ -173,8 +173,18 @@ export default function Layout() {
   }, [chats]);
 
   const navItems = [
-    { label: '项目', icon: <Folder size={14} />, path: '/projects' },
-    { label: '任务', icon: <Clock3 size={14} />, path: '/tools' }
+    {
+      label: '项目',
+      icon: <Folder size={14} />,
+      path: '/projects',
+      isActive: location.pathname === '/projects' || location.pathname.startsWith('/project/'),
+    },
+    {
+      label: '任务',
+      icon: <Clock3 size={14} />,
+      path: '/tools',
+      isActive: location.pathname === '/tools' || location.pathname.startsWith('/tool/'),
+    },
   ];
 
   const activeChat = useMemo(() => {
@@ -228,7 +238,11 @@ export default function Layout() {
           <div className="px-0 mb-0.5 mt-0.5">
             <button 
               onClick={() => navigate('/chat/new')}
-              className={`nav-item ${location.pathname === '/chat/new' ? 'nav-item-active' : 'nav-item-inactive'}`}
+              className={`nav-item ${
+                location.pathname === '/chat/new'
+                  ? 'bg-[#E4EAF0] text-primaryText'
+                  : 'text-secondaryText hover:bg-[#E4EAF0] hover:text-primaryText'
+              }`}
             >
               <SquarePen size={14} />
               <span>发起新对话</span>
@@ -238,12 +252,16 @@ export default function Layout() {
           {/* 主导航 */}
           <div className="px-0 flex flex-col gap-0.5 mb-4">
             {navItems.map(item => {
-              const isActive = location.pathname.startsWith(item.path);
+              const isActive = item.isActive;
               return (
                 <button
                   key={item.path}
                   onClick={() => navigate(item.path)}
-                  className={`nav-item ${isActive ? 'nav-item-active' : 'nav-item-inactive'}`}
+                  className={`nav-item ${
+                    isActive
+                      ? 'bg-[#E4EAF0] text-primaryText'
+                      : 'text-secondaryText hover:bg-[#E4EAF0] hover:text-primaryText'
+                  }`}
                 >
                   {item.icon}
                   <span>{item.label}</span>
@@ -325,7 +343,7 @@ export default function Layout() {
                         <div
                           onClick={() => navigate(`/chat/${chat.id}`)}
                           className={`mx-[10px] text-sm pl-[10px] pr-4 py-1.5 rounded-full cursor-pointer transition-colors flex items-center justify-between group ${
-                            isActive ? 'text-primaryText bg-bgLight font-normal' : 'text-secondaryText hover:text-primaryText hover:bg-bgLight font-normal'
+                            isActive ? 'text-primaryText bg-[#E4EAF0] font-normal' : 'text-secondaryText hover:text-primaryText hover:bg-[#E4EAF0] font-normal'
                           }`}
                         >
                           <div className="flex min-w-0 items-center gap-2">
@@ -417,7 +435,7 @@ export default function Layout() {
                             <div 
                               onClick={() => navigate(`/chat/${chat.id}`)}
                               className={`mx-[10px] text-sm pl-[30px] pr-4 py-1.5 rounded-full cursor-pointer transition-colors flex items-center justify-between group ${
-                                isActive ? 'text-primaryText bg-bgLight font-normal' : 'text-secondaryText hover:text-primaryText hover:bg-bgLight font-normal'
+                                isActive ? 'text-primaryText bg-[#E4EAF0] font-normal' : 'text-secondaryText hover:text-primaryText hover:bg-[#E4EAF0] font-normal'
                               }`}
                             >
                               <span className="truncate">{chat.title}</span>
@@ -509,7 +527,7 @@ export default function Layout() {
                             <div 
                               onClick={() => navigate(`/chat/${chat.id}`)}
                               className={`mx-[10px] text-sm pl-[30px] pr-4 py-1.5 rounded-full cursor-pointer transition-colors flex items-center justify-between group ${
-                                isActive ? 'text-primaryText bg-bgLight font-normal' : 'text-secondaryText hover:text-primaryText hover:bg-bgLight font-normal'
+                                isActive ? 'text-primaryText bg-[#E4EAF0] font-normal' : 'text-secondaryText hover:text-primaryText hover:bg-[#E4EAF0] font-normal'
                               }`}
                             >
                               <span className="truncate">{chat.title}</span>
@@ -582,7 +600,7 @@ export default function Layout() {
                       <div 
                         onClick={() => navigate(`/chat/${chat.id}`)}
                         className={`mx-[10px] text-sm pl-[10px] pr-4 py-1.5 rounded-full cursor-pointer transition-colors flex items-center justify-between group ${
-                          isActive ? 'text-primaryText bg-bgLight font-normal' : 'text-secondaryText hover:text-primaryText hover:bg-bgLight font-normal'
+                          isActive ? 'text-primaryText bg-[#E4EAF0] font-normal' : 'text-secondaryText hover:text-primaryText hover:bg-[#E4EAF0] font-normal'
                         }`}
                       >
                         <span className="truncate">{chat.title}</span>

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { useNavigate, useOutletContext } from 'react-router-dom';
-import { ChevronLeft, Menu, Plus, X, HelpCircle, AlertCircle, ShieldCheck } from 'lucide-react';
+import { useOutletContext } from 'react-router-dom';
+import { Menu, Plus, X, HelpCircle, AlertCircle, ShieldCheck } from 'lucide-react';
 import { BaseButton } from '@/components';
 import { type LayoutOutletContext } from '../components/Layout';
 
@@ -176,7 +176,6 @@ const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const generateInviteCode = () => Array.from({ length: 6 }, () => Math.floor(Math.random() * 10)).join('');
 
 export default function MemberManagementPage() {
-  const navigate = useNavigate();
   const { isSidebarOpen, setIsSidebarOpen } = useOutletContext<LayoutOutletContext>();
 
   const [members, setTeamMembers] = useState<TeamMember[]>(initialTeamMembers);
@@ -312,13 +311,7 @@ export default function MemberManagementPage() {
             </button>
           )}
           <div className="flex items-center gap-2 text-sm">
-            <button
-              type="button"
-              onClick={() => navigate('/settings')}
-              className="text-tertiaryText transition-colors hover:text-primaryText"
-            >
-              系统设置
-            </button>
+            <span className="text-tertiaryText">系统设置</span>
             <span className="text-tertiaryText">/</span>
             <span className="font-medium text-primaryText">成员管理</span>
           </div>

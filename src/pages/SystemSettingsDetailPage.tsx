@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
-import { useNavigate, useOutletContext } from 'react-router-dom';
-import { ChevronLeft, Menu } from 'lucide-react';
+import { useOutletContext } from 'react-router-dom';
+import { Menu } from 'lucide-react';
 import { type LayoutOutletContext } from '../components/Layout';
 import { BaseButton, BaseInput, BaseModal, BaseSelect, BaseToggle } from '@/components';
 
@@ -83,7 +83,6 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 }
 
 export default function SystemSettingsDetailPage() {
-  const navigate = useNavigate();
   const { isSidebarOpen, setIsSidebarOpen } = useOutletContext<LayoutOutletContext>();
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
   const [settings, setSettings] = useState<SettingsState>(initialSettings);
@@ -305,13 +304,7 @@ export default function SystemSettingsDetailPage() {
             </button>
           )}
           <div className="flex items-center gap-2 text-sm">
-            <button
-              type="button"
-              onClick={() => navigate('/settings')}
-              className="text-tertiaryText transition-colors hover:text-primaryText"
-            >
-              系统设置
-            </button>
+            <span className="text-tertiaryText">系统设置</span>
             <span className="text-tertiaryText">/</span>
             <span className="font-medium text-primaryText">更多设置</span>
           </div>
