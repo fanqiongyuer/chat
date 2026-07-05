@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
-import { Menu, Plus, Users } from 'lucide-react';
+import { ChevronLeft, Menu, Plus, Users } from 'lucide-react';
 import { BaseButton, BaseEmpty, BaseSelect } from '@/components';
 import {
   EXPERIMENTS_BY_PROJECT,
@@ -76,7 +76,6 @@ export default function ProjectDetailPage() {
     activeTab === 'experiment'
       ? [
           { label: '实验阶段', value: 'all' },
-          { label: '规划中', value: '规划中' },
           { label: '进行中', value: '进行中' },
           { label: '已完成', value: '已完成' },
         ]
@@ -119,7 +118,6 @@ export default function ProjectDetailPage() {
   }, [projectMembers]);
 
   const statusStyleMap: Record<string, React.CSSProperties> = {
-    规划中: { backgroundColor: 'var(--color-gray-1)', color: 'var(--color-gray-5)' },
     进行中: { backgroundColor: 'rgba(236, 253, 245, 1)', color: '#059669' },
     已完成: { backgroundColor: 'rgba(239, 246, 255, 1)', color: '#2563eb' },
     对话沉淀: { backgroundColor: 'rgba(236, 253, 245, 1)', color: '#059669' },
@@ -141,7 +139,13 @@ export default function ProjectDetailPage() {
             </button>
           )}
           <div className="flex items-center gap-2 text-sm">
-            <span className="text-tertiaryText">项目</span>
+            <button
+              type="button"
+              onClick={() => navigate('/projects')}
+              className="text-tertiaryText transition-colors hover:text-primaryText"
+            >
+              项目
+            </button>
             <span className="text-tertiaryText">/</span>
             <span className="font-medium text-primaryText">{project?.name ?? '详情'}</span>
           </div>
@@ -240,10 +244,11 @@ export default function ProjectDetailPage() {
                 </div>
 
                 <BaseButton
-                  type="primary"
+                  type="ghost"
                   size="small"
                   rounded="large"
-                  icon={<Plus size={14} />}
+                  icon={<Plus size={16} />}
+                  className="!h-auto !border-transparent !bg-transparent !px-0 !py-0 !text-sm !font-semibold !text-primaryText hover:!bg-transparent hover:!text-[var(--color-gray-6)]"
                 >
                   {activeTab === 'experiment' ? '新建实验' : '新建知识'}
                 </BaseButton>

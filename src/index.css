@@ -71,6 +71,37 @@ body {
   background: #a8aaaa;
 }
 
+.auto-hide-scrollbar {
+  scrollbar-width: none;
+}
+
+.auto-hide-scrollbar::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.auto-hide-scrollbar.is-scrolling {
+  scrollbar-width: thin;
+}
+
+.auto-hide-scrollbar.is-scrolling::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.auto-hide-scrollbar.is-scrolling::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.auto-hide-scrollbar.is-scrolling::-webkit-scrollbar-thumb {
+  background: #c4c7c5;
+  border-radius: 4px;
+}
+
+.auto-hide-scrollbar.is-scrolling::-webkit-scrollbar-thumb:hover {
+  background: #a8aaaa;
+}
+
 .task-table-scroll {
   scrollbar-width: thin;
   scrollbar-color: #d4dae2 transparent;

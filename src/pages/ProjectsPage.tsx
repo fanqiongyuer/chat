@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { mockProjects } from '../mock/projects';
-import { Plus, Menu } from 'lucide-react';
+import { ChevronLeft, Plus, Menu } from 'lucide-react';
 import { BaseButton } from '@/components';
 import { type LayoutOutletContext } from '../components/Layout';
 
@@ -32,8 +32,6 @@ export default function ProjectsPage() {
             </button>
           )}
           <div className="flex items-center gap-2 text-sm">
-            <span className="text-tertiaryText">系统设置</span>
-            <span className="text-tertiaryText">/</span>
             <span className="font-medium text-primaryText">项目</span>
           </div>
         </div>

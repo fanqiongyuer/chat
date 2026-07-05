@@ -1,6 +1,6 @@
 export type ProjectVisibility = 'private' | 'public';
 export type PrivateProjectType = 'team' | 'personal';
-export type ExperimentStatus = '规划中' | '进行中' | '已完成';
+export type ExperimentStatus = '进行中' | '已完成';
 export type KnowledgeStatus = '对话沉淀' | '手工创建' | '外部导入';
 export type ExperimentTimelineStatus =
   | '创建试验方案'
@@ -282,7 +282,7 @@ export const EXPERIMENT_DETAILS_BY_PROJECT: Record<string, ProjectExperimentDeta
       subtitle: '通过不同转染试剂与时间窗口组合，提高 CRISPR 编辑稳定性',
       summary: '通过不同转染试剂与时间窗口组合，提高 CRISPR 编辑稳定性。',
       ownerId: 'm-songke',
-      status: '规划中',
+      status: '进行中',
       tags: ['实验目标', '流程优化'],
       updatedAt: '2026.06.04 09:00',
       timeline: [
@@ -424,7 +424,7 @@ export const EXPERIMENT_DETAILS_BY_PROJECT: Record<string, ProjectExperimentDeta
       subtitle: '统一临床前指标，搭建不同实验模型的对照基线',
       summary: '统一临床前指标，搭建不同实验模型的对照基线。',
       ownerId: 'm-lijin',
-      status: '规划中',
+      status: '进行中',
       tags: ['流程优化'],
       updatedAt: '2026.06.02 12:00',
       timeline: [

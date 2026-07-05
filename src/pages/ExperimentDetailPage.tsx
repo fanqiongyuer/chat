@@ -1,16 +1,15 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import {
-  ArrowLeft,
   CheckCircle2,
   FlaskConical,
   LineChart,
   Menu,
   Pencil,
   Plus,
-  Users,
+  Upload,
 } from 'lucide-react';
 import { BaseButton, BaseEmpty } from '@/components';
 import {
@@ -69,6 +68,11 @@ export default function ExperimentDetailPage() {
   }>();
   const { isSidebarOpen, setIsSidebarOpen } = useOutletContext<LayoutOutletContext>();
   const [selectedTimelineId, setSelectedTimelineId] = useState<string | null>(null);
+  const [isTimelineScrolling, setIsTimelineScrolling] = useState(false);
+  const [isContentScrolling, setIsContentScrolling] = useState(false);
+  const timelineScrollTimerRef = useRef<number | null>(null);
+  const contentScrollTimerRef = useRef<number | null>(null);
+  const importInputRef = useRef<HTMLInputElement | null>(null);
 
   const project = useMemo(
     () => mockProjects.find((item) => item.id === projectId),
@@ -99,6 +103,52 @@ export default function ExperimentDetailPage() {
     );
   }, [experiment, selectedTimelineId]);
 
+  const createdByName = useMemo(() => {
+    if (!activeTimeline) return ownerName;
+    return activeTimeline.actor || ownerName;
+  }, [activeTimeline, ownerName]);
+
+  const modifiedByName = useMemo(() => {
+    if (!activeTimeline) return ownerName;
+    return activeTimeline.actor || ownerName;
+  }, [activeTimeline, ownerName]);
+
+  const parentPath = useMemo(() => {
+    if (!projectId) return null;
+    return `/project/${projectId}`;
+  }, [projectId]);
+
+  const handleTimelineScroll = () => {
+    setIsTimelineScrolling(true);
+    if (timelineScrollTimerRef.current !== null) {
+      window.clearTimeout(timelineScrollTimerRef.current);
+    }
+    timelineScrollTimerRef.current = window.setTimeout(() => {
+      setIsTimelineScrolling(false);
+    }, 700);
+  };
+
+  const handleContentScroll = () => {
+    setIsContentScrolling(true);
+    if (contentScrollTimerRef.current !== null) {
+      window.clearTimeout(contentScrollTimerRef.current);
+    }
+    contentScrollTimerRef.current = window.setTimeout(() => {
+      setIsContentScrolling(false);
+    }, 700);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (timelineScrollTimerRef.current !== null) {
+        window.clearTimeout(timelineScrollTimerRef.current);
+      }
+      if (contentScrollTimerRef.current !== null) {
+        window.clearTimeout(contentScrollTimerRef.current);
+      }
+    };
+  }, []);
+
   return (
     <div className="flex h-full w-full flex-col bg-white">
       <header className="z-10 flex h-16 shrink-0 items-center justify-between bg-white/80 px-4 backdrop-blur-sm">
@@ -113,25 +163,51 @@ export default function ExperimentDetailPage() {
             </button>
           )}
           <div className="flex items-center gap-2 text-sm">
-            <span className="text-tertiaryText">项目</span>
+            <button
+              type="button"
+              onClick={() => navigate('/projects')}
+              className="text-tertiaryText transition-colors hover:text-primaryText"
+            >
+              项目
+            </button>
             <span className="text-tertiaryText">/</span>
-            <span className="text-tertiaryText">{project?.name ?? '实验详情'}</span>
+            <button
+              type="button"
+              onClick={() => parentPath && navigate(parentPath)}
+              disabled={!parentPath}
+              className={`transition-colors ${
+                parentPath
+                  ? 'text-tertiaryText hover:text-primaryText'
+                  : 'cursor-not-allowed text-tertiaryText/60'
+              }`}
+            >
+              {project?.name ?? '实验详情'}
+            </button>
             <span className="text-tertiaryText">/</span>
             <span className="font-medium text-primaryText">{experiment?.title ?? '实验详情'}</span>
           </div>
         </div>
 
-        <BaseButton
-          type="secondary"
-          size="small"
-          rounded="large"
-          icon={<ArrowLeft size={14} />}
-          onClick={() =>
-            navigate(projectId ? `/project/${projectId}` : '/projects')
-          }
-        >
-          返回列表
-        </BaseButton>
+        <>
+          <BaseButton
+            type="primary"
+            size="small"
+            rounded="large"
+            icon={<Upload size={14} strokeWidth={1.8} />}
+            onClick={() => importInputRef.current?.click()}
+          >
+            导入文件
+          </BaseButton>
+          <input
+            ref={importInputRef}
+            type="file"
+            className="hidden"
+            onChange={(event) => {
+              // Placeholder for future import handling.
+              event.currentTarget.value = '';
+            }}
+          />
+        </>
       </header>
 
       <div className="flex-1 min-h-0 overflow-hidden px-4 pb-8 pt-4 md:px-8 lg:px-10 md:pt-6">
@@ -142,16 +218,22 @@ export default function ExperimentDetailPage() {
             </div>
           ) : (
             <>
-              <section className="mb-6 max-w-[760px] shrink-0">
+              <section className="mb-6 shrink-0">
                 <h1 className="text-2xl font-semibold text-primaryText">{experiment.title}</h1>
                 <p className="mt-1 text-sm leading-6 text-tertiaryText">
                   {experiment.subtitle}
                 </p>
+                <div className="mt-4 border-t border-[var(--color-line-subtle)]" />
               </section>
 
-              <div className="flex min-h-0 flex-1 gap-8">
-                <aside className="hidden order-2 w-[280px] shrink-0 border-l border-[var(--color-line-subtle)] pl-6 lg:flex lg:flex-col lg:min-h-0">
-                  <div className="min-h-0 flex-1 overflow-y-auto pb-6">
+              <div className="flex min-h-0 flex-1 gap-10">
+                <aside className="hidden order-2 w-[280px] shrink-0 lg:flex lg:flex-col lg:min-h-0">
+                  <div
+                    onScroll={handleTimelineScroll}
+                    className={`min-h-0 flex-1 overflow-y-auto pb-6 auto-hide-scrollbar ${
+                      isTimelineScrolling ? 'is-scrolling' : ''
+                    }`}
+                  >
                     <div className="space-y-1.5">
                     {experiment.timeline.map((entry, index) => {
                       const isActive = activeTimeline?.id === entry.id;
@@ -199,26 +281,36 @@ export default function ExperimentDetailPage() {
                 </div>
                 </aside>
 
-                <section className="order-1 min-w-0 flex-1 min-h-0 overflow-y-auto pb-8">
-                  <div className="max-w-[860px]">
-                  <div className="flex flex-wrap items-center gap-4 text-sm text-tertiaryText">
-                    <div className="flex items-center gap-1.5">
-                      <Users size={14} />
-                      <span>{ownerName}</span>
+                <section className="order-1 min-w-0 flex-1 min-h-0">
+                  <div className="max-w-[860px] h-full min-h-0">
+                  <div
+                    onScroll={handleContentScroll}
+                    className={`h-full min-h-0 rounded-2xl border border-[var(--color-line-subtle)] bg-[rgba(250,251,252,0.55)] px-4 pb-4 pt-0 md:px-5 md:pb-5 md:pt-0 overflow-y-auto auto-hide-scrollbar ${
+                      isContentScrolling ? 'is-scrolling' : ''
+                    }`}
+                  >
+                    <div className="sticky top-0 z-20 -mx-4 bg-[rgba(250,251,252,1)] px-4 pt-4 md:-mx-5 md:px-5 md:pt-5">
+                      <h2 className="text-[18px] font-semibold leading-7 text-primaryText">
+                        {activeTimeline?.detailTitle ?? experiment.title}
+                      </h2>
+                      <div className="mt-2 flex items-center justify-between gap-4">
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-tertiaryText">
+                          <span>创建人: {createdByName}</span>
+                          <span>最近修改: {modifiedByName}</span>
+                          <span>{activeTimeline?.updatedAt ?? experiment.updatedAt}</span>
+                        </div>
+                        <button
+                          type="button"
+                          className="shrink-0 text-sm font-medium text-primaryText transition-colors hover:text-primaryText/80"
+                        >
+                          编辑
+                        </button>
+                      </div>
+                      <div className="mt-4 border-t border-[var(--color-line-subtle)]" />
                     </div>
-                    <span>更新时间 {experiment.updatedAt}</span>
-                  </div>
-
-                  <div className="mt-5 rounded-[28px] border border-[var(--color-line-subtle)] bg-[linear-gradient(180deg,rgba(252,252,252,0.95),rgba(255,255,255,1))] px-6 py-6 shadow-[0_12px_32px_rgba(15,23,42,0.04)] md:px-8 md:py-8">
-                    <div className="text-sm text-tertiaryText">
-                      {activeTimeline?.date} · {activeTimeline?.status}
-                    </div>
-                    <h2 className="mt-3 text-[28px] font-semibold leading-9 text-primaryText">
-                      {activeTimeline?.detailTitle ?? experiment.title}
-                    </h2>
                     {activeTimeline?.markdownContent ? (
-                      <div className="mt-4 rounded-2xl border border-[var(--color-line-subtle)] bg-white/95 px-5 py-4 md:px-6 md:py-5">
-                        <div className="prose prose-slate max-w-none text-primaryText prose-p:my-3 prose-p:text-sm prose-p:leading-7 prose-li:text-sm prose-li:leading-7 prose-headings:text-primaryText prose-headings:tracking-[-0.01em] prose-h2:mt-4 prose-h2:mb-2 prose-h2:text-xl prose-h2:font-semibold prose-h3:mt-4 prose-h3:mb-2 prose-h3:text-base prose-h3:font-semibold prose-strong:text-primaryText prose-code:before:content-none prose-code:after:content-none prose-hr:my-5 prose-li:my-1 prose-li:marker:text-secondaryText prose-ol:pl-6 prose-ul:pl-6 prose-blockquote:border-l-2 prose-blockquote:border-[var(--color-line-subtle)] prose-blockquote:pl-3 prose-blockquote:text-secondaryText prose-a:text-primary prose-a:no-underline hover:prose-a:underline">
+                      <div className="mt-4">
+                        <div className="prose prose-slate max-w-none text-primaryText prose-p:my-3 prose-p:text-sm prose-p:leading-7 prose-li:text-sm prose-li:leading-7 prose-headings:text-primaryText prose-headings:tracking-[-0.01em] prose-h2:mt-4 prose-h2:mb-2 prose-h2:text-[16px] prose-h2:font-semibold prose-h3:mt-4 prose-h3:mb-2 prose-h3:text-base prose-h3:font-semibold prose-strong:text-primaryText prose-code:before:content-none prose-code:after:content-none prose-hr:my-5 prose-li:my-1 prose-li:marker:text-secondaryText prose-ol:pl-6 prose-ul:pl-6 prose-blockquote:border-l-2 prose-blockquote:border-[var(--color-line-subtle)] prose-blockquote:pl-3 prose-blockquote:text-secondaryText prose-a:text-primary prose-a:no-underline hover:prose-a:underline">
                           <ReactMarkdown remarkPlugins={[remarkGfm]}>
                             {activeTimeline.markdownContent}
                           </ReactMarkdown>
@@ -248,7 +340,7 @@ export default function ExperimentDetailPage() {
                       </>
                     )}
 
-                    <div className="mt-8 rounded-2xl bg-[#fafafa] px-4 py-4">
+                    <div className="mt-8 rounded-2xl bg-[#fafafa] px-4 py-4 mb-6">
                       <div className="text-sm font-medium text-primaryText">记录摘要</div>
                       <p className="mt-2 text-sm leading-6 text-secondaryText">
                         {activeTimeline?.summary}
@@ -278,15 +370,6 @@ export default function ExperimentDetailPage() {
                     </div>
                   </div>
 
-                  <div className="mt-8 rounded-2xl border border-[var(--color-line-subtle)] bg-white px-5 py-5">
-                    <div className="text-sm font-medium text-primaryText">实验说明</div>
-                    <p className="mt-2 text-sm leading-7 text-secondaryText">
-                      {experiment.subtitle}
-                    </p>
-                    <p className="mt-3 text-sm leading-7 text-secondaryText">
-                      当前页面采用左侧实验目录与右侧详情联动的查看方式，可继续沿实验节点追溯方案创建、调整、模拟与湿实验记录。
-                    </p>
-                  </div>
                 </div>
                 </section>
               </div>

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { useOutletContext } from 'react-router-dom';
-import { Menu, Plus, MoreHorizontal, Pencil, Copy, Trash2, X, Check, ChevronDown, ChevronRight, CalendarDays, Clock3, Folder } from 'lucide-react';
+import { useNavigate, useOutletContext } from 'react-router-dom';
+import { Menu, Plus, MoreHorizontal, Pencil, Copy, Trash2, X, Check, ChevronLeft, ChevronDown, ChevronRight, CalendarDays, Clock3, Folder } from 'lucide-react';
 import { mockProjects } from '../mock/projects';
 import { BaseButton } from '@/components';
 import { type LayoutOutletContext } from '../components/Layout';
@@ -170,6 +170,7 @@ const pubmedMatchOptions: Array<{ value: PubMedMatchMode; label: string }> = [
 ];
 
 export default function ToolsPage() {
+  const navigate = useNavigate();
   const { isSidebarOpen, setIsSidebarOpen } = useOutletContext<LayoutOutletContext>();
   const [tasks, setTasks] = useState<UserTask[]>(initialUserTasks);
   const [actionMenuTaskId, setActionMenuTaskId] = useState<string | null>(null);
@@ -387,8 +388,6 @@ export default function ToolsPage() {
             </button>
           )}
           <div className="flex items-center gap-2 text-sm">
-            <span className="text-tertiaryText">系统设置</span>
-            <span className="text-tertiaryText">/</span>
             <span className="font-medium text-primaryText">任务</span>
           </div>
         </div>

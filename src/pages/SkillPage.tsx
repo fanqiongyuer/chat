@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { useOutletContext } from 'react-router-dom';
-import { Menu, Plus, Search } from 'lucide-react';
+import { useNavigate, useOutletContext } from 'react-router-dom';
+import { ChevronLeft, Menu, Plus, Search } from 'lucide-react';
 import { BaseButton } from '@/components';
 import { type LayoutOutletContext } from '../components/Layout';
 
@@ -91,6 +91,7 @@ const riskStyleMap: Record<SkillRiskLevel, React.CSSProperties> = {
 };
 
 export default function SkillPage() {
+  const navigate = useNavigate();
   const { isSidebarOpen, setIsSidebarOpen } = useOutletContext<LayoutOutletContext>();
   const [activeTab, setActiveTab] = useState<SkillTab>('installed');
   const [keyword, setKeyword] = useState('');
@@ -125,7 +126,13 @@ export default function SkillPage() {
             </button>
           )}
           <div className="flex items-center gap-2 text-sm">
-            <span className="text-tertiaryText">系统设置</span>
+            <button
+              type="button"
+              onClick={() => navigate('/settings')}
+              className="text-tertiaryText transition-colors hover:text-primaryText"
+            >
+              系统设置
+            </button>
             <span className="text-tertiaryText">/</span>
             <span className="font-medium text-primaryText">Skill</span>
           </div>
