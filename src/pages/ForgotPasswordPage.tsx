@@ -187,11 +187,11 @@ export default function ForgotPasswordPage() {
   };
 
   // ---- 步骤切换 ----
-  const goNext = () => {
-    const order: ForgotPasswordStep[] = ['email', 'verify', 'password', 'success'];
-    const idx = order.indexOf(step);
-    if (idx < order.length - 1) setStep(order[idx + 1]);
-  };
+const goNext = () => {
+  if (step === 'email') {
+    setStep('success');
+  }
+};
 
   // ---- 各步骤可提交判断 ----
   const canSubmitStep = useMemo(() => {
@@ -220,12 +220,7 @@ export default function ForgotPasswordPage() {
     await new Promise((r) => window.setTimeout(r, 800));
     setIsSubmitting(false);
 
-    if (step === 'password') {
-      // 密码重置完成，跳转到成功页
-      goNext();
-    } else {
-      goNext();
-    }
+    goNext();
   };
 
   // ---- 步骤描述 ----

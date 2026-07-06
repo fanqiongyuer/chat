@@ -20,7 +20,7 @@ type MemberProfile = {
 type ProjectUsageRow = {
   id: string;
   name: string;
-  members: string;
+  members: number;
   usage: number;
   ratio: string;
 };
@@ -428,7 +428,7 @@ export default function AiUsagePage() {
         title: '成员数',
         dataIndex: 'members',
         width: '22%',
-        render: (value: string) => <span className="text-secondaryText">{value}</span>,
+        render: (value: number) => <span className="text-secondaryText">{value}</span>,
       },
       {
         title: '消耗量',

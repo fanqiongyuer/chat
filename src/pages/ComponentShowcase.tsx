@@ -73,6 +73,7 @@ export function ComponentShowcase() {
     },
     {
       title: '操作',
+      dataIndex: 'id',
       render: () => (
         <div className="space-x-4">
           <span className="action-link">编辑</span>

@@ -17,8 +17,6 @@ import RegisterPage from './pages/RegisterPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ComponentShowcase from './pages/ComponentShowcase';
 
-type ReactElement = any;
-
 const AUTH_STORAGE_KEY = 'deeptrace-authenticated';
 const AUTH_SESSION_KEY = 'deeptrace-authenticated-session';
 
