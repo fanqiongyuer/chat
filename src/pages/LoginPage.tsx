@@ -31,7 +31,7 @@ const createParticle = (width: number, height: number): Particle => {
   };
 };
 
-const baseConnectionColor = '80, 180, 120';
+const baseConnectionColor = '20, 184, 134';
 
 type ForgotStep = 'email' | 'success';
 
@@ -136,7 +136,7 @@ export default function LoginPage() {
         if (distance < mouse.radius) {
           particle.x -= directionX * 0.5;
           particle.y -= directionY * 0.5;
-          context.fillStyle = 'rgba(52, 168, 83, 0.9)';
+          context.fillStyle = 'rgba(20, 184, 134, 0.9)';
           particle.size = Math.min(particle.size + 0.1, 2.5);
         } else {
           if (particle.x !== particle.baseX) {
@@ -147,7 +147,7 @@ export default function LoginPage() {
             const moveY = particle.y - particle.baseY;
             particle.y -= moveY / 50;
           }
-          context.fillStyle = 'rgba(80, 180, 120, 0.4)';
+          context.fillStyle = 'rgba(20, 184, 134, 0.4)';
           particle.size = Math.max(particle.size - 0.05, 1);
         }
 
@@ -283,14 +283,14 @@ export default function LoginPage() {
         <canvas ref={canvasRef} className="h-full w-full" />
       </div>
 
-      <div className="pointer-events-none absolute left-1/2 top-1/2 z-[1] h-[80vh] w-[80vw] -translate-x-1/2 -translate-y-1/2 bg-[radial-gradient(circle,rgba(52,168,83,0.06)_0%,rgba(255,255,255,0)_70%)]" />
-      <div className="pointer-events-none absolute bottom-[-20%] right-[-10%] z-[1] h-[60vh] w-[60vw] bg-[radial-gradient(circle,rgba(15,157,88,0.05)_0%,rgba(255,255,255,0)_60%)]" />
+      <div className="pointer-events-none absolute left-1/2 top-1/2 z-[1] h-[80vh] w-[80vw] -translate-x-1/2 -translate-y-1/2 bg-[radial-gradient(circle,rgba(20,184,134,0.06)_0%,rgba(255,255,255,0)_70%)]" />
+      <div className="pointer-events-none absolute bottom-[-20%] right-[-10%] z-[1] h-[60vh] w-[60vw] bg-[radial-gradient(circle,rgba(20,184,134,0.05)_0%,rgba(255,255,255,0)_60%)]" />
 
       <div className="relative z-10 mx-auto flex h-full w-full max-w-md items-center justify-center px-4">
         <div className="w-full rounded-3xl border border-white/90 bg-surface/70 p-10 shadow-[0_20px_40px_rgba(0,0,0,0.05),0_1px_3px_rgba(0,0,0,0.02)] backdrop-blur-[20px]">
           <div className="mb-10 text-center">
             <h1 className="bg-[linear-gradient(135deg,#202124_0%,#5f6368_100%)] bg-clip-text text-4xl font-semibold tracking-[-0.02em] text-transparent">
-              DepTrace
+              Helia
             </h1>
             <p className="mt-2 text-sm text-gray-500">欢迎回来，请登录以进入科研工作台。</p>
           </div>
@@ -304,9 +304,9 @@ export default function LoginPage() {
                 required
                 placeholder=" "
                 autoComplete="off"
-                className="peer h-14 w-full rounded-xl border border-black/10 bg-surface px-5 py-4 text-base leading-none text-primaryText shadow-sm outline-none transition-all focus:border-success focus:ring-4 focus:ring-success/10"
+                className="peer h-14 w-full rounded-xl border border-black/10 bg-surface px-5 py-4 text-base leading-none text-primaryText shadow-sm outline-none transition-all focus:border-[#14B886] focus:ring-4 focus:ring-[#14B886]/10"
               />
-              <span className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-base text-tertiaryText transition-all peer-focus:left-4 peer-focus:top-0 peer-focus:-translate-y-1/2 peer-focus:rounded peer-focus:bg-surface peer-focus:px-1.5 peer-focus:text-xs peer-focus:font-medium peer-focus:text-success peer-[&:not(:placeholder-shown)]:left-4 peer-[&:not(:placeholder-shown)]:top-0 peer-[&:not(:placeholder-shown)]:-translate-y-1/2 peer-[&:not(:placeholder-shown)]:rounded peer-[&:not(:placeholder-shown)]:bg-surface peer-[&:not(:placeholder-shown)]:px-1.5 peer-[&:not(:placeholder-shown)]:text-xs peer-[&:not(:placeholder-shown)]:font-medium peer-[&:not(:placeholder-shown)]:text-success">
+              <span className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-base text-tertiaryText transition-all peer-focus:left-4 peer-focus:top-0 peer-focus:-translate-y-1/2 peer-focus:rounded peer-focus:bg-surface peer-focus:px-1.5 peer-focus:text-xs peer-focus:font-medium peer-focus:text-[#14B886] peer-[&:not(:placeholder-shown)]:left-4 peer-[&:not(:placeholder-shown)]:top-0 peer-[&:not(:placeholder-shown)]:-translate-y-1/2 peer-[&:not(:placeholder-shown)]:rounded peer-[&:not(:placeholder-shown)]:bg-surface peer-[&:not(:placeholder-shown)]:px-1.5 peer-[&:not(:placeholder-shown)]:text-xs peer-[&:not(:placeholder-shown)]:font-medium peer-[&:not(:placeholder-shown)]:text-[#14B886]">
                  邮箱
 
               </span>
@@ -319,9 +319,9 @@ export default function LoginPage() {
                 onChange={(event) => setPassword(event.target.value)}
                 required
                 placeholder=" "
-                className="peer h-14 w-full rounded-xl border border-black/10 bg-surface px-5 py-4 text-base leading-none text-primaryText shadow-sm outline-none transition-all focus:border-success focus:ring-4 focus:ring-success/10"
+                className="peer h-14 w-full rounded-xl border border-black/10 bg-surface px-5 py-4 text-base leading-none text-primaryText shadow-sm outline-none transition-all focus:border-[#14B886] focus:ring-4 focus:ring-[#14B886]/10"
               />
-              <span className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-base text-tertiaryText transition-all peer-focus:left-4 peer-focus:top-0 peer-focus:-translate-y-1/2 peer-focus:rounded peer-focus:bg-surface peer-focus:px-1.5 peer-focus:text-xs peer-focus:font-medium peer-focus:text-success peer-[&:not(:placeholder-shown)]:left-4 peer-[&:not(:placeholder-shown)]:top-0 peer-[&:not(:placeholder-shown)]:-translate-y-1/2 peer-[&:not(:placeholder-shown)]:rounded peer-[&:not(:placeholder-shown)]:bg-surface peer-[&:not(:placeholder-shown)]:px-1.5 peer-[&:not(:placeholder-shown)]:text-xs peer-[&:not(:placeholder-shown)]:font-medium peer-[&:not(:placeholder-shown)]:text-success">
+              <span className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-base text-tertiaryText transition-all peer-focus:left-4 peer-focus:top-0 peer-focus:-translate-y-1/2 peer-focus:rounded peer-focus:bg-surface peer-focus:px-1.5 peer-focus:text-xs peer-focus:font-medium peer-focus:text-[#14B886] peer-[&:not(:placeholder-shown)]:left-4 peer-[&:not(:placeholder-shown)]:top-0 peer-[&:not(:placeholder-shown)]:-translate-y-1/2 peer-[&:not(:placeholder-shown)]:rounded peer-[&:not(:placeholder-shown)]:bg-surface peer-[&:not(:placeholder-shown)]:px-1.5 peer-[&:not(:placeholder-shown)]:text-xs peer-[&:not(:placeholder-shown)]:font-medium peer-[&:not(:placeholder-shown)]:text-[#14B886]">
                  密码
 
               </span>
@@ -329,7 +329,7 @@ export default function LoginPage() {
 
             <div className="flex items-center justify-between px-1">
               <label className="group inline-flex cursor-pointer items-center gap-2">
-                <span className="relative inline-flex h-4 w-4 items-center justify-center rounded border border-gray-300 bg-surface shadow-sm transition-colors group-hover:border-green-400">
+                <span className="relative inline-flex h-4 w-4 items-center justify-center rounded border border-gray-300 bg-surface shadow-sm transition-colors group-hover:border-[#14B886]">
                   <input
                     type="checkbox"
                     checked={rememberMe}
@@ -337,7 +337,7 @@ export default function LoginPage() {
                     className="peer absolute inset-0 cursor-pointer opacity-0"
                   />
                   <svg
-                    className="h-3 w-3 text-green-500 opacity-0 transition-opacity peer-checked:opacity-100"
+                    className="h-3 w-3 text-[#14B886] opacity-0 transition-opacity peer-checked:opacity-100"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -347,7 +347,7 @@ export default function LoginPage() {
                 </span>
                 <span className="text-sm text-gray-600 transition-colors group-hover:text-gray-900">记住我</span>
               </label>
-              <button type="button" onClick={() => navigate('/forgot-password')} className="text-sm font-medium text-[#5f6368] transition-colors hover:text-success">
+              <button type="button" onClick={() => navigate('/forgot-password')} className="text-sm font-medium text-[#5f6368] transition-colors hover:text-[#14B886]">
                  忘记密码？
 
               </button>
@@ -356,7 +356,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={!canSubmit}
-              className="mt-2 inline-flex h-14 w-full items-center justify-center rounded-xl bg-success text-base font-semibold text-white shadow-md transition-all hover:-translate-y-0.5 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:translate-y-0"
+              className="mt-2 inline-flex h-14 w-full items-center justify-center rounded-xl bg-[#14B886] text-base font-semibold text-white shadow-md transition-all hover:-translate-y-0.5 hover:bg-[#0d9e6d] hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:translate-y-0"
             >
               <span>{isSubmitting ? '认证中...' : '登录'}</span>
               {isSubmitting && (
@@ -380,7 +380,7 @@ export default function LoginPage() {
           {!showForgotPassword && (
             <p className="mt-6 text-center text-sm text-gray-500">
               首次使用平台？
-              <button type="button" onClick={() => navigate('/register')} className="ml-1 font-medium text-green-500 transition-colors hover:text-green-600">
+              <button type="button" onClick={() => navigate('/register')} className="ml-1 font-medium text-[#14B886] transition-colors hover:text-[#0d9e6d]">
                 去注册
               </button>
             </p>
@@ -393,7 +393,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={handleBackToLogin}
-                  className="text-sm font-medium text-[#5f6368] transition-colors hover:text-success"
+                  className="text-sm font-medium text-[#5f6368] transition-colors hover:text-[#14B886]"
                 >
                   ← 返回登录
                 </button>
@@ -413,9 +413,9 @@ export default function LoginPage() {
                       onChange={(e) => setForgotEmail(e.target.value)}
                       placeholder=" "
                       autoComplete="off"
-                      className="peer h-14 w-full rounded-xl border border-black/10 bg-surface px-5 py-4 text-base leading-none text-primaryText shadow-sm outline-none transition-all focus:border-success focus:ring-4 focus:ring-success/10"
+                      className="peer h-14 w-full rounded-xl border border-black/10 bg-surface px-5 py-4 text-base leading-none text-primaryText shadow-sm outline-none transition-all focus:border-[#14B886] focus:ring-4 focus:ring-[#14B886]/10"
                     />
-                    <span className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-base text-tertiaryText transition-all peer-focus:left-4 peer-focus:top-0 peer-focus:-translate-y-1/2 peer-focus:rounded peer-focus:bg-surface peer-focus:px-1.5 peer-focus:text-xs peer-focus:font-medium peer-focus:text-success peer-[&:not(:placeholder-shown)]:left-4 peer-[&:not(:placeholder-shown)]:top-0 peer-[&:not(:placeholder-shown)]:-translate-y-1/2 peer-[&:not(:placeholder-shown)]:rounded peer-[&:not(:placeholder-shown)]:bg-surface peer-[&:not(:placeholder-shown)]:px-1.5 peer-[&:not(:placeholder-shown)]:text-xs peer-[&:not(:placeholder-shown)]:font-medium peer-[&:not(:placeholder-shown)]:text-success">
+                    <span className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-base text-tertiaryText transition-all peer-focus:left-4 peer-focus:top-0 peer-focus:-translate-y-1/2 peer-focus:rounded peer-focus:bg-surface peer-focus:px-1.5 peer-focus:text-xs peer-focus:font-medium peer-focus:text-[#14B886] peer-[&:not(:placeholder-shown)]:left-4 peer-[&:not(:placeholder-shown)]:top-0 peer-[&:not(:placeholder-shown)]:-translate-y-1/2 peer-[&:not(:placeholder-shown)]:rounded peer-[&:not(:placeholder-shown)]:bg-surface peer-[&:not(:placeholder-shown)]:px-1.5 peer-[&:not(:placeholder-shown)]:text-xs peer-[&:not(:placeholder-shown)]:font-medium peer-[&:not(:placeholder-shown)]:text-[#14B886]">
                       邮箱
                     </span>
                   </label>
@@ -429,9 +429,9 @@ export default function LoginPage() {
                         placeholder=" "
                         autoComplete="off"
                         maxLength={6}
-                        className="peer h-14 w-full rounded-xl border border-black/10 bg-surface px-5 py-4 text-base leading-none text-primaryText shadow-sm outline-none transition-all focus:border-success focus:ring-4 focus:ring-success/10"
+                        className="peer h-14 w-full rounded-xl border border-black/10 bg-surface px-5 py-4 text-base leading-none text-primaryText shadow-sm outline-none transition-all focus:border-[#14B886] focus:ring-4 focus:ring-[#14B886]/10"
                       />
-                      <span className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-base text-tertiaryText transition-all peer-focus:left-4 peer-focus:top-0 peer-focus:-translate-y-1/2 peer-focus:rounded peer-focus:bg-surface peer-focus:px-1.5 peer-focus:text-xs peer-focus:font-medium peer-focus:text-success peer-[&:not(:placeholder-shown)]:left-4 peer-[&:not(:placeholder-shown)]:top-0 peer-[&:not(:placeholder-shown)]:-translate-y-1/2 peer-[&:not(:placeholder-shown)]:rounded peer-[&:not(:placeholder-shown)]:bg-surface peer-[&:not(:placeholder-shown)]:px-1.5 peer-[&:not(:placeholder-shown)]:text-xs peer-[&:not(:placeholder-shown)]:font-medium peer-[&:not(:placeholder-shown)]:text-success">
+                      <span className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-base text-tertiaryText transition-all peer-focus:left-4 peer-focus:top-0 peer-focus:-translate-y-1/2 peer-focus:rounded peer-focus:bg-surface peer-focus:px-1.5 peer-focus:text-xs peer-focus:font-medium peer-focus:text-[#14B886] peer-[&:not(:placeholder-shown)]:left-4 peer-[&:not(:placeholder-shown)]:top-0 peer-[&:not(:placeholder-shown)]:-translate-y-1/2 peer-[&:not(:placeholder-shown)]:rounded peer-[&:not(:placeholder-shown)]:bg-surface peer-[&:not(:placeholder-shown)]:px-1.5 peer-[&:not(:placeholder-shown)]:text-xs peer-[&:not(:placeholder-shown)]:font-medium peer-[&:not(:placeholder-shown)]:text-[#14B886]">
                         验证码
                       </span>
                     </label>
@@ -455,9 +455,9 @@ export default function LoginPage() {
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
                       placeholder=" "
-                      className="peer h-14 w-full rounded-xl border border-black/10 bg-surface px-5 py-4 text-base leading-none text-primaryText shadow-sm outline-none transition-all focus:border-success focus:ring-4 focus:ring-success/10"
+                      className="peer h-14 w-full rounded-xl border border-black/10 bg-surface px-5 py-4 text-base leading-none text-primaryText shadow-sm outline-none transition-all focus:border-[#14B886] focus:ring-4 focus:ring-[#14B886]/10"
                     />
-                    <span className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-base text-tertiaryText transition-all peer-focus:left-4 peer-focus:top-0 peer-focus:-translate-y-1/2 peer-focus:rounded peer-focus:bg-surface peer-focus:px-1.5 peer-focus:text-xs peer-focus:font-medium peer-focus:text-success peer-[&:not(:placeholder-shown)]:left-4 peer-[&:not(:placeholder-shown)]:top-0 peer-[&:not(:placeholder-shown)]:-translate-y-1/2 peer-[&:not(:placeholder-shown)]:rounded peer-[&:not(:placeholder-shown)]:bg-surface peer-[&:not(:placeholder-shown)]:px-1.5 peer-[&:not(:placeholder-shown)]:text-xs peer-[&:not(:placeholder-shown)]:font-medium peer-[&:not(:placeholder-shown)]:text-success">
+                    <span className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-base text-tertiaryText transition-all peer-focus:left-4 peer-focus:top-0 peer-focus:-translate-y-1/2 peer-focus:rounded peer-focus:bg-surface peer-focus:px-1.5 peer-focus:text-xs peer-focus:font-medium peer-focus:text-[#14B886] peer-[&:not(:placeholder-shown)]:left-4 peer-[&:not(:placeholder-shown)]:top-0 peer-[&:not(:placeholder-shown)]:-translate-y-1/2 peer-[&:not(:placeholder-shown)]:rounded peer-[&:not(:placeholder-shown)]:bg-surface peer-[&:not(:placeholder-shown)]:px-1.5 peer-[&:not(:placeholder-shown)]:text-xs peer-[&:not(:placeholder-shown)]:font-medium peer-[&:not(:placeholder-shown)]:text-[#14B886]">
                       新密码
                     </span>
                   </label>
@@ -468,13 +468,13 @@ export default function LoginPage() {
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       placeholder=" "
-                      className={`peer h-14 w-full rounded-xl border border-black/10 bg-surface px-5 py-4 text-base leading-none text-primaryText shadow-sm outline-none transition-all focus:border-success focus:ring-4 focus:ring-success/10 ${
+                      className={`peer h-14 w-full rounded-xl border border-black/10 bg-surface px-5 py-4 text-base leading-none text-primaryText shadow-sm outline-none transition-all focus:border-[#14B886] focus:ring-4 focus:ring-[#14B886]/10 ${
                         confirmPassword.length > 0 && newPassword !== confirmPassword
                           ? 'border-red-400 focus:border-red-400 focus:ring-red-400/10'
                           : ''
                       }`}
                     />
-                    <span className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-base text-tertiaryText transition-all peer-focus:left-4 peer-focus:top-0 peer-focus:-translate-y-1/2 peer-focus:rounded peer-focus:bg-surface peer-focus:px-1.5 peer-focus:text-xs peer-focus:font-medium peer-focus:text-success peer-[&:not(:placeholder-shown)]:left-4 peer-[&:not(:placeholder-shown)]:top-0 peer-[&:not(:placeholder-shown)]:-translate-y-1/2 peer-[&:not(:placeholder-shown)]:rounded peer-[&:not(:placeholder-shown)]:bg-surface peer-[&:not(:placeholder-shown)]:px-1.5 peer-[&:not(:placeholder-shown)]:text-xs peer-[&:not(:placeholder-shown)]:font-medium peer-[&:not(:placeholder-shown)]:text-success">
+                    <span className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-base text-tertiaryText transition-all peer-focus:left-4 peer-focus:top-0 peer-focus:-translate-y-1/2 peer-focus:rounded peer-focus:bg-surface peer-focus:px-1.5 peer-focus:text-xs peer-focus:font-medium peer-focus:text-[#14B886] peer-[&:not(:placeholder-shown)]:left-4 peer-[&:not(:placeholder-shown)]:top-0 peer-[&:not(:placeholder-shown)]:-translate-y-1/2 peer-[&:not(:placeholder-shown)]:rounded peer-[&:not(:placeholder-shown)]:bg-surface peer-[&:not(:placeholder-shown)]:px-1.5 peer-[&:not(:placeholder-shown)]:text-xs peer-[&:not(:placeholder-shown)]:font-medium peer-[&:not(:placeholder-shown)]:text-[#14B886]">
                       确认密码
                     </span>
                   </label>
@@ -486,7 +486,7 @@ export default function LoginPage() {
                     type="button"
                     onClick={handleForgotNext}
                     disabled={!forgotEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(forgotEmail) || !forgotCode.trim() || forgotCode.length < 6 || !newPassword.trim() || newPassword.length < 6 || newPassword !== confirmPassword}
-                    className="mt-2 inline-flex h-14 w-full items-center justify-center rounded-xl bg-success text-base font-semibold text-white shadow-md transition-all hover:-translate-y-0.5 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:translate-y-0"
+                    className="mt-2 inline-flex h-14 w-full items-center justify-center rounded-xl bg-[#14B886] text-base font-semibold text-white shadow-md transition-all hover:-translate-y-0.5 hover:bg-[#0d9e6d] hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:translate-y-0"
                   >
                     重置密码
                   </button>
@@ -496,9 +496,9 @@ export default function LoginPage() {
               {forgotStep === 'success' && (
                 <div className="flex flex-col items-center justify-center space-y-6">
                   <div className="relative">
-                    <div className="absolute inset-0 animate-pulse rounded-full bg-green-100/50" />
-                    <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-green-50">
-                      <CheckCircle2 size={40} className="text-success" />
+                    <div className="absolute inset-0 animate-pulse rounded-full bg-primary-soft/70" />
+                    <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-primary-soft">
+                      <CheckCircle2 size={40} className="text-[#14B886]" />
                     </div>
                   </div>
                   <div className="text-center">
@@ -509,7 +509,7 @@ export default function LoginPage() {
                   <button
                     type="button"
                     onClick={handleBackToLogin}
-                    className="mt-4 inline-flex h-14 w-full items-center justify-center rounded-xl bg-success text-base font-semibold text-white shadow-md transition-all hover:-translate-y-0.5 hover:shadow-lg"
+                    className="mt-4 inline-flex h-14 w-full items-center justify-center rounded-xl bg-[#14B886] text-base font-semibold text-white shadow-md transition-all hover:-translate-y-0.5 hover:bg-[#0d9e6d] hover:shadow-lg"
                   >
                     返回登录
                   </button>
@@ -525,7 +525,7 @@ export default function LoginPage() {
           showToast ? 'opacity-100' : 'opacity-0'
         }`}
       >
-        <CheckCircle2 size={18} className="text-green-500" />
+        <CheckCircle2 size={18} className="text-[#14B886]" />
         <span>认证成功，正在进入工作台...</span>
       </div>
     </div>

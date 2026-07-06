@@ -221,8 +221,8 @@ export default function Layout() {
           {/* Logo 区域 */}
 <div className="mt-2 md:mt-3 flex h-16 items-center justify-between pl-5 pr-[10px]">
 <div className="flex items-center gap-3 cursor-pointer min-w-0 flex-1" onClick={() => navigate('/chat/new')}>
-<img src={logoIcon} alt="DepTrace Logo" className="h-[16px] w-[16px] shrink-0 flex-shrink-0" style={{ display: 'flex', alignItems: 'center' }} />
-<span className="text-[18px] font-bold text-primaryText tracking-tight truncate leading-none">DepTrace</span>
+<img src={logoIcon} alt="Helia Logo" className="h-[16px] w-[16px] shrink-0 flex-shrink-0" style={{ display: 'flex', alignItems: 'center' }} />
+<span className="text-[18px] font-bold text-primaryText tracking-tight truncate leading-none">Helia</span>
 </div>
             <div className="flex items-center gap-0 shrink-0">
               <button className="p-2 text-secondaryText hover:bg-bgLight rounded-full transition-colors" title="搜索">
@@ -342,7 +342,7 @@ export default function Layout() {
                       <div key={chat.id} className="relative">
                         <div
                           onClick={() => navigate(`/chat/${chat.id}`)}
-                          className={`mx-[10px] text-sm pl-[10px] pr-4 py-1.5 rounded-full cursor-pointer transition-colors flex items-center justify-between group ${
+                          className={`mx-[10px] text-sm pl-[10px] pr-4 py-1.5 rounded-md cursor-pointer transition-colors flex items-center justify-between group ${
                             isActive ? 'text-primaryText bg-[#E4EAF0] font-normal' : 'text-secondaryText hover:text-primaryText hover:bg-[#E4EAF0] font-normal'
                           }`}
                         >
@@ -407,7 +407,7 @@ export default function Layout() {
               return (
                 <div key={proj.id} className="mb-0.5">
                   <div 
-                    className="group mx-[10px] flex items-center gap-2 pl-[8px] pr-4 py-2 text-sm font-normal text-secondaryText cursor-pointer hover:text-primaryText rounded-full hover:bg-bgLight transition-colors"
+                    className="group mx-[10px] flex items-center gap-2 pl-[8px] pr-4 py-2 text-sm font-normal text-secondaryText cursor-pointer hover:text-primaryText rounded-md hover:bg-bgLight transition-colors"
                     onClick={() => toggleProject(proj.id)}
                   >
                     <div className="relative h-[14px] w-[14px] shrink-0">
@@ -434,7 +434,7 @@ export default function Layout() {
                           <div key={chat.id} className="relative">
                             <div 
                               onClick={() => navigate(`/chat/${chat.id}`)}
-                              className={`mx-[10px] text-sm pl-[30px] pr-4 py-1.5 rounded-full cursor-pointer transition-colors flex items-center justify-between group ${
+                              className={`mx-[10px] text-sm pl-[30px] pr-4 py-1.5 rounded-md cursor-pointer transition-colors flex items-center justify-between group ${
                                 isActive ? 'text-primaryText bg-[#E4EAF0] font-normal' : 'text-secondaryText hover:text-primaryText hover:bg-[#E4EAF0] font-normal'
                               }`}
                             >
@@ -499,7 +499,7 @@ export default function Layout() {
               return (
                 <div className="mb-0.5 mt-1">
                   <div 
-                    className="group mx-[10px] flex items-center gap-2 pl-[8px] pr-4 py-2 text-sm font-normal text-secondaryText cursor-pointer hover:text-primaryText rounded-full hover:bg-bgLight transition-colors"
+                    className="group mx-[10px] flex items-center gap-2 pl-[8px] pr-4 py-2 text-sm font-normal text-secondaryText cursor-pointer hover:text-primaryText rounded-md hover:bg-bgLight transition-colors"
                     onClick={() => toggleProject('unassigned')}
                   >
                     <div className="relative h-[14px] w-[14px] shrink-0">
@@ -526,7 +526,7 @@ export default function Layout() {
                           <div key={chat.id} className="relative">
                             <div 
                               onClick={() => navigate(`/chat/${chat.id}`)}
-                              className={`mx-[10px] text-sm pl-[30px] pr-4 py-1.5 rounded-full cursor-pointer transition-colors flex items-center justify-between group ${
+                              className={`mx-[10px] text-sm pl-[30px] pr-4 py-1.5 rounded-md cursor-pointer transition-colors flex items-center justify-between group ${
                                 isActive ? 'text-primaryText bg-[#E4EAF0] font-normal' : 'text-secondaryText hover:text-primaryText hover:bg-[#E4EAF0] font-normal'
                               }`}
                             >
@@ -599,7 +599,7 @@ export default function Layout() {
                     <div key={chat.id} className="relative">
                       <div 
                         onClick={() => navigate(`/chat/${chat.id}`)}
-                        className={`mx-[10px] text-sm pl-[10px] pr-4 py-1.5 rounded-full cursor-pointer transition-colors flex items-center justify-between group ${
+                        className={`mx-[10px] text-sm pl-[10px] pr-4 py-1.5 rounded-md cursor-pointer transition-colors flex items-center justify-between group ${
                           isActive ? 'text-primaryText bg-[#E4EAF0] font-normal' : 'text-secondaryText hover:text-primaryText hover:bg-[#E4EAF0] font-normal'
                         }`}
                       >

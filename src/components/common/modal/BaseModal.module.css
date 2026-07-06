@@ -15,8 +15,8 @@
   left: 50%;
   transform: translate(-50%, -50%);
   background: var(--color-surface);
-  border-radius: 16px;
-  box-shadow: 0 3px 6px -4px rgba(0, 0, 0, 0.12);
+  border-radius: 8px;
+  box-shadow: 0 6px 16px 0 rgba(0, 0, 0, 0.08), 0 3px 6px -4px rgba(0, 0, 0, 0.12);
   z-index: 1001;
   max-height: 90vh;
   overflow-y: auto;
@@ -29,7 +29,7 @@
 }
 
 .modalHeader {
-  padding: 16px 24px;
+  padding: 16px 20px;
   border-bottom: 1px solid var(--color-line-soft);
   display: flex;
   justify-content: space-between;
@@ -39,7 +39,7 @@
 .modalTitle {
   margin: 0;
   font-size: 16px;
-  font-weight: 500;
+  font-weight: 600;
   line-height: 24px;
   color: var(--color-text-primary);
 }
@@ -47,31 +47,33 @@
 .modalClose {
   border: none;
   background: transparent;
-  font-size: 18px;
+  font-size: 16px;
   cursor: pointer;
   padding: 0;
   color: var(--color-text-muted);
-  transition: color 0.2s;
+  transition: all 0.2s;
   line-height: 1;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .modalClose:hover {
-  color: var(--color-black);
+  color: var(--color-text-primary);
+  background: var(--color-surface-muted);
 }
 
 .modalBody {
-  padding: 24px;
+  padding: 20px;
   min-height: 80px;
   color: var(--color-text-primary);
 }
 
 .modalFooter {
-  padding: 16px 24px;
+  padding: 12px 20px;
   text-align: right;
   border-top: 1px solid var(--color-line-soft);
   display: flex;

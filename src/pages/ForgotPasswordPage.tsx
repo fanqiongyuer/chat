@@ -28,7 +28,7 @@ const createParticle = (width: number, height: number): Particle => {
   };
 };
 
-const baseConnectionColor = '80, 180, 120';
+const baseConnectionColor = '20, 184, 134';
 
 type ForgotPasswordStep = 'email' | 'success';
 
@@ -113,12 +113,12 @@ export default function ForgotPasswordPage() {
         if (distance < mouse.radius) {
           particle.x -= directionX * 0.5;
           particle.y -= directionY * 0.5;
-          context.fillStyle = 'rgba(52, 168, 83, 0.9)';
+          context.fillStyle = 'rgba(20, 184, 134, 0.9)';
           particle.size = Math.min(particle.size + 0.1, 2.5);
         } else {
           if (particle.x !== particle.baseX) particle.x -= (particle.x - particle.baseX) / 50;
           if (particle.y !== particle.baseY) particle.y -= (particle.y - particle.baseY) / 50;
-          context.fillStyle = 'rgba(80, 180, 120, 0.4)';
+          context.fillStyle = 'rgba(20, 184, 134, 0.4)';
           particle.size = Math.max(particle.size - 0.05, 1);
         }
 
@@ -235,9 +235,9 @@ const goNext = () => {
 
   // ---- 输入框通用样式 ----
   const inputClass =
-    'peer h-14 w-full rounded-xl border border-black/10 bg-surface px-5 py-4 text-base leading-none text-primaryText shadow-sm outline-none transition-all focus:border-success focus:ring-4 focus:ring-success/10';
+    'peer h-14 w-full rounded-xl border border-black/10 bg-surface px-5 py-4 text-base leading-none text-primaryText shadow-sm outline-none transition-all focus:border-[#14B886] focus:ring-4 focus:ring-[#14B886]/10';
   const labelClass =
-    'pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-base text-tertiaryText transition-all peer-focus:left-4 peer-focus:top-0 peer-focus:-translate-y-1/2 peer-focus:rounded peer-focus:bg-surface peer-focus:px-1.5 peer-focus:text-xs peer-focus:font-medium peer-focus:text-success peer-[&:not(:placeholder-shown)]:left-4 peer-[&:not(:placeholder-shown)]:top-0 peer-[&:not(:placeholder-shown)]:-translate-y-1/2 peer-[&:not(:placeholder-shown)]:rounded peer-[&:not(:placeholder-shown)]:bg-surface peer-[&:not(:placeholder-shown)]:px-1.5 peer-[&:not(:placeholder-shown)]:text-xs peer-[&:not(:placeholder-shown)]:font-medium peer-[&:not(:placeholder-shown)]:text-success';
+    'pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-base text-tertiaryText transition-all peer-focus:left-4 peer-focus:top-0 peer-focus:-translate-y-1/2 peer-focus:rounded peer-focus:bg-surface peer-focus:px-1.5 peer-focus:text-xs peer-focus:font-medium peer-focus:text-[#14B886] peer-[&:not(:placeholder-shown)]:left-4 peer-[&:not(:placeholder-shown)]:top-0 peer-[&:not(:placeholder-shown)]:-translate-y-1/2 peer-[&:not(:placeholder-shown)]:rounded peer-[&:not(:placeholder-shown)]:bg-surface peer-[&:not(:placeholder-shown)]:px-1.5 peer-[&:not(:placeholder-shown)]:text-xs peer-[&:not(:placeholder-shown)]:font-medium peer-[&:not(:placeholder-shown)]:text-[#14B886]';
 
   return (
     <div ref={containerRef} className="relative h-screen w-full overflow-hidden bg-bgLight text-primaryText">
@@ -245,15 +245,15 @@ const goNext = () => {
       <div className="absolute inset-0 z-0">
         <canvas ref={canvasRef} className="h-full w-full" />
       </div>
-      <div className="pointer-events-none absolute left-1/2 top-1/2 z-[1] h-[80vh] w-[80vw] -translate-x-1/2 -translate-y-1/2 bg-[radial-gradient(circle,rgba(52,168,83,0.06)_0%,rgba(255,255,255,0)_70%)]" />
-      <div className="pointer-events-none absolute bottom-[-20%] right-[-10%] z-[1] h-[60vh] w-[60vw] bg-[radial-gradient(circle,rgba(15,157,88,0.05)_0%,rgba(255,255,255,0)_60%)]" />
+      <div className="pointer-events-none absolute left-1/2 top-1/2 z-[1] h-[80vh] w-[80vw] -translate-x-1/2 -translate-y-1/2 bg-[radial-gradient(circle,rgba(20,184,134,0.06)_0%,rgba(255,255,255,0)_70%)]" />
+      <div className="pointer-events-none absolute bottom-[-20%] right-[-10%] z-[1] h-[60vh] w-[60vw] bg-[radial-gradient(circle,rgba(20,184,134,0.05)_0%,rgba(255,255,255,0)_60%)]" />
 
       <div className="relative z-10 mx-auto flex h-full w-full max-w-md items-center justify-center px-4">
         <div className="w-full rounded-3xl border border-white/90 bg-surface/70 p-10 shadow-[0_20px_40px_rgba(0,0,0,0.05),0_1px_3px_rgba(0,0,0,0.02)] backdrop-blur-[20px]">
           {/* 头部 */}
           <div className="mb-8 text-center">
             <h1 className="bg-[linear-gradient(135deg,#202124_0%,#5f6368_100%)] bg-clip-text text-4xl font-semibold tracking-[-0.02em] text-transparent">
-              DepTrace
+              Helia
             </h1>
             <p className="mt-2 text-sm text-gray-500">重置您的登录密码。</p>
           </div>
@@ -345,7 +345,7 @@ const goNext = () => {
               <button
                 type="submit"
                 disabled={!canSubmitStep}
-                className="inline-flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-success text-base font-semibold text-white shadow-[0_4px_14px_rgba(52,168,83,0.3)] transition-all hover:-translate-y-0.5 hover:shadow-[0_6px_20px_rgba(52,168,83,0.4)] disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:translate-y-0 pt-2"
+                className="inline-flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-[#14B886] text-base font-semibold text-white shadow-[0_4px_14px_rgba(20,184,134,0.3)] transition-all hover:-translate-y-0.5 hover:bg-[#0d9e6d] hover:shadow-[0_6px_20px_rgba(20,184,134,0.4)] disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:translate-y-0 pt-2"
               >
                 <span>{isSubmitting ? '处理中...' : '重置密码'}</span>
                 {isSubmitting && (
@@ -371,9 +371,9 @@ const goNext = () => {
           {step === 'success' && (
             <div className="flex flex-col items-center justify-center space-y-6">
               <div className="relative">
-                <div className="absolute inset-0 animate-pulse rounded-full bg-green-100/50" />
-                <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-green-50">
-                  <CheckCircle2 size={40} className="text-success" />
+                <div className="absolute inset-0 animate-pulse rounded-full bg-primary-soft/70" />
+                <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-primary-soft">
+                  <CheckCircle2 size={40} className="text-[#14B886]" />
                 </div>
               </div>
               <div className="text-center">
@@ -388,7 +388,7 @@ const goNext = () => {
                     navigate('/login', { replace: true });
                   }, 1000);
                 }}
-                className="mt-4 inline-flex h-14 w-full items-center justify-center rounded-xl bg-success text-base font-semibold text-white shadow-[0_4px_14px_rgba(52,168,83,0.3)] transition-all hover:-translate-y-0.5 hover:shadow-[0_6px_20px_rgba(52,168,83,0.4)]"
+                className="mt-4 inline-flex h-14 w-full items-center justify-center rounded-xl bg-[#14B886] text-base font-semibold text-white shadow-[0_4px_14px_rgba(20,184,134,0.3)] transition-all hover:-translate-y-0.5 hover:bg-[#0d9e6d] hover:shadow-[0_6px_20px_rgba(20,184,134,0.4)]"
               >
                 返回登录
               </button>
@@ -398,7 +398,7 @@ const goNext = () => {
           {step !== 'success' && (
             <p className="mt-6 text-center text-sm text-gray-500">
               想起密码了？
-              <button type="button" onClick={() => navigate('/login')} className="ml-1 font-medium text-green-500 transition-colors hover:text-green-600">
+              <button type="button" onClick={() => navigate('/login')} className="ml-1 font-medium text-[#14B886] transition-colors hover:text-[#0d9e6d]">
                 返回登录
               </button>
             </p>

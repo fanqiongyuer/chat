@@ -29,7 +29,7 @@ const InputArea = ({ onSend, disabled }: InputAreaProps) => {
           }}
           disabled={disabled}
           placeholder="输入你的科研问题..."
-          className="w-full min-h-[72px] max-h-[180px] px-5 pt-4 pb-3 outline-none resize-none text-lg bg-transparent text-primaryText placeholder:text-tertiaryText leading-relaxed"
+          className="w-full min-h-[72px] max-h-[180px] px-5 pt-4 pb-3 outline-none resize-none text-[14px] bg-transparent text-primaryText placeholder:text-tertiaryText leading-relaxed"
         />
         <div className="flex justify-between items-center p-3 pt-0">
           <button className="w-8 h-8 rounded-full border border-borderGray flex items-center justify-center text-tertiaryText hover:bg-bgLight transition-colors bg-white">

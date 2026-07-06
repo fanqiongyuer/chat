@@ -2,15 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
-import {
-  CheckCircle2,
-  FlaskConical,
-  LineChart,
-  Menu,
-  Pencil,
-  Plus,
-  Upload,
-} from 'lucide-react';
+import { Menu, Upload } from 'lucide-react';
 import { BaseButton, BaseEmpty } from '../components';
 import {
   EXPERIMENT_DETAILS_BY_PROJECT,
@@ -18,44 +10,8 @@ import {
   findProjectExperimentDetail,
   mockProjects,
   type ExperimentTimelineEntry,
-  type ExperimentTimelineStatus,
 } from '../mock/projects';
 import { type LayoutOutletContext } from '../components/Layout';
-
-const getTimelineStatusMeta = (status: ExperimentTimelineStatus) => {
-  switch (status) {
-    case '创建试验方案':
-      return {
-        icon: <Plus size={10} strokeWidth={2.4} />,
-        className: 'border-[var(--color-primary)] bg-[rgba(255,214,0,0.16)] text-[var(--color-primary)]',
-      };
-    case '修改试验方案':
-      return {
-        icon: <Pencil size={10} strokeWidth={2.2} />,
-        className: 'border-violet-200 bg-violet-50 text-violet-600',
-      };
-    case '干试验模拟':
-      return {
-        icon: <LineChart size={10} strokeWidth={2.2} />,
-        className: 'border-indigo-200 bg-indigo-50 text-indigo-600',
-      };
-    case '湿试验记录':
-      return {
-        icon: <FlaskConical size={10} strokeWidth={2.2} />,
-        className: 'border-cyan-200 bg-cyan-50 text-cyan-600',
-      };
-    case '实验结束':
-      return {
-        icon: <CheckCircle2 size={10} strokeWidth={2.2} />,
-        className: 'border-emerald-200 bg-emerald-50 text-emerald-600',
-      };
-    default:
-      return {
-        icon: <FlaskConical size={10} strokeWidth={2.2} />,
-        className: 'border-[var(--color-line-subtle)] bg-white text-secondaryText',
-      };
-  }
-};
 
 const getDefaultTimelineEntry = (timeline: ExperimentTimelineEntry[]) =>
   timeline.find((entry) => entry.status !== '实验结束') ?? timeline[0] ?? null;
@@ -237,7 +193,6 @@ export default function ExperimentDetailPage() {
                     <div className="space-y-1.5">
                     {experiment.timeline.map((entry, index) => {
                       const isActive = activeTimeline?.id === entry.id;
-                      const statusMeta = getTimelineStatusMeta(entry.status);
                       const showConnector = index < experiment.timeline.length - 1;
 
                       return (
@@ -245,31 +200,37 @@ export default function ExperimentDetailPage() {
                           key={entry.id}
                           type="button"
                           onClick={() => setSelectedTimelineId(entry.id)}
-                          className={`block w-full rounded-2xl px-3 py-2 text-left transition-colors ${
-                            isActive ? 'bg-[#f5f5f5]' : 'hover:bg-[#fafafa]'
-                          }`}
+                          className="group block w-full text-left"
                         >
                           <div className="relative flex gap-3">
                             <div className="relative flex w-4 shrink-0 justify-center">
                               {showConnector && (
                                 <span className="absolute left-1/2 top-5 bottom-[-14px] w-px -translate-x-1/2 bg-[var(--color-line-subtle)]" />
                               )}
-                              <span
-                                className={`mt-0.5 flex h-4 w-4 items-center justify-center rounded-full border ${statusMeta.className}`}
-                              >
-                                {statusMeta.icon}
-                              </span>
+                              <span className="mt-[13px] h-1.5 w-1.5 rounded-full bg-[#D1D5DB]" />
                             </div>
                             <div className="min-w-0 flex-1 pb-3">
-                              <div className="text-sm font-medium text-primaryText">
-                                {entry.date}
-                              </div>
                               <div
-                                className={`mt-1 line-clamp-2 text-sm leading-5 ${
-                                  isActive ? 'text-primaryText' : 'text-secondaryText'
+                                className={`-mt-0.5 rounded-lg px-3.5 py-2.5 transition-colors ${
+                                  isActive ? 'bg-[#fafafa]' : 'group-hover:bg-[#fafafa]'
                                 }`}
                               >
-                                {entry.summary}
+                                <div
+                                  className={`line-clamp-2 text-sm leading-5 ${
+                                    isActive
+                                      ? 'font-semibold text-primaryText'
+                                      : 'font-normal text-secondaryText'
+                                  }`}
+                                >
+                                  {entry.summary}
+                                </div>
+                                <div
+                                  className={`mt-1 text-xs ${
+                                    isActive ? 'text-secondaryText' : 'text-tertiaryText'
+                                  }`}
+                                >
+                                  {entry.date}
+                                </div>
                               </div>
                             </div>
                           </div>

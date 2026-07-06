@@ -1,4 +1,5 @@
 import type { ReactElement } from 'react';
+import { ConfigProvider } from 'antd';
 import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import ChatPage from './pages/ChatPage';
@@ -103,5 +104,15 @@ const router = createBrowserRouter(
 );
 
 export default function App() {
-  return <RouterProvider router={router} />;
+  return (
+    <ConfigProvider
+      theme={{
+        token: {
+          colorPrimary: '#14B886',
+        },
+      }}
+    >
+      <RouterProvider router={router} />
+    </ConfigProvider>
+  );
 }

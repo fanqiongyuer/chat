@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useLayoutEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useParams, useOutletContext, useLocation } from 'react-router-dom';
-import { Menu, Folder, ChevronDown, ChevronRight, Plus, Send, FileText, FlaskConical, Pencil, CheckCircle2, LineChart, Search, X, Paperclip } from 'lucide-react';
+import { Menu, Folder, ChevronDown, ChevronRight, Plus, Send, FileText, FlaskConical, Search, X, Paperclip } from 'lucide-react';
 import MessageItem from '../components/chat/MessageItem';
 import InputArea from '../components/chat/InputArea';
 import QuickPrompts from '../components/chat/QuickPrompts';
@@ -70,13 +70,6 @@ interface Project {
 
 type KnowledgeCategory = '方法' | '经验' | '文献';
 
-type ExperimentStatus =
-  | '创建试验方案'
-  | '修改试验方案'
-  | '干试验模拟'
-  | '湿试验记录'
-  | '实验结束';
-
 interface ProjectKnowledgeDoc {
   id: string;
   category: KnowledgeCategory;
@@ -88,7 +81,7 @@ interface ProjectKnowledgeDoc {
 interface ProjectExperimentLog {
   id: string;
   date: string;
-  status: ExperimentStatus;
+  status: string;
   summary: string;
 }
 
@@ -111,7 +104,7 @@ interface PreviewItem {
   title: string;
   subtitle: string;
   content: string;
-  status?: ExperimentStatus;
+  status?: string;
 }
 
 const mockAttachmentByProjectId: Record<string, ProjectAttachmentContent> = {
@@ -217,47 +210,13 @@ const attachmentContentFallback: ProjectAttachmentContent = {
   ],
 };
 
-const getExperimentStatusMeta = (status: ExperimentStatus) => {
-  switch (status) {
-    case '创建试验方案':
-      return {
-        icon: <Plus size={10} strokeWidth={2.6} />,
-        className: 'bg-primary-soft text-primary',
-      };
-    case '修改试验方案':
-      return {
-        icon: <Pencil size={10} strokeWidth={2.4} />,
-        className: 'bg-violet-50 text-violet-600',
-      };
-    case '干试验模拟':
-      return {
-        icon: <LineChart size={10} strokeWidth={2.3} />,
-        className: 'bg-indigo-50 text-indigo-600',
-      };
-    case '湿试验记录':
-      return {
-        icon: <FlaskConical size={10} strokeWidth={2.4} />,
-        className: 'bg-cyan-50 text-cyan-600',
-      };
-    case '实验结束':
-      return {
-        icon: <CheckCircle2 size={10} strokeWidth={2.4} />,
-        className: 'bg-emerald-50 text-emerald-600',
-      };
-    default:
-      return {
-        icon: <FlaskConical size={10} strokeWidth={2.4} />,
-        className: 'bg-gray-100 text-secondaryText',
-      };
-  }
-};
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
 const PANEL_MIN_WIDTH = 200;
 const PANEL_MAX_WIDTH = 440;
+const MIN_CHAT_WIDTH = 320;
 const DEFAULT_RIGHT_PANEL_WIDTH = 260;
 const DEFAULT_PREVIEW_PANEL_WIDTH = 320;
-const CHAT_MIN_WIDTH_WITH_PREVIEW = 320;
-
 export default function ChatPage({ isNew }: { isNew?: boolean }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -279,13 +238,14 @@ export default function ChatPage({ isNew }: { isNew?: boolean }) {
   const [isRightPanelResizing, setIsRightPanelResizing] = useState(false);
   const rightPanelResizeStartXRef = useRef(0);
   const rightPanelResizeStartWidthRef = useRef(DEFAULT_RIGHT_PANEL_WIDTH);
-  const rightPanelResizeStartPreviewWidthRef = useRef(DEFAULT_PREVIEW_PANEL_WIDTH);
   const [showPreviewPanel, setShowPreviewPanel] = useState(false);
   const [previewPanelWidth, setPreviewPanelWidth] = useState(DEFAULT_PREVIEW_PANEL_WIDTH);
   const [isPreviewPanelResizing, setIsPreviewPanelResizing] = useState(false);
   const previewPanelResizeStartXRef = useRef(0);
   const previewPanelResizeStartWidthRef = useRef(DEFAULT_PREVIEW_PANEL_WIDTH);
   const previewPanelContainerRef = useRef<HTMLElement | null>(null);
+  const workspaceContainerRef = useRef<HTMLDivElement | null>(null);
+  const [workspaceWidth, setWorkspaceWidth] = useState(0);
   const prevSidebarOpenRef = useRef(isSidebarOpen);
   const suppressAutoCollapseRef = useRef(false);
   const [inputVal, setInputVal] = useState('');
@@ -373,22 +333,16 @@ export default function ChatPage({ isNew }: { isNew?: boolean }) {
     if (!isRightPanelResizing) return;
 
     const handleMouseMove = (event: MouseEvent) => {
+      if (!showRightPanel || workspaceWidth <= 0) return;
+
       const delta = rightPanelResizeStartXRef.current - event.clientX;
-
-      if (showPreviewPanel) {
-        // 右侧附件面板左边分割线拖拽时，优先在附件区和中间预览区之间分配空间。
-        const linkedWidth = rightPanelResizeStartWidthRef.current + rightPanelResizeStartPreviewWidthRef.current;
-        const minRightWidth = Math.max(PANEL_MIN_WIDTH, linkedWidth - PANEL_MAX_WIDTH);
-        const maxRightWidth = Math.min(PANEL_MAX_WIDTH, linkedWidth - PANEL_MIN_WIDTH);
-        const nextRightWidth = Math.min(maxRightWidth, Math.max(minRightWidth, rightPanelResizeStartWidthRef.current + delta));
-
-        setRightPanelWidth(nextRightWidth);
-        setPreviewPanelWidth(linkedWidth - nextRightWidth);
-        return;
-      }
-
-      const nextWidth = Math.min(PANEL_MAX_WIDTH, Math.max(PANEL_MIN_WIDTH, rightPanelResizeStartWidthRef.current + delta));
-      setRightPanelWidth(nextWidth);
+      const maxRightWidthBySpace = workspaceWidth - MIN_CHAT_WIDTH - (showPreviewPanel ? PANEL_MIN_WIDTH : 0);
+      const nextRightWidth = clamp(
+        rightPanelResizeStartWidthRef.current + delta,
+        PANEL_MIN_WIDTH,
+        Math.max(PANEL_MIN_WIDTH, Math.min(PANEL_MAX_WIDTH, maxRightWidthBySpace)),
+      );
+      setRightPanelWidth(nextRightWidth);
     };
 
     const handleMouseUp = () => {
@@ -406,14 +360,22 @@ export default function ChatPage({ isNew }: { isNew?: boolean }) {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isRightPanelResizing, showPreviewPanel]);
+  }, [isRightPanelResizing, showPreviewPanel, showRightPanel, workspaceWidth]);
 
   useEffect(() => {
     if (!isPreviewPanelResizing) return;
 
     const handleMouseMove = (event: MouseEvent) => {
+      if (!showPreviewPanel || workspaceWidth <= 0) return;
+
       const delta = previewPanelResizeStartXRef.current - event.clientX;
-      const nextWidth = Math.min(PANEL_MAX_WIDTH, Math.max(PANEL_MIN_WIDTH, previewPanelResizeStartWidthRef.current + delta));
+      const reservedRightWidth = showRightPanel ? rightPanelWidth : 0;
+      const maxPreviewWidthBySpace = workspaceWidth - MIN_CHAT_WIDTH - reservedRightWidth;
+      const nextWidth = clamp(
+        previewPanelResizeStartWidthRef.current + delta,
+        PANEL_MIN_WIDTH,
+        Math.max(PANEL_MIN_WIDTH, Math.min(PANEL_MAX_WIDTH, maxPreviewWidthBySpace)),
+      );
       setPreviewPanelWidth(nextWidth);
     };
 
@@ -432,7 +394,7 @@ export default function ChatPage({ isNew }: { isNew?: boolean }) {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isPreviewPanelResizing]);
+  }, [isPreviewPanelResizing, rightPanelWidth, showPreviewPanel, showRightPanel, workspaceWidth]);
 
   useEffect(() => {
     if (!showRightPanel) {
@@ -446,6 +408,59 @@ export default function ChatPage({ isNew }: { isNew?: boolean }) {
       setPreviewPanelWidth(DEFAULT_PREVIEW_PANEL_WIDTH);
     }
   }, [showPreviewPanel]);
+
+  useEffect(() => {
+    const workspace = workspaceContainerRef.current;
+    if (!workspace) return;
+
+    const updateWidth = () => {
+      const nextWidth = workspace.getBoundingClientRect().width;
+      setWorkspaceWidth(nextWidth);
+    };
+
+    updateWidth();
+
+    const resizeObserver = new ResizeObserver(() => {
+      updateWidth();
+    });
+
+    resizeObserver.observe(workspace);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (workspaceWidth <= 0) return;
+
+    const maxRightBySpace = workspaceWidth - MIN_CHAT_WIDTH - (showPreviewPanel ? PANEL_MIN_WIDTH : 0);
+    const nextRight = showRightPanel
+      ? clamp(
+          rightPanelWidth,
+          PANEL_MIN_WIDTH,
+          Math.max(PANEL_MIN_WIDTH, Math.min(PANEL_MAX_WIDTH, maxRightBySpace)),
+        )
+      : rightPanelWidth;
+
+    const reservedRight = showRightPanel ? nextRight : 0;
+    const maxPreviewBySpace = workspaceWidth - MIN_CHAT_WIDTH - reservedRight;
+    const nextPreview = showPreviewPanel
+      ? clamp(
+          previewPanelWidth,
+          PANEL_MIN_WIDTH,
+          Math.max(PANEL_MIN_WIDTH, Math.min(PANEL_MAX_WIDTH, maxPreviewBySpace)),
+        )
+      : previewPanelWidth;
+
+    if (showRightPanel && nextRight !== rightPanelWidth) {
+      setRightPanelWidth(nextRight);
+    }
+
+    if (showPreviewPanel && nextPreview !== previewPanelWidth) {
+      setPreviewPanelWidth(nextPreview);
+    }
+  }, [previewPanelWidth, rightPanelWidth, showPreviewPanel, showRightPanel, workspaceWidth]);
 
   useEffect(() => {
     const wasSidebarOpen = prevSidebarOpenRef.current;
@@ -487,12 +502,6 @@ export default function ChatPage({ isNew }: { isNew?: boolean }) {
       resizeObserver.disconnect();
     };
   }, [setIsSidebarOpen, showPreviewPanel]);
-
-  useEffect(() => {
-    if (showPreviewPanel && showRightPanel) {
-      setPreviewPanelWidth(DEFAULT_PREVIEW_PANEL_WIDTH);
-    }
-  }, [showPreviewPanel, showRightPanel]);
 
   useEffect(() => {
     if (!isNewChat) return;
@@ -647,7 +656,6 @@ export default function ChatPage({ isNew }: { isNew?: boolean }) {
   const handleRightPanelResizeStart = (event: React.MouseEvent<HTMLDivElement>) => {
     rightPanelResizeStartXRef.current = event.clientX;
     rightPanelResizeStartWidthRef.current = rightPanelWidth;
-    rightPanelResizeStartPreviewWidthRef.current = previewPanelWidth;
     setIsRightPanelResizing(true);
   };
 
@@ -853,9 +861,6 @@ export default function ChatPage({ isNew }: { isNew?: boolean }) {
     return previewTabs.find((tab) => tab.key === activePreviewKey) ?? null;
   }, [activePreviewKey, previewTabs]);
 
-  const previewStatusMeta = activePreviewItem?.status
-    ? getExperimentStatusMeta(activePreviewItem.status)
-    : null;
   const chatContentMaxWidth: number | string = showPreviewPanel ? '100%' : 800;
   const chatInputMaxWidth: number | string = showPreviewPanel ? '100%' : 840;
 
@@ -902,11 +907,8 @@ export default function ChatPage({ isNew }: { isNew?: boolean }) {
           </div>
         )}
       </header>
-      <div className="flex flex-1 min-h-0 w-full overflow-hidden">
-        <div
-          className={`${showPreviewPanel ? 'shrink-0 min-w-[320px]' : 'flex-1 min-w-0'} flex flex-col h-full bg-white`}
-          style={showPreviewPanel ? { width: CHAT_MIN_WIDTH_WITH_PREVIEW } : undefined}
-        >
+      <div ref={workspaceContainerRef} className="flex flex-1 min-h-0 w-full overflow-hidden">
+        <div className="flex min-w-0 flex-1 flex-col h-full bg-white" style={{ minWidth: 0 }}>
           {/* 聊天内容区 */}
         {isNewChat ? (
           <div className="flex-1 flex flex-col items-center justify-center w-full mx-auto px-6 overflow-y-auto">
@@ -926,13 +928,13 @@ export default function ChatPage({ isNew }: { isNew?: boolean }) {
                     }
                   }}
                   placeholder="输入你的科研问题..."
-                  className="w-full min-h-[90px] max-h-[200px] p-5 outline-none resize-none text-lg bg-transparent text-primaryText placeholder:text-tertiaryText leading-relaxed"
+                  className="w-full min-h-[90px] max-h-[200px] p-5 outline-none resize-none text-[14px] bg-transparent text-primaryText placeholder:text-tertiaryText leading-relaxed"
                 />
                 <div className="flex justify-between items-center p-3 pt-0">
                   <div className="flex items-center gap-2 pl-1 relative">
                     <button 
                       onClick={() => setShowProjectDropdown(!showProjectDropdown)}
-                      className="flex items-center gap-1.5 px-4 py-1.5 rounded-full border border-borderGray text-base text-tertiaryText hover:bg-bgLight transition-colors bg-white"
+                      className="flex items-center gap-1.5 px-4 py-1.5 rounded-full border border-borderGray text-[14px] text-tertiaryText hover:bg-bgLight transition-colors bg-white"
                     >
                       <span className="truncate max-w-[120px]">
                         {selectedProject ? selectedProject.name : 'Work in a project'}
@@ -944,29 +946,40 @@ export default function ChatPage({ isNew }: { isNew?: boolean }) {
                     {showProjectDropdown && (
                       <>
                         <div className="fixed inset-0 z-30" onClick={() => setShowProjectDropdown(false)}></div>
-<div className="absolute bottom-full left-0 mb-2 w-60 bg-white rounded-xl shadow-popover z-40 overflow-hidden py-2 animate-in fade-in slide-in-from-bottom-2">
-<div className="max-h-[200px] overflow-y-auto">
-                            {mockProjects.map(p => (
-                              <div 
-                                key={p.id} 
-                                className={`px-4 py-2.5 text-base cursor-pointer flex items-center justify-between rounded-lg mx-2 transition-colors ${
-                                  selectedProject?.id === p.id 
-                                    ? 'bg-green-100 text-green-700 font-medium' 
-                                    : 'text-primaryText hover:bg-bgLight'
-                                }`}
-                                onClick={() => { setSelectedProject(p); setShowProjectDropdown(false); }}
-                              >
-                                <span className="truncate">{p.name}</span>
-                              </div>
-                            ))}
-                          </div>
-                          <div 
-                            className="px-4 py-2.5 text-base text-green-600 hover:bg-green-50 cursor-pointer flex items-center gap-2 font-medium rounded-lg mx-2 transition-colors"
-                            onClick={() => {
-                              setShowProjectDropdown(false);
-                            }}
-                          >
-                            <Plus size={16} /> 新建项目
+                        <div
+                          className="absolute bottom-full left-0 mb-2 z-40 w-64 rounded-xl bg-white shadow-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200 origin-bottom-left"
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          <div className="py-2 text-base text-primaryText font-normal space-y-1 px-2">
+                            <div className="max-h-[208px] overflow-y-auto pr-0.5">
+                              {mockProjects.map((project) => (
+                                <button
+                                  key={project.id}
+                                  type="button"
+                                  className={`w-full px-3 py-2.5 cursor-pointer transition-colors flex items-center justify-between rounded-lg text-left ${
+                                    selectedProject?.id === project.id
+                                      ? 'bg-bgLight text-primaryText font-medium'
+                                      : 'text-primaryText hover:bg-bgLight'
+                                  }`}
+                                  onClick={() => {
+                                    setSelectedProject(project);
+                                    setShowProjectDropdown(false);
+                                  }}
+                                >
+                                  <span className="truncate">{project.name}</span>
+                                </button>
+                              ))}
+                            </div>
+                            <button
+                              type="button"
+                              className="w-full text-left px-3 py-2.5 text-primaryText hover:bg-bgLight cursor-pointer transition-colors font-medium rounded-lg flex items-center gap-2"
+                              onClick={() => {
+                                setShowProjectDropdown(false);
+                              }}
+                            >
+                              <Plus size={16} />
+                              <span>新建项目</span>
+                            </button>
                           </div>
                         </div>
                       </>
@@ -1040,16 +1053,12 @@ export default function ChatPage({ isNew }: { isNew?: boolean }) {
         {!isNewChat && (
           <aside
             ref={previewPanelContainerRef}
-            style={{ flexBasis: showPreviewPanel ? previewPanelWidth : 0 }}
-            className={`min-h-0 overflow-hidden ${
-              isPreviewPanelResizing ? 'transition-none' : 'transition-[flex-basis] duration-300 ease-out'
-            } ${showPreviewPanel ? 'flex-1 min-w-[200px]' : 'shrink-0 pointer-events-none'}`}
+            style={{ width: showPreviewPanel ? previewPanelWidth : 0 }}
+            className={`shrink-0 min-h-0 overflow-hidden ${
+              isPreviewPanelResizing ? 'transition-none' : 'transition-[width] duration-300 ease-out'
+            } ${showPreviewPanel ? 'min-w-0' : 'pointer-events-none'}`}
           >
-            <div
-              className={`relative h-full w-full bg-white border-l border-[#efefef] flex flex-col transform-gpu ${
-                isPreviewPanelResizing ? 'transition-none' : 'transition-transform duration-300 ease-out'
-              } ${showPreviewPanel ? 'translate-x-0' : 'translate-x-full'}`}
-            >
+            <div className="relative h-full w-full min-w-0 bg-white border-l border-[#efefef] flex flex-col">
               <div
                 role="separator"
                 aria-orientation="vertical"
@@ -1065,9 +1074,9 @@ export default function ChatPage({ isNew }: { isNew?: boolean }) {
                       <div key={tab.key} className="group relative shrink-0 w-[150px]">
                         <button
                           onClick={() => setActivePreviewKey(tab.key)}
-                          className={`w-full inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 pr-6 text-sm transition-colors ${
-                            isActiveTab ? 'bg-[#f3f8fc] text-primaryText' : 'text-secondaryText hover:bg-bgLight'
-                          }`}
+className={`w-full inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 pr-6 text-sm transition-colors ${
+                                isActiveTab ? 'bg-[#fafafa] text-primaryText' : 'text-secondaryText hover:bg-[#fafafa]'
+                              }`}
                         >
                           {tab.type === 'knowledge' ? (
                             <FileText size={14} className="text-tertiaryText shrink-0" />
@@ -1112,15 +1121,15 @@ export default function ChatPage({ isNew }: { isNew?: boolean }) {
                       {activePreviewItem.type === 'knowledge' && (
                         <div className="text-xs text-tertiaryText">{activePreviewItem.subtitle}</div>
                       )}
-                      {previewStatusMeta && (
-                        <div className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs ${previewStatusMeta.className}`}>
-                          {previewStatusMeta.icon}
-                          <span>{activePreviewItem.status}</span>
-                        </div>
-                      )}
+                  {activePreviewItem?.status && (
+                    <div className="inline-flex items-center rounded-full bg-bgLight px-2 py-1 text-xs text-secondaryText">
+                      <span>{activePreviewItem.status}</span>
+                    </div>
+                  )}
+
                     </div>
                     <div className="rounded-xl border border-borderGray bg-bgLight/40 p-3">
-                      <p className="text-sm text-secondaryText leading-6 whitespace-pre-line">{activePreviewItem.content}</p>
+                      <p className="text-sm text-secondaryText leading-6 whitespace-pre-line break-words">{activePreviewItem.content}</p>
                     </div>
                   </div>
                 ) : (
@@ -1143,7 +1152,7 @@ export default function ChatPage({ isNew }: { isNew?: boolean }) {
           >
             <div
               style={{ width: rightPanelWidth }}
-              className="relative h-full bg-white border-l border-[#efefef] flex flex-col"
+              className="relative h-full min-w-0 bg-white border-l border-[#efefef] flex flex-col"
             >
               <div
                 role="separator"
@@ -1193,7 +1202,7 @@ export default function ChatPage({ isNew }: { isNew?: boolean }) {
                                 key={doc.id}
                                 onClick={() => handleKnowledgeDocClick(doc)}
                                 className={`w-full flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-sm text-primaryText transition-colors ${
-                                  isActive ? 'bg-[#f3f8fc]' : 'hover:bg-bgLight'
+                                  isActive ? 'bg-[#fafafa] font-semibold' : 'font-normal hover:bg-[#fafafa]'
                                 }`}
                               >
                                 <FileText size={13} className="text-tertiaryText shrink-0" />
@@ -1233,7 +1242,7 @@ export default function ChatPage({ isNew }: { isNew?: boolean }) {
                               <div key={experiment.id} className="rounded-lg">
                                 <button
                                   onClick={() => toggleExperiment(experiment.id)}
-                                  className="w-full flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-sm text-primaryText hover:bg-bgLight transition-colors"
+                                  className="w-full flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-sm text-primaryText hover:bg-[#fafafa] transition-colors"
                                 >
                                   {isExpanded ? (
                                     <ChevronDown size={13} className="text-tertiaryText shrink-0" />
@@ -1245,35 +1254,53 @@ export default function ChatPage({ isNew }: { isNew?: boolean }) {
                                 </button>
 
                                 {isExpanded && (
-                                  <div className="ml-7 mt-0.5 space-y-1">
+                                  <div className="ml-7 mt-0.5 space-y-0.5">
                                     {experiment.logs.length > 0 ? (
                                       experiment.logs.map((log, logIndex) => {
-                                        const statusMeta = getExperimentStatusMeta(log.status);
                                         const showConnector = logIndex < experiment.logs.length - 1;
-
                                         const previewKey = `experiment-log:${log.id}`;
                                         const isActive = activePreviewKey === previewKey;
 
                                         return (
-                                          <div
+                                          <button
                                             key={log.id}
+                                            type="button"
                                             onClick={() => handleExperimentLogClick(experiment, log)}
-                                            className={`relative pl-7 pb-2 last:pb-0 rounded-lg cursor-pointer transition-colors ${
-                                              isActive ? 'bg-[#f3f8fc]' : 'hover:bg-bgLight/70'
-                                            }`}
+                                            className="group block w-full text-left"
                                           >
-                                            {showConnector && (
-                                              <div className="absolute left-2 top-[8px] bottom-[-8px] w-px -translate-x-1/2 bg-borderGray/80" />
-                                            )}
-                                            <div
-                                              title={log.status}
-                                              className={`absolute left-0 top-0 flex h-4 w-4 items-center justify-center rounded-full ${statusMeta.className}`}
-                                            >
-                                              {statusMeta.icon}
+                                            <div className="relative flex gap-2">
+                                              <div className="relative flex w-3.5 shrink-0 justify-center">
+                                                {showConnector && (
+                                                  <span className="absolute left-1/2 top-[14px] bottom-[-6px] w-px -translate-x-1/2 bg-borderGray/80" />
+                                                )}
+                                                <span className="mt-[9px] h-1.5 w-1.5 rounded-full bg-[#D1D5DB]" />
+                                              </div>
+                                              <div className="min-w-0 flex-1 pb-1.5">
+                                                <div
+                                                  className={`rounded-lg px-2.5 py-1.5 transition-colors ${
+                                                    isActive ? 'bg-[#fafafa]' : 'group-hover:bg-[#fafafa]'
+                                                  }`}
+                                                >
+                                                  <div
+                                                    className={`line-clamp-2 text-sm leading-5 ${
+                                                      isActive
+                                                        ? 'font-semibold text-primaryText'
+                                                        : 'font-normal text-secondaryText'
+                                                    }`}
+                                                  >
+                                                    {log.summary}
+                                                  </div>
+                                                  <div
+                                                    className={`mt-0.5 text-xs ${
+                                                      isActive ? 'text-secondaryText' : 'text-tertiaryText'
+                                                    }`}
+                                                  >
+                                                    {log.date}
+                                                  </div>
+                                                </div>
+                                              </div>
                                             </div>
-                                            <div className="text-sm font-medium text-primaryText leading-5">{log.date}</div>
-                                            <div className="text-sm text-secondaryText mt-0.5 leading-5 truncate">{log.summary}</div>
-                                          </div>
+                                          </button>
                                         );
                                       })
                                     ) : (

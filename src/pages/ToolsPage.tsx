@@ -1,9 +1,14 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
+import { DatePicker, Radio } from 'antd';
+import dayjs from 'dayjs';
 import { useNavigate, useOutletContext } from 'react-router-dom';
-import { Menu, Plus, MoreHorizontal, Pencil, Copy, Trash2, X, Check, ChevronLeft, ChevronDown, ChevronRight, CalendarDays, Clock3, Folder } from 'lucide-react';
+import { Menu, Plus, MoreHorizontal, Pencil, Copy, Trash2, Check, ChevronLeft, ChevronDown, ChevronRight, CalendarDays, Clock3, Folder } from 'lucide-react';
 import { mockProjects } from '../mock/projects';
-import { BaseButton } from '../components';
+import { BaseActionMenu, BaseButton, BaseInput, BaseModal, BaseTable, BaseToggle } from '../components';
+import type { BaseActionMenuItem, BaseTableColumn } from '../components';
 import { type LayoutOutletContext } from '../components/Layout';
+
+const { RangePicker } = DatePicker;
 
 interface TaskTemplate {
   id: string;
@@ -29,9 +34,10 @@ type RepeatMode = 'none' | 'monthly' | 'weekly' | 'hourly';
 
 interface LiteratureTrackForm {
   topic: string;
-  lookbackDays: string;
+  periodStart: string;
+  periodEnd: string;
   frequency: FetchFrequency;
-  sourceTypes: SourceType[];
+  sourceType: SourceType;
   keywords: string;
   pubmedMatchMode: PubMedMatchMode;
 }
@@ -111,9 +117,10 @@ const initialUserTasks: UserTask[] = [
 
 const initialLiteratureTrackForm: LiteratureTrackForm = {
   topic: '',
-  lookbackDays: '30',
+  periodStart: '2026-06-01',
+  periodEnd: '2026-06-30',
   frequency: 'daily',
-  sourceTypes: ['pubmed'],
+  sourceType: 'pubmed',
   keywords: 'CRISPR, prime editing, base editor',
   pubmedMatchMode: 'all',
 };
@@ -296,21 +303,11 @@ export default function ToolsPage() {
     setActionMenuTaskId(null);
   };
 
-  const toggleSourceType = (sourceType: SourceType) => {
-    setLiteratureForm((prev) => {
-      const exists = prev.sourceTypes.includes(sourceType);
-
-      if (exists && prev.sourceTypes.length === 1) {
-        return prev;
-      }
-
-      return {
-        ...prev,
-        sourceTypes: exists
-          ? prev.sourceTypes.filter((type) => type !== sourceType)
-          : [...prev.sourceTypes, sourceType],
-      };
-    });
+  const handleSourceTypeChange = (sourceType: SourceType) => {
+    setLiteratureForm((prev) => ({
+      ...prev,
+      sourceType,
+    }));
   };
 
   const buildLiteraturePrompt = () => {
@@ -323,9 +320,7 @@ export default function ToolsPage() {
       return `任务：${literatureForm.topic || '每周工作总结'}；项目：${projectLabel}；重复机制：${repeatLabel}；起止日期：${weeklyScheduleForm.startDate}~${weeklyScheduleForm.endDate}；执行时间：${weeklyScheduleForm.runAt}；任务内容：${weeklyScheduleForm.taskPrompt}；保留同一对话：${weeklyScheduleForm.keepInSameConversation ? '是' : '否'}；通知方式：${emailLabel}`;
     }
 
-    const sourceLabel = literatureForm.sourceTypes
-      .map((type) => (type === 'pubmed' ? 'PubMed' : 'bioRxiv'))
-      .join(' + ');
+    const sourceLabel = literatureForm.sourceType === 'pubmed' ? 'PubMed' : 'bioRxiv';
 
     const matchModeLabel =
       literatureForm.pubmedMatchMode === 'all'
@@ -334,7 +329,7 @@ export default function ToolsPage() {
           ? '任一关键词'
           : '高级表达式';
 
-    return `主题：${literatureForm.topic || '文献追踪'}；关键词：${literatureForm.keywords}；来源：${sourceLabel}；回看 ${literatureForm.lookbackDays} 天；PubMed 匹配：${matchModeLabel}`;
+    return `主题：${literatureForm.topic || '文献追踪'}；关键词：${literatureForm.keywords}；来源：${sourceLabel}；任务周期：${literatureForm.periodStart} ~ ${literatureForm.periodEnd}；PubMed 匹配：${matchModeLabel}`;
   };
 
   const handleCreateLiteratureTask = () => {
@@ -345,7 +340,11 @@ export default function ToolsPage() {
     if (
       !trimmedTopic ||
       (activeModalTemplateId === 'template-meeting-brief' && !trimmedWeeklyPrompt) ||
-      (activeModalTemplateId !== 'template-meeting-brief' && !trimmedKeywords)
+      (activeModalTemplateId !== 'template-meeting-brief' &&
+        (!trimmedKeywords ||
+          !literatureForm.periodStart ||
+          !literatureForm.periodEnd ||
+          literatureForm.periodStart > literatureForm.periodEnd))
     ) {
       return;
     }
@@ -373,6 +372,88 @@ export default function ToolsPage() {
 
     closeTaskConfigModal();
   };
+
+  const taskTableColumns = useMemo<BaseTableColumn<UserTask>[]>(
+    () => [
+      {
+        title: '任务名称',
+        dataIndex: 'name',
+        width: '20%',
+        render: (name) => <span className="truncate text-primaryText">{name}</span>,
+      },
+      {
+        title: '任务内容',
+        dataIndex: 'prompt',
+        width: '40%',
+        render: (prompt) => <span className="truncate text-secondaryText">{prompt}</span>,
+      },
+      {
+        title: '下次运行',
+        dataIndex: 'nextRun',
+        width: '14%',
+        render: (nextRun) => <span className="text-secondaryText">{nextRun}</span>,
+      },
+      {
+        title: '触发方式',
+        dataIndex: 'trigger',
+        width: '16%',
+        render: (trigger) => <span className="text-secondaryText">{trigger}</span>,
+      },
+      {
+        title: '状态',
+        dataIndex: 'isEnabled',
+        width: '7%',
+        render: (_, task) => (
+          <BaseToggle
+            size="small"
+            checked={task.isEnabled}
+            onChange={() => handleToggleStatus(task.id)}
+            aria-label={task.isEnabled ? '关闭任务' : '开启任务'}
+          />
+        ),
+      },
+      {
+        title: '操作',
+        dataIndex: 'id',
+        width: '3%',
+        align: 'right',
+        render: (_, task) => {
+          const actionItems: BaseActionMenuItem[] = [
+            { key: 'rename', label: '编辑', icon: <Pencil size={14} /> },
+            { key: 'copy', label: '复制', icon: <Copy size={14} /> },
+            { key: 'delete', label: '删除', icon: <Trash2 size={14} />, danger: true },
+          ];
+
+          return (
+            <BaseActionMenu
+              open={actionMenuTaskId === task.id}
+              onOpenChange={(open) => setActionMenuTaskId(open ? task.id : null)}
+              placement="bottom-end"
+              width={144}
+              trigger={
+                <span className="inline-flex rounded-md p-1 text-secondaryText transition-colors hover:bg-bgLight hover:text-primaryText">
+                  <MoreHorizontal size={16} />
+                </span>
+              }
+              items={actionItems}
+              onItemClick={(item) => {
+                if (item.key === 'rename') {
+                  handleRenameTask(task.id);
+                  return;
+                }
+                if (item.key === 'copy') {
+                  handleCopyTask(task.id);
+                  return;
+                }
+                handleDeleteTask(task.id);
+              }}
+            />
+          );
+        },
+      },
+    ],
+    [actionMenuTaskId, tasks],
+  );
 
   return (
     <div className="flex h-full w-full flex-col bg-white">
@@ -403,16 +484,17 @@ export default function ToolsPage() {
         </BaseButton>
       </header>
 
-      <div className="flex-1 overflow-y-auto px-4 pb-12 pt-4 md:px-8 lg:px-10 md:pb-12 md:pt-6">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 pb-12 pt-4 md:px-8 lg:px-10 md:pb-12 md:pt-6">
         <div className="max-w-[1240px] mx-auto space-y-10">
           <section>
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <h2 className="text-2xl font-semibold text-primaryText">定时任务</h2>
+            <div className="mt-6 grid grid-cols-1 gap-[18px] md:grid-cols-2 lg:grid-cols-3">
               {taskTemplates.map((template) => (
                 <button
                   key={template.id}
                   type="button"
                   onClick={() => handleCreateFromTemplate(template)}
-                  className="rounded-xl border border-[#e9edf2] bg-white p-4 text-left transition-all hover:shadow-sm hover:border-[#dde3ea] flex flex-col"
+                  className="rounded-lg border border-[#e9edf2] bg-white p-4 text-left transition-all hover:shadow-sm hover:border-[#dde3ea] flex flex-col"
                 >
                   <h3 className="text-[17px] font-medium text-primaryText">{template.name}</h3>
                   <p className="mt-1 line-clamp-2 min-h-[38px] text-sm leading-5 text-secondaryText">{template.desc}</p>
@@ -426,119 +508,36 @@ export default function ToolsPage() {
               <h2 className="text-[15px] font-medium text-primaryText">已设置任务</h2>
             </div>
 
-            <div className="task-table-scroll overflow-x-auto border-b border-[borderGray] bg-white">
-              <div className="min-w-[940px]">
-                <div className="grid grid-cols-[1.05fr_2.2fr_0.85fr_0.95fr_72px_44px] border-b border-[#edf1f5] pl-0 pr-3 py-2 text-sm text-[#8a94a0]">
-                  <span>任务名称</span>
-                  <span>任务内容</span>
-                  <span>下次运行</span>
-                  <span>触发方式</span>
-                  <span>状态</span>
-                  <span className="text-right">操作</span>
-                </div>
-
-                {tasks.map((task) => {
-                  const isMenuOpen = actionMenuTaskId === task.id;
-
-                  return (
-                    <div
-                      key={task.id}
-                      className="relative grid grid-cols-[1.05fr_2.2fr_0.85fr_0.95fr_72px_44px] items-center gap-2 border-b border-[#f1f4f7] pl-0 pr-3 py-2.5 text-sm last:border-b-0"
-                    >
-                      <span className="truncate text-primaryText">{task.name}</span>
-                      <span className="truncate text-secondaryText">{task.prompt}</span>
-                      <span className="text-secondaryText">{task.nextRun}</span>
-                      <span className="text-secondaryText">{task.trigger}</span>
-
-                      <div>
-                        <button
-                          type="button"
-                          onClick={() => handleToggleStatus(task.id)}
-                          className={`inline-flex h-5 w-9 items-center rounded-full p-[2px] transition-colors ${
-                            task.isEnabled ? 'justify-end bg-[#1f1f1f]' : 'justify-start bg-[#d9dee5]'
-                          }`}
-                          aria-label={task.isEnabled ? '关闭任务' : '开启任务'}
-                          role="switch"
-                          aria-checked={task.isEnabled}
-                        >
-                          <span className="h-4 w-4 rounded-full bg-white shadow" />
-                        </button>
-                      </div>
-
-                      <div className="relative flex justify-end">
-                        <button
-                          type="button"
-                          onClick={() => setActionMenuTaskId(isMenuOpen ? null : task.id)}
-                          className="rounded-md p-1 text-secondaryText transition-colors hover:bg-bgLight hover:text-primaryText"
-                          aria-label="任务操作"
-                        >
-                          <MoreHorizontal size={16} />
-                        </button>
-
-                        {isMenuOpen && (
-                          <>
-                            <div className="fixed inset-0 z-20" onClick={() => setActionMenuTaskId(null)}></div>
-                            <div className="absolute right-0 top-8 z-30 w-36 overflow-hidden rounded-xl border border-borderGray bg-white py-1.5 shadow-popover">
-                              <button
-                                type="button"
-                                onClick={() => handleRenameTask(task.id)}
-                                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-primaryText transition-colors hover:bg-bgLight"
-                              >
-                                <Pencil size={14} />
-                                编辑
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleCopyTask(task.id)}
-                                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-primaryText transition-colors hover:bg-bgLight"
-                              >
-                                <Copy size={14} />
-                                复制
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteTask(task.id)}
-                                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 transition-colors hover:bg-red-50"
-                              >
-                                <Trash2 size={14} />
-                                删除
-                              </button>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+            <div className="border-b border-borderGray bg-white">
+              <BaseTable
+                className="task-table-scroll w-full [&_table]:min-w-[940px]"
+                columns={taskTableColumns}
+                dataSource={tasks}
+                rowKey="id"
+                striped={false}
+              />
             </div>
           </section>
         </div>
       </div>
 
-      {showLiteratureModal && (
-        <>
-          <div className="fixed inset-0 z-40 bg-black/20" onClick={closeTaskConfigModal} />
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div
-              className="w-full max-w-[600px] rounded-lg bg-white shadow-popover"
-              onClick={(event) => event.stopPropagation()}
-            >
-              <div className="flex items-center justify-between border-b border-[borderGray] px-6 py-3.5">
-                <div>
-                  <h3 className="text-[17px] font-semibold text-primaryText">{modalTitle}</h3>
-                </div>
-                <button
-                  type="button"
-                  onClick={closeTaskConfigModal}
-                  className="rounded-full p-2 text-secondaryText transition-colors hover:bg-bgLight hover:text-primaryText"
-                  aria-label="关闭弹窗"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              <div className="space-y-5 px-6 py-5">
+      <BaseModal
+        visible={showLiteratureModal}
+        title={modalTitle}
+        width={600}
+        className="tools-task-modal"
+        okText="创建任务"
+        cancelText="取消"
+        onCancel={closeTaskConfigModal}
+        onConfirm={handleCreateLiteratureTask}
+        okButtonProps={{
+          disabled:
+            !literatureForm.topic.trim() ||
+            (activeModalTemplateId === 'template-meeting-brief' && !weeklyScheduleForm.taskPrompt.trim()) ||
+            (activeModalTemplateId !== 'template-meeting-brief' && !literatureForm.keywords.trim()),
+        }}
+      >
+        <div className="space-y-5">
                 <div>
                   <div className="mb-1.5 flex items-center gap-2">
                     <span className="text-sm font-medium text-primaryText">任务名称</span>
@@ -548,7 +547,7 @@ export default function ToolsPage() {
                         : '留空时会自动使用一个关键词生成“文献订阅”名称。'}
                     </span>
                   </div>
-                  <input
+                  <BaseInput
                     value={literatureForm.topic}
                     onChange={(event) =>
                       setLiteratureForm((prev) => ({
@@ -557,7 +556,8 @@ export default function ToolsPage() {
                       }))
                     }
                     placeholder={activeModalTemplateId === 'template-meeting-brief' ? '例：每周工作总结' : '例：EGFR resistance'}
-                    className="w-full rounded-lg border border-[borderGray] px-3.5 py-2.5 text-sm text-primaryText outline-none transition-colors placeholder:text-tertiaryText focus:border-[#34D399]"
+                    size="medium"
+                    containerClassName="!px-3.5"
                   />
                 </div>
 
@@ -804,41 +804,47 @@ export default function ToolsPage() {
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
                       <div className="mb-1.5 text-sm font-medium text-primaryText">抓取频率</div>
-                      <div className="flex w-full gap-2">
-                        {frequencyOptions.map((option) => (
-                          <button
-                            key={option.value}
-                            type="button"
-                            onClick={() =>
-                              setLiteratureForm((prev) => ({
-                                ...prev,
-                                frequency: option.value,
-                              }))
-                            }
-                            className={`flex-1 rounded-lg border px-4 py-2 text-center text-sm font-medium transition-colors ${
-                              literatureForm.frequency === option.value
-                                ? 'border-[#34D399] bg-[#ECFDF5] text-[#047857]'
-                                : 'border-[#D9E2EC] bg-white text-secondaryText hover:border-[#6EE7B7] hover:text-[#047857]'
-                            }`}
-                          >
-                            {option.label}
-                          </button>
-                        ))}
+                      <div className="relative">
+                        <select
+                          value={literatureForm.frequency}
+                          onChange={(event) =>
+                            setLiteratureForm((prev) => ({
+                              ...prev,
+                              frequency: event.target.value as FetchFrequency,
+                            }))
+                          }
+                          className="h-9 w-full appearance-none rounded-lg border border-[borderGray] bg-white px-3 pr-10 text-sm text-primaryText outline-none transition-colors focus:border-[#34D399]"
+                        >
+                          {frequencyOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                        <ChevronDown size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#98A2B3]" />
                       </div>
                     </div>
 
                     <div>
-                      <div className="mb-1.5 text-sm font-medium text-primaryText">订阅天数</div>
-                      <input
-                        value={literatureForm.lookbackDays}
-                        onChange={(event) =>
+                      <div className="mb-1.5 text-sm font-medium text-primaryText">任务周期</div>
+                      <RangePicker
+                        format="YYYY-MM-DD"
+                        className="task-period-picker w-full"
+                        popupClassName="task-period-picker-popup"
+                        value={[
+                          literatureForm.periodStart ? dayjs(literatureForm.periodStart, 'YYYY-MM-DD') : null,
+                          literatureForm.periodEnd ? dayjs(literatureForm.periodEnd, 'YYYY-MM-DD') : null,
+                        ]}
+                        onChange={(_, dateStrings) => {
+                          const [periodStart, periodEnd] = dateStrings;
                           setLiteratureForm((prev) => ({
                             ...prev,
-                            lookbackDays: event.target.value.replace(/[^\d]/g, ''),
-                          }))
-                        }
-                        placeholder="30"
-                        className="w-full rounded-lg border border-[borderGray] px-3.5 py-2.5 text-sm text-primaryText outline-none transition-colors placeholder:text-tertiaryText focus:border-[#34D399]"
+                            periodStart,
+                            periodEnd,
+                          }));
+                        }}
+                        placeholder={['开始日期', '结束日期']}
+                        allowClear={false}
                       />
                     </div>
                   </div>
@@ -848,32 +854,30 @@ export default function ToolsPage() {
                   <>
                     <div>
                       <div className="mb-2 text-sm font-medium text-primaryText">订阅来源</div>
-                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        {(Object.keys(sourceTypeMeta) as SourceType[]).map((sourceType) => {
-                          const selected = literatureForm.sourceTypes.includes(sourceType);
-                          const source = sourceTypeMeta[sourceType];
-
-                          return (
-                            <button
-                              key={sourceType}
-                              type="button"
-                              onClick={() => toggleSourceType(sourceType)}
-                              className={`rounded-lg border px-3.5 py-3 text-left transition-colors ${
-                                selected
-                                  ? 'border-[#34D399] bg-[#ECFDF5]'
-                                  : 'border-[borderGray] bg-white hover:border-[#cad6e5]'
-                              }`}
-                            >
-                              <div className="mb-1 flex items-center justify-between gap-2">
-                                <span className="text-sm font-medium text-primaryText">{source.label}</span>
-                                {selected && <Check size={14} className="text-[#047857]" />}
-                              </div>
-                              <p className="text-[13px] text-secondaryText">{source.desc}</p>
-                            </button>
-                          );
-                        })}
-                      </div>
-                      <p className="mt-1.5 text-[13px] text-tertiaryText">当前版本支持 PubMed 和 bioRxiv，可同时勾选多个来源。</p>
+                      <Radio.Group
+                        value={literatureForm.sourceType}
+                        onChange={(event) => handleSourceTypeChange(event.target.value as SourceType)}
+                        className="w-full task-radio-group"
+                      >
+                        <div className="grid grid-cols-2 gap-3">
+                          {(Object.keys(sourceTypeMeta) as SourceType[]).map((sourceType) => {
+                            const source = sourceTypeMeta[sourceType];
+                            return (
+                              <label
+                                key={sourceType}
+                                className="flex items-start gap-2.5 rounded-lg border border-[borderGray] bg-white px-3.5 py-3 hover:border-[#cad6e5]"
+                              >
+                                <Radio value={sourceType} className="mt-0.5" />
+                                <span>
+                                  <span className="block text-sm font-medium text-primaryText">{source.label}</span>
+                                  <span className="mt-0.5 block text-[13px] text-secondaryText">{source.desc}</span>
+                                </span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </Radio.Group>
+                      <p className="mt-1.5 text-[13px] text-tertiaryText">当前版本支持 PubMed 和 bioRxiv，单次任务请选择一个来源。</p>
                     </div>
 
                     <div>
@@ -893,57 +897,29 @@ export default function ToolsPage() {
 
                     <div>
                       <div className="mb-2 text-sm font-medium text-primaryText">PubMed 匹配方式</div>
-                      <div className="inline-flex flex-wrap gap-2">
-                        {pubmedMatchOptions.map((option) => (
-                          <button
-                            key={option.value}
-                            type="button"
-                            onClick={() =>
-                              setLiteratureForm((prev) => ({
-                                ...prev,
-                                pubmedMatchMode: option.value,
-                              }))
-                            }
-                            className={`rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
-                              literatureForm.pubmedMatchMode === option.value
-                                ? 'border-[#34D399] bg-[#ECFDF5] text-[#047857]'
-                                : 'border-[#D9E2EC] bg-white text-secondaryText hover:border-[#6EE7B7] hover:text-[#047857]'
-                            }`}
-                          >
-                            {option.label}
-                          </button>
-                        ))}
-                      </div>
+                      <Radio.Group
+                        value={literatureForm.pubmedMatchMode}
+                        onChange={(event) =>
+                          setLiteratureForm((prev) => ({
+                            ...prev,
+                            pubmedMatchMode: event.target.value as PubMedMatchMode,
+                          }))
+                        }
+                        className="task-radio-group"
+                      >
+                        <div className="flex flex-wrap gap-5">
+                          {pubmedMatchOptions.map((option) => (
+                            <Radio key={option.value} value={option.value}>
+                              {option.label}
+                            </Radio>
+                          ))}
+                        </div>
+                      </Radio.Group>
                     </div>
                   </>
                 )}
-              </div>
-
-              <div className="flex items-center justify-end gap-3 border-t border-[borderGray] px-6 py-4">
-                <button
-                  type="button"
-                  onClick={closeTaskConfigModal}
-                  className="rounded-full border border-[#d8e0ea] px-4 py-2 text-sm text-secondaryText transition-colors hover:bg-bgLight"
-                >
-                  取消
-                </button>
-                <button
-                  type="button"
-                  onClick={handleCreateLiteratureTask}
-                  disabled={
-                    !literatureForm.topic.trim() ||
-                    (activeModalTemplateId === 'template-meeting-brief' && !weeklyScheduleForm.taskPrompt.trim()) ||
-                    (activeModalTemplateId !== 'template-meeting-brief' && !literatureForm.keywords.trim())
-                  }
-                  className="rounded-full bg-[#1f1f1f] px-5 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  创建任务
-                </button>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
+        </div>
+      </BaseModal>
     </div>
   );
 }
