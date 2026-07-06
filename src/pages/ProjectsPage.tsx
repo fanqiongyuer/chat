@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { mockProjects } from '../mock/projects';
 import { ChevronLeft, Plus, Menu } from 'lucide-react';
-import { BaseButton } from '@/components';
+import { BaseButton } from '../components';
 import { type LayoutOutletContext } from '../components/Layout';
 
 type ProjectTab = 'private' | 'public';

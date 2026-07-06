@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { ChevronLeft, Menu, Plus, Users } from 'lucide-react';
-import { BaseButton, BaseEmpty, BaseSelect } from '@/components';
+import { BaseButton, BaseEmpty, BaseSelect } from '../components';
 import {
   EXPERIMENTS_BY_PROJECT,
   KNOWLEDGE_BY_PROJECT,

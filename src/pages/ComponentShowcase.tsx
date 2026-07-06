@@ -11,7 +11,7 @@ import {
   BasePagination,
   BaseEmpty,
   BaseActionMenu,
-} from '@/components';
+} from '../components';
 
 /**
  * ComponentShowcase - 组件库全展示页面

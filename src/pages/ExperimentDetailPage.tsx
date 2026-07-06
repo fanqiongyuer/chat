@@ -11,7 +11,7 @@ import {
   Plus,
   Upload,
 } from 'lucide-react';
-import { BaseButton, BaseEmpty } from '@/components';
+import { BaseButton, BaseEmpty } from '../components';
 import {
   EXPERIMENT_DETAILS_BY_PROJECT,
   PROJECT_MEMBERS,

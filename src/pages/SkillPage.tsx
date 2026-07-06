@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { Menu, Plus, Search } from 'lucide-react';
-import { BaseButton } from '@/components';
+import { BaseButton } from '../components';
 import { type LayoutOutletContext } from '../components/Layout';
 
 type SkillRiskLevel = 'low' | 'medium';

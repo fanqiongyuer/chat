@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { Menu, Plus, X, HelpCircle, AlertCircle, ShieldCheck } from 'lucide-react';
-import { BaseButton } from '@/components';
+import { BaseButton } from '../components';
 import { type LayoutOutletContext } from '../components/Layout';
 
 type MemberRole = '管理员' | '成员';

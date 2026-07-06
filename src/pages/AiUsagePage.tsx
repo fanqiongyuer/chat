@@ -2,7 +2,7 @@ import React, { useMemo, useRef, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { Menu } from 'lucide-react';
 import { type LayoutOutletContext } from '../components/Layout';
-import { BaseModal, BaseSelect, BaseSegmented, BaseTable, type BaseTableColumn } from '@/components';
+import { BaseModal, BaseSelect, BaseSegmented, BaseTable, type BaseTableColumn } from '../components';
 import { mockProjects } from '../mock/projects';
 
 type ViewTab = 'analysis' | 'users';
