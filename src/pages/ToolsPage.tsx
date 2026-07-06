@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { Menu, Plus, MoreHorizontal, Pencil, Copy, Trash2, X, Check, ChevronLeft, ChevronDown, ChevronRight, CalendarDays, Clock3, Folder } from 'lucide-react';
 import { mockProjects } from '../mock/projects';
-import { BaseButton } from '@/components';
+import { BaseButton } from '../components';
 import { type LayoutOutletContext } from '../components/Layout';
 
 interface TaskTemplate {

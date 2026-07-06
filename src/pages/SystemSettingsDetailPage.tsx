@@ -2,7 +2,7 @@ import React, { useRef, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { Menu } from 'lucide-react';
 import { type LayoutOutletContext } from '../components/Layout';
-import { BaseButton, BaseInput, BaseModal, BaseSelect, BaseToggle } from '@/components';
+import { BaseButton, BaseInput, BaseModal, BaseSelect, BaseToggle } from '../components';
 
 type SettingsTab = 'general' | 'ai-model';
 
