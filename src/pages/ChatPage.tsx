@@ -995,7 +995,7 @@ export default function ChatPage({ isNew }: { isNew?: boolean }) {
                     </button>
                     <button 
                       onClick={() => handleSend(inputVal)}
-                      className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${inputVal.trim() && !isTyping ? 'bg-green-600 text-white shadow-md hover:bg-green-700' : 'bg-tertiaryText text-white'}`}
+                      className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${inputVal.trim() && !isTyping ? 'bg-primary text-white shadow-md hover:bg-primary-hover' : 'bg-tertiaryText text-white'}`}
                     >
                       <Send size={16} />
                     </button>

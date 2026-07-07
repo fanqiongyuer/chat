@@ -42,7 +42,7 @@ const InputArea = ({ onSend, disabled }: InputAreaProps) => {
             <button
               onClick={handleSend}
               disabled={disabled || !val.trim()}
-              className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${val.trim() && !disabled ? 'bg-green-600 text-white shadow-md hover:bg-green-700' : 'bg-tertiaryText text-white'}`}
+              className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${val.trim() && !disabled ? 'bg-primary text-white shadow-md hover:bg-primary-hover' : 'bg-tertiaryText text-white'}`}
             >
               <Send size={16} />
             </button>
