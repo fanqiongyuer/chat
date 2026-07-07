@@ -4,7 +4,11 @@
 
 :root {
   --color-primary: #14B886;
+  --color-primary-rgb: 20 184 134;
   --color-primary-hover: #0d9e6d;
+  --color-primary-hover-rgb: 13 158 109;
+  --color-primary-soft-rgb: 240 249 246;
+  --color-primary-soft-strong-rgb: 232 247 242;
   --color-success: #00b42a;
   --color-warning: #ff7d00;
   --color-danger: #f53f3f;

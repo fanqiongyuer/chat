@@ -42,6 +42,14 @@ const RedirectIfAuthenticated = ({ children }: { children: ReactElement }) => {
 
 const importMetaEnv = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env;
 const routerBaseName = importMetaEnv?.BASE_URL || '/';
+const DEFAULT_PRIMARY_COLOR = '#14B886';
+const DEFAULT_PRIMARY_HOVER_COLOR = '#0d9e6d';
+
+const readCssColorVar = (varName: string, fallback: string) => {
+  if (typeof window === 'undefined') return fallback;
+  const value = window.getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+  return value || fallback;
+};
 
 const router = createBrowserRouter(
   [
@@ -104,11 +112,15 @@ const router = createBrowserRouter(
 );
 
 export default function App() {
+  const colorPrimary = readCssColorVar('--color-primary', DEFAULT_PRIMARY_COLOR);
+  const colorPrimaryHover = readCssColorVar('--color-primary-hover', DEFAULT_PRIMARY_HOVER_COLOR);
+
   return (
     <ConfigProvider
       theme={{
         token: {
-          colorPrimary: '#14B886',
+          colorPrimary,
+          colorPrimaryHover,
         },
       }}
     >

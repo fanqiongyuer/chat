@@ -25,10 +25,10 @@ export default {
         lineSoft: '#f1f4f7',
 
         // 功能色
-        primary: '#14B886',
-        'primary-hover': '#0d9e6d',
-        'primary-soft': '#f0f9f6',
-        'primary-soft-strong': '#e8f7f2',
+        primary: 'rgb(var(--color-primary-rgb) / <alpha-value>)',
+        'primary-hover': 'rgb(var(--color-primary-hover-rgb) / <alpha-value>)',
+        'primary-soft': 'rgb(var(--color-primary-soft-rgb) / <alpha-value>)',
+        'primary-soft-strong': 'rgb(var(--color-primary-soft-strong-rgb) / <alpha-value>)',
         success: '#00b42a',
         'success-soft': '#edf9f0',
         warning: '#ff7d00',
