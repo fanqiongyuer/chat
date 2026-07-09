@@ -6,6 +6,7 @@ import type { BaseActionMenuItem, BaseActionMenuProps } from './BaseActionMenu.t
 export const BaseActionMenu: React.FC<BaseActionMenuProps> = ({
   trigger,
   items,
+  footerItems = [],
   open = false,
   onOpenChange,
   onTriggerClick,
@@ -13,7 +14,10 @@ export const BaseActionMenu: React.FC<BaseActionMenuProps> = ({
   placement = 'bottom-start',
   width,
   className,
+  triggerClassName,
   menuClassName,
+  listClassName,
+  footerClassName,
 }) => {
   const wrapperRef = useRef<HTMLDivElement>(null);
 
@@ -46,11 +50,32 @@ export const BaseActionMenu: React.FC<BaseActionMenuProps> = ({
     [width]
   );
 
+  const renderMenuItem = useCallback(
+    (item: BaseActionMenuItem) => (
+      <button
+        key={item.key}
+        type="button"
+        role="menuitem"
+        className={classNames(styles.menuItem, {
+          [styles.menuItemActive]: item.active,
+          [styles.menuItemDanger]: item.danger,
+          [styles.menuItemDisabled]: item.disabled,
+        })}
+        onClick={(event) => onItemClick?.(item, event)}
+        disabled={item.disabled}
+      >
+        {item.icon && <span className={styles.menuItemIcon}>{item.icon}</span>}
+        <span className={styles.menuItemLabel}>{item.label}</span>
+      </button>
+    ),
+    [onItemClick]
+  );
+
   return (
     <div ref={wrapperRef} className={classNames(styles.menuWrapper, className)}>
       <button
         type="button"
-        className={styles.triggerButton}
+        className={classNames(styles.triggerButton, triggerClassName)}
         onClick={handleTriggerClick}
         aria-haspopup="menu"
         aria-expanded={open}
@@ -62,28 +87,21 @@ export const BaseActionMenu: React.FC<BaseActionMenuProps> = ({
         <div
           className={classNames(
             styles.menuPanel,
-            placement === 'bottom-end' ? styles.alignEnd : styles.alignStart,
+            (placement === 'bottom-end' || placement === 'top-end') ? styles.alignEnd : styles.alignStart,
+            (placement === 'top-start' || placement === 'top-end') && styles.above,
             menuClassName
           )}
           style={menuStyle}
           role="menu"
         >
-          {items.map((item) => (
-            <button
-              key={item.key}
-              type="button"
-              role="menuitem"
-              className={classNames(styles.menuItem, {
-                [styles.menuItemDanger]: item.danger,
-                [styles.menuItemDisabled]: item.disabled,
-              })}
-              onClick={(event) => onItemClick?.(item, event)}
-              disabled={item.disabled}
-            >
-              {item.icon && <span className={styles.menuItemIcon}>{item.icon}</span>}
-              <span className={styles.menuItemLabel}>{item.label}</span>
-            </button>
-          ))}
+          <div className={classNames(styles.menuList, listClassName)}>
+            {items.map(renderMenuItem)}
+          </div>
+          {footerItems.length > 0 && (
+            <div className={classNames(styles.menuFooter, footerClassName)}>
+              {footerItems.map(renderMenuItem)}
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { Plus, Folder, Clock3, Settings, Search, ChevronDown, ChevronRight, PanelLeftClose, Menu, SquarePen, MoreHorizontal, Pencil, Share2, Trash2, ArrowUpDown, Check, Pin } from 'lucide-react';
+import { Folder, Clock3, Settings, Search, ChevronDown, ChevronRight, PanelLeftClose, Menu, SquarePen, MoreHorizontal, Pencil, Share2, Trash2, Pin } from 'lucide-react';
+import { BaseActionMenu } from './common';
+import type { BaseActionMenuItem, BaseActionMenuProps } from './common';
 import { mockProjects } from '../mock/projects';
 import { mockChats, type MockChat } from '../mock/chats';
 
@@ -16,10 +18,6 @@ const AUTH_STORAGE_KEY = 'deeptrace-authenticated';
 const AUTH_SESSION_KEY = 'deeptrace-authenticated-session';
 const CHATS_STORAGE_KEY = 'deeptrace-chats';
 const CHAT_MESSAGES_STORAGE_KEY = 'deeptrace-chat-messages';
-const SORT_MENU_WIDTH = 192;
-const SORT_MENU_HEIGHT = 116;
-const SORT_MENU_OFFSET = 6;
-
 function loadChatsFromStorage(): MockChat[] {
   if (typeof window === 'undefined') return [];
 
@@ -80,18 +78,15 @@ export default function Layout() {
     mockProjects.forEach(p => { initial[p.id] = true; });
     return initial;
   });
-  const [showSettings, setShowSettings] = useState(false);
+  const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
   const [chats, setChats] = useState<MockChat[]>(() => loadChatsFromStorage());
   const [chatMenuOpenId, setChatMenuOpenId] = useState<string | null>(null);
-  const [sortMode, setSortMode] = useState<'time' | 'project'>('project');
-  const [showSortMenu, setShowSortMenu] = useState(false);
-  const [sortMenuPos, setSortMenuPos] = useState({ top: 0, left: 0 });
-  const sortButtonRef = useRef<HTMLButtonElement>(null);
+  const [sortMode, setSortMode] = useState<'time' | 'project'>('time');
 
   const handleLogout = () => {
     localStorage.removeItem(AUTH_STORAGE_KEY);
     sessionStorage.removeItem(AUTH_SESSION_KEY);
-    setShowSettings(false);
+    setSettingsMenuOpen(false);
     navigate('/login', { replace: true });
   };
 
@@ -172,6 +167,118 @@ export default function Layout() {
     window.localStorage.setItem(CHATS_STORAGE_KEY, JSON.stringify(chats));
   }, [chats]);
 
+  const settingsMenuItems = useMemo<BaseActionMenuItem[]>(() => [
+    {
+      key: 'skills',
+      label: 'Skill',
+    },
+    {
+      key: 'ai-usage',
+      label: 'AI用量',
+    },
+    {
+      key: 'members',
+      label: '成员管理',
+    },
+    {
+      key: 'system-settings',
+      label: '更多系统设置',
+    },
+    {
+      key: 'logout',
+      label: '退出登录',
+      danger: true,
+    },
+  ], []);
+
+  const handleSettingsMenuItemClick: BaseActionMenuProps['onItemClick'] = (item) => {
+    setSettingsMenuOpen(false);
+
+    if (item.key === 'skills') {
+      navigate('/skills');
+      return;
+    }
+
+    if (item.key === 'ai-usage') {
+      navigate('/ai-usage');
+      return;
+    }
+
+    if (item.key === 'members') {
+      navigate('/members');
+      return;
+    }
+
+    if (item.key === 'system-settings') {
+      navigate('/system-settings');
+      return;
+    }
+
+    if (item.key === 'logout') {
+      handleLogout();
+    }
+  };
+
+  const chatMenuFooterItems = useMemo<BaseActionMenuItem[]>(() => [
+    {
+      key: 'delete',
+      label: '删除',
+      icon: <Trash2 size={14} />,
+      danger: true,
+    },
+  ], []);
+
+  const buildChatMenuItems = (chat: MockChat): BaseActionMenuItem[] => [
+    {
+      key: 'rename',
+      label: '重命名',
+      icon: <Pencil size={14} />,
+    },
+    {
+      key: 'share',
+      label: '分享对话',
+      icon: <Share2 size={14} />,
+    },
+    {
+      key: 'pin',
+      label: chat.isPinned ? '取消置顶' : '置顶对话',
+      icon: <Pin size={14} />,
+    },
+  ];
+
+  const renderChatActionControl = (chat: MockChat, isMenuOpen: boolean) => (
+    <div className="ml-2 shrink-0 flex h-[14px] w-5 items-center justify-center">
+      <span className={`text-xs opacity-60 ${isMenuOpen ? 'hidden' : 'group-hover:hidden'}`}>{chat.count}</span>
+      <BaseActionMenu
+        open={isMenuOpen}
+        onOpenChange={(open) => setChatMenuOpenId(open ? chat.id : null)}
+        placement="bottom-end"
+        width={Math.max(136, Math.min(176, sidebarWidth - 56))}
+        trigger={<MoreHorizontal size={14} />}
+        onTriggerClick={(event) => {
+          event.stopPropagation();
+        }}
+        items={buildChatMenuItems(chat)}
+        footerItems={chatMenuFooterItems}
+        onItemClick={(item, event) => {
+          event.stopPropagation();
+          if (item.key === 'pin') {
+            handleTogglePinChat(chat.id);
+            return;
+          }
+          if (item.key === 'delete') {
+            handleDeleteChat(chat.id);
+            return;
+          }
+          setChatMenuOpenId(null);
+        }}
+        triggerClassName={`-mx-1 items-center justify-center ${isMenuOpen ? 'inline-flex' : 'hidden group-hover:inline-flex'}`}
+        className="relative z-40"
+        menuClassName="!min-w-0 !right-[-6px]"
+      />
+    </div>
+  );
+
   const navItems = [
     {
       label: '项目',
@@ -213,7 +320,7 @@ export default function Layout() {
       {/* 侧边栏 */}
       <aside 
         style={{ width: isSidebarOpen ? sidebarWidth : 0 }}
-        className={`relative bg-bgLight flex flex-col h-full flex-shrink-0 z-20 transition-[width,opacity] duration-300 ease-in-out overflow-hidden ${
+        className={`relative bg-bgLight flex flex-col h-full flex-shrink-0 z-20 transition-[width,opacity] duration-300 ease-in-out overflow-y-hidden overflow-x-visible ${
           isSidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
       >
@@ -272,63 +379,8 @@ export default function Layout() {
 
           {/* 对话历史 */}
           <div className="flex-1 overflow-y-auto px-0 relative">
-            <div className="mx-[10px] mb-4 mt-0.5 flex items-center justify-between pl-[8px] pr-4 text-sm font-normal text-secondaryText group relative">
+            <div className="mx-[10px] mb-4 mt-0.5 flex items-center pl-[8px] pr-4 text-sm font-normal text-secondaryText">
               <span className="opacity-60">近期对话</span>
-              <div className="relative">
-                <button 
-                  ref={sortButtonRef}
-                  onClick={() => {
-                    if (!showSortMenu && sortButtonRef.current) {
-                      const rect = sortButtonRef.current.getBoundingClientRect();
-                      const preferredLeft = rect.right - SORT_MENU_WIDTH;
-                      const minLeft = 8;
-                      const maxLeft = window.innerWidth - SORT_MENU_WIDTH - 8;
-                      const left = Math.min(maxLeft, Math.max(minLeft, preferredLeft));
-
-                      const belowTop = rect.bottom + SORT_MENU_OFFSET;
-                      const aboveTop = rect.top - SORT_MENU_HEIGHT - SORT_MENU_OFFSET;
-                      const maxTop = window.innerHeight - SORT_MENU_HEIGHT - 8;
-                      const top = belowTop <= maxTop ? belowTop : Math.max(8, aboveTop);
-
-                      setSortMenuPos({ top, left });
-                    }
-                    setShowSortMenu(!showSortMenu);
-                  }}
-                  className={`flex h-[14px] w-5 items-center justify-center text-tertiaryText hover:text-secondaryText transition-opacity transition-colors ${showSortMenu ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
-                  title="排序方式"
-                >
-                  <ArrowUpDown size={14} />
-                </button>
-                {showSortMenu && (
-                  <>
-                    <div className="fixed inset-0 z-[90]" onClick={() => setShowSortMenu(false)}></div>
-                    <div className="fixed bg-white rounded-xl shadow-lg z-[100] overflow-hidden py-2 animate-in fade-in slide-in-from-bottom-2" style={{ width: `${SORT_MENU_WIDTH}px`, top: `${sortMenuPos.top}px`, left: `${sortMenuPos.left}px` }}>
-                      <div 
-                        onClick={() => {
-                          setSortMode('time');
-                          setShowSortMenu(false);
-                        }}
-                        className="px-4 py-2.5 text-base text-primaryText cursor-pointer transition-colors flex items-center gap-3 rounded-lg mx-2 hover:bg-bgLight"
-                      >
-                        <Menu size={16} className="shrink-0" />
-                        <span className="flex-1">按时间排序</span>
-                        {sortMode === 'time' && <Check size={14} className="shrink-0" />}
-                      </div>
-                      <div 
-                        onClick={() => {
-                          setSortMode('project');
-                          setShowSortMenu(false);
-                        }}
-                        className="px-4 py-2.5 text-base text-primaryText cursor-pointer transition-colors flex items-center gap-3 rounded-lg mx-2 hover:bg-bgLight"
-                      >
-                        <Folder size={16} className="shrink-0" />
-                        <span className="flex-1">按项目排序</span>
-                        {sortMode === 'project' && <Check size={14} className="shrink-0" />}
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
             </div>
             
             {pinnedChats.length > 0 && (
@@ -342,56 +394,16 @@ export default function Layout() {
                       <div key={chat.id} className="relative">
                         <div
                           onClick={() => navigate(`/chat/${chat.id}`)}
-                          className={`mx-[10px] text-sm pl-[10px] pr-4 py-1.5 rounded-md cursor-pointer transition-colors flex items-center justify-between group ${
+                          className={`mx-[10px] text-sm pl-[10px] pr-2 py-1.5 rounded-md cursor-pointer transition-colors flex items-center justify-between group ${
                             isActive ? 'text-primaryText bg-[#E4EAF0] font-normal' : 'text-secondaryText hover:text-primaryText hover:bg-[#E4EAF0] font-normal'
                           }`}
                         >
                           <div className="flex min-w-0 items-center gap-2">
-                            <Pin size={14} className="shrink-0" />
+                            {sortMode !== 'time' && <Pin size={14} className="shrink-0" />}
                             <span className="truncate">{chat.title}</span>
                           </div>
-                          <div className="ml-2 shrink-0 flex h-[14px] w-5 items-center justify-center">
-                            <span className={`text-xs opacity-60 ${isMenuOpen ? 'hidden' : 'group-hover:hidden'}`}>{chat.count}</span>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setChatMenuOpenId(isMenuOpen ? null : chat.id);
-                              }}
-                              className={`flex items-center justify-center -mx-1 ${isMenuOpen ? 'block' : 'hidden group-hover:block'}`}
-                            >
-                              <MoreHorizontal size={14} />
-                            </button>
-                          </div>
+                          {renderChatActionControl(chat, isMenuOpen)}
                         </div>
-                        {isMenuOpen && (
-                          <>
-                            <div className="fixed inset-0 z-30" onClick={() => setChatMenuOpenId(null)}></div>
-                            <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-xl shadow-lg z-40 overflow-hidden py-2 animate-in fade-in slide-in-from-bottom-2">
-                              <div className="px-4 py-2.5 text-base text-primaryText hover:bg-bgLight cursor-pointer transition-colors flex items-center gap-3 rounded-lg mx-2">
-                                <Pencil size={16} />
-                                <span>重命名</span>
-                              </div>
-                              <div className="px-4 py-2.5 text-base text-primaryText hover:bg-bgLight cursor-pointer transition-colors flex items-center gap-3 rounded-lg mx-2">
-                                <Share2 size={16} />
-                                <span>分享对话</span>
-                              </div>
-                              <div
-                                onClick={() => handleTogglePinChat(chat.id)}
-                                className="px-4 py-2.5 text-base text-primaryText hover:bg-bgLight cursor-pointer transition-colors flex items-center gap-3 rounded-lg mx-2"
-                              >
-                                <Pin size={16} />
-                                <span>{chat.isPinned ? '取消置顶' : '置顶对话'}</span>
-                              </div>
-                              <div
-                                onClick={() => handleDeleteChat(chat.id)}
-                                className="px-4 py-2.5 text-base text-red-600 hover:bg-red-50 cursor-pointer transition-colors flex items-center gap-3 rounded-lg mx-2"
-                              >
-                                <Trash2 size={16} />
-                                <span>删除</span>
-                              </div>
-                            </div>
-                          </>
-                        )}
                       </div>
                     );
                   })}
@@ -434,53 +446,13 @@ export default function Layout() {
                           <div key={chat.id} className="relative">
                             <div 
                               onClick={() => navigate(`/chat/${chat.id}`)}
-                              className={`mx-[10px] text-sm pl-[30px] pr-4 py-1.5 rounded-md cursor-pointer transition-colors flex items-center justify-between group ${
+                              className={`mx-[10px] text-sm pl-[30px] pr-2 py-1.5 rounded-md cursor-pointer transition-colors flex items-center justify-between group ${
                                 isActive ? 'text-primaryText bg-[#E4EAF0] font-normal' : 'text-secondaryText hover:text-primaryText hover:bg-[#E4EAF0] font-normal'
                               }`}
                             >
                               <span className="truncate">{chat.title}</span>
-                              <div className="ml-2 shrink-0 flex h-[14px] w-5 items-center justify-center">
-                                <span className={`text-xs opacity-60 ${isMenuOpen ? 'hidden' : 'group-hover:hidden'}`}>{chat.count}</span>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setChatMenuOpenId(isMenuOpen ? null : chat.id);
-                                  }}
-                                  className={`flex items-center justify-center -mx-1 ${isMenuOpen ? 'block' : 'hidden group-hover:block'}`}
-                                >
-                                  <MoreHorizontal size={14} />
-                                </button>
-                              </div>
+                              {renderChatActionControl(chat, isMenuOpen)}
                             </div>
-                            {isMenuOpen && (
-                              <>
-                                <div className="fixed inset-0 z-30" onClick={() => setChatMenuOpenId(null)}></div>
-                                <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-xl shadow-lg z-40 overflow-hidden py-2 animate-in fade-in slide-in-from-bottom-2">
-                                  <div className="px-4 py-2.5 text-base text-primaryText hover:bg-bgLight cursor-pointer transition-colors flex items-center gap-3 rounded-lg mx-2">
-                                    <Pencil size={16} />
-                                    <span>重命名</span>
-                                  </div>
-                                  <div className="px-4 py-2.5 text-base text-primaryText hover:bg-bgLight cursor-pointer transition-colors flex items-center gap-3 rounded-lg mx-2">
-                                    <Share2 size={16} />
-                                    <span>分享对话</span>
-                                  </div>
-                                  <div
-                                    onClick={() => handleTogglePinChat(chat.id)}
-                                    className="px-4 py-2.5 text-base text-primaryText hover:bg-bgLight cursor-pointer transition-colors flex items-center gap-3 rounded-lg mx-2"
-                                  >
-                                    <Pin size={16} />
-                                    <span>{chat.isPinned ? '取消置顶' : '置顶对话'}</span>
-                                  </div>
-                                  <div
-                                    onClick={() => handleDeleteChat(chat.id)}
-                                    className="px-4 py-2.5 text-base text-red-600 hover:bg-red-50 cursor-pointer transition-colors flex items-center gap-3 rounded-lg mx-2"
-                                  >
-                                    <Trash2 size={16} />
-                                    <span>删除</span>
-                                  </div>
-                                </div>
-                              </>
-                            )}
                           </div>
                         );
                       })}
@@ -526,53 +498,13 @@ export default function Layout() {
                           <div key={chat.id} className="relative">
                             <div 
                               onClick={() => navigate(`/chat/${chat.id}`)}
-                              className={`mx-[10px] text-sm pl-[30px] pr-4 py-1.5 rounded-md cursor-pointer transition-colors flex items-center justify-between group ${
+                              className={`mx-[10px] text-sm pl-[30px] pr-2 py-1.5 rounded-md cursor-pointer transition-colors flex items-center justify-between group ${
                                 isActive ? 'text-primaryText bg-[#E4EAF0] font-normal' : 'text-secondaryText hover:text-primaryText hover:bg-[#E4EAF0] font-normal'
                               }`}
                             >
                               <span className="truncate">{chat.title}</span>
-                              <div className="ml-2 shrink-0 flex h-[14px] w-5 items-center justify-center">
-                                <span className={`text-xs opacity-60 ${isMenuOpen ? 'hidden' : 'group-hover:hidden'}`}>{chat.count}</span>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setChatMenuOpenId(isMenuOpen ? null : chat.id);
-                                  }}
-                                  className={`flex items-center justify-center -mx-1 ${isMenuOpen ? 'block' : 'hidden group-hover:block'}`}
-                                >
-                                  <MoreHorizontal size={14} />
-                                </button>
-                              </div>
+                              {renderChatActionControl(chat, isMenuOpen)}
                             </div>
-                            {isMenuOpen && (
-                              <>
-                                <div className="fixed inset-0 z-30" onClick={() => setChatMenuOpenId(null)}></div>
-                                <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-xl shadow-lg z-40 overflow-hidden py-2 animate-in fade-in slide-in-from-bottom-2">
-                                  <div className="px-4 py-2.5 text-base text-primaryText hover:bg-bgLight cursor-pointer transition-colors flex items-center gap-3 rounded-lg mx-2">
-                                    <Pencil size={16} />
-                                    <span>重命名</span>
-                                  </div>
-                                  <div className="px-4 py-2.5 text-base text-primaryText hover:bg-bgLight cursor-pointer transition-colors flex items-center gap-3 rounded-lg mx-2">
-                                    <Share2 size={16} />
-                                    <span>分享对话</span>
-                                  </div>
-                                  <div
-                                    onClick={() => handleTogglePinChat(chat.id)}
-                                    className="px-4 py-2.5 text-base text-primaryText hover:bg-bgLight cursor-pointer transition-colors flex items-center gap-3 rounded-lg mx-2"
-                                  >
-                                    <Pin size={16} />
-                                    <span>{chat.isPinned ? '取消置顶' : '置顶对话'}</span>
-                                  </div>
-                                  <div
-                                    onClick={() => handleDeleteChat(chat.id)}
-                                    className="px-4 py-2.5 text-base text-red-600 hover:bg-red-50 cursor-pointer transition-colors flex items-center gap-3 rounded-lg mx-2"
-                                  >
-                                    <Trash2 size={16} />
-                                    <span>删除</span>
-                                  </div>
-                                </div>
-                              </>
-                            )}
                           </div>
                         );
                       })}
@@ -599,53 +531,13 @@ export default function Layout() {
                     <div key={chat.id} className="relative">
                       <div 
                         onClick={() => navigate(`/chat/${chat.id}`)}
-                        className={`mx-[10px] text-sm pl-[10px] pr-4 py-1.5 rounded-md cursor-pointer transition-colors flex items-center justify-between group ${
+                        className={`mx-[10px] text-sm pl-[10px] pr-2 py-1.5 rounded-md cursor-pointer transition-colors flex items-center justify-between group ${
                           isActive ? 'text-primaryText bg-[#E4EAF0] font-normal' : 'text-secondaryText hover:text-primaryText hover:bg-[#E4EAF0] font-normal'
                         }`}
                       >
                         <span className="truncate">{chat.title}</span>
-                        <div className="ml-2 shrink-0 flex h-[14px] w-5 items-center justify-center">
-                          <span className={`text-xs opacity-60 ${isMenuOpen ? 'hidden' : 'group-hover:hidden'}`}>{chat.count}</span>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setChatMenuOpenId(isMenuOpen ? null : chat.id);
-                            }}
-                            className={`flex items-center justify-center -mx-1 ${isMenuOpen ? 'block' : 'hidden group-hover:block'}`}
-                          >
-                            <MoreHorizontal size={14} />
-                          </button>
-                        </div>
+                        {renderChatActionControl(chat, isMenuOpen)}
                       </div>
-                      {isMenuOpen && (
-                        <>
-                          <div className="fixed inset-0 z-30" onClick={() => setChatMenuOpenId(null)}></div>
-                          <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-xl shadow-lg z-40 overflow-hidden py-2 animate-in fade-in slide-in-from-bottom-2">
-                            <div className="px-4 py-2.5 text-base text-primaryText hover:bg-bgLight cursor-pointer transition-colors flex items-center gap-3 rounded-lg mx-2">
-                              <Pencil size={16} />
-                              <span>重命名</span>
-                            </div>
-                            <div className="px-4 py-2.5 text-base text-primaryText hover:bg-bgLight cursor-pointer transition-colors flex items-center gap-3 rounded-lg mx-2">
-                              <Share2 size={16} />
-                              <span>分享对话</span>
-                            </div>
-                            <div
-                              onClick={() => handleTogglePinChat(chat.id)}
-                              className="px-4 py-2.5 text-base text-primaryText hover:bg-bgLight cursor-pointer transition-colors flex items-center gap-3 rounded-lg mx-2"
-                            >
-                              <Pin size={16} />
-                              <span>{chat.isPinned ? '取消置顶' : '置顶对话'}</span>
-                            </div>
-                            <div
-                              onClick={() => handleDeleteChat(chat.id)}
-                              className="px-4 py-2.5 text-base text-red-600 hover:bg-red-50 cursor-pointer transition-colors flex items-center gap-3 rounded-lg mx-2"
-                            >
-                              <Trash2 size={16} />
-                              <span>删除</span>
-                            </div>
-                          </div>
-                        </>
-                      )}
                     </div>
                   );
                 })}
@@ -655,20 +547,30 @@ export default function Layout() {
 
           {/* 用户区域 */}
           <div className="p-3 mt-auto">
-            <div 
-              onClick={() => setShowSettings(true)}
-              className="flex items-center justify-between p-2 rounded-full hover:bg-bgLight transition-colors cursor-pointer text-secondaryText"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center text-white text-sm font-medium">
-                  研
-                </div>
-                <span className="text-sm font-normal">研究员</span>
-              </div>
-              <div className="p-1 rounded-full">
-                <Settings size={18} />
-              </div>
-            </div>
+            <BaseActionMenu
+              open={settingsMenuOpen}
+              onOpenChange={setSettingsMenuOpen}
+              placement="top-start"
+              width="100%"
+              trigger={
+                <span className="flex w-full items-center justify-between p-2 rounded-full hover:bg-bgLight transition-colors cursor-pointer text-secondaryText">
+                  <span className="flex items-center gap-3">
+                    <span className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center text-white text-sm font-medium">
+                      研
+                    </span>
+                    <span className="text-sm font-normal">研究员</span>
+                  </span>
+                  <span className="p-1 rounded-full">
+                    <Settings size={18} />
+                  </span>
+                </span>
+              }
+              items={settingsMenuItems}
+              onItemClick={handleSettingsMenuItemClick}
+              triggerClassName="w-full justify-start"
+              className="w-full"
+              menuClassName="!min-w-0"
+            />
           </div>
         </div>
         {isSidebarOpen && (
@@ -701,64 +603,6 @@ export default function Layout() {
         </div>
       </main>
 
-      {/* 设置弹窗 */}
-      {showSettings && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setShowSettings(false)}></div>
-          <div 
-            className="absolute left-4 bottom-[72px] z-50 bg-white w-64 rounded-xl shadow-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200 origin-bottom-left"
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="py-2 text-base text-primaryText font-normal space-y-1 px-2">
-              <button
-                onClick={() => {
-                  setShowSettings(false);
-                  navigate('/skills');
-                }}
-                className="w-full px-3 py-2.5 hover:bg-bgLight cursor-pointer transition-colors flex justify-between items-center rounded-lg"
-              >
-                <span>Skill</span>
-              </button>
-              <button
-                onClick={() => {
-                  setShowSettings(false);
-                  navigate('/ai-usage');
-                }}
-                className="w-full px-3 py-2.5 hover:bg-bgLight cursor-pointer transition-colors flex justify-between items-center rounded-lg"
-              >
-                <span>AI用量</span>
-                <span className="text-tertiaryText text-sm font-normal">剩余 89%</span>
-              </button>
-              <button
-                onClick={() => {
-                  setShowSettings(false);
-                  navigate('/members');
-                }}
-                className="w-full px-3 py-2.5 hover:bg-bgLight cursor-pointer transition-colors flex justify-between items-center rounded-lg"
-              >
-                <span>成员管理</span>
-                <span className="text-tertiaryText text-sm font-normal">5 人</span>
-              </button>
-              <button
-                onClick={() => {
-                  setShowSettings(false);
-                  navigate('/system-settings');
-                }}
-                className="w-full px-3 py-2.5 text-primaryText hover:bg-bgLight cursor-pointer transition-colors flex justify-between items-center rounded-lg"
-              >
-                <span>更多系统设置</span>
-                <Settings size={16} className="text-tertiaryText" />
-              </button>
-              <button
-                onClick={handleLogout}
-                className="w-full text-left px-3 py-2.5 text-red-600 hover:bg-red-50 cursor-pointer transition-colors font-medium rounded-lg"
-              >
-                退出登录
-              </button>
-            </div>
-          </div>
-        </>
-      )}
     </div>
   );
 }

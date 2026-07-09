@@ -86,31 +86,16 @@ export default function ProjectsPage() {
                 onClick={() => navigate(`/project/${proj.id}`)}
                 className="group rounded-lg border border-[var(--color-line-subtle)] bg-[var(--color-surface)] px-4 py-3.5 text-left transition-all hover:border-[var(--color-gray-3)] hover:shadow-sm"
               >
-                <div className="mb-1 flex items-center gap-2">
-                  <h3 className="truncate text-base font-medium text-primaryText">{proj.name}</h3>
-                  <span
-                    className={`shrink-0 rounded px-1.5 py-0.5 text-[11px] leading-none ${
-                      proj.visibility === 'private'
-                        ? proj.privateType === 'personal'
-                          ? 'bg-[#f5f3ff] text-[#7c3aed]'
-                          : 'bg-[#ecfdf5] text-[#059669]'
-                        : 'bg-[#eff6ff] text-[#2563eb]'
-                    }`}
-                  >
-                    {proj.visibility === 'private'
-                      ? proj.privateType === 'personal'
-                        ? '个人项目'
-                        : '团队项目'
-                      : '公开项目'}
-                  </span>
+                <div className="mb-1">
+                  <h3 className="truncate text-lg font-medium text-primaryText">{proj.name}</h3>
                 </div>
 
                 <p className="line-clamp-2 min-h-[40px] text-sm leading-5 text-secondaryText">{proj.desc}</p>
 
-                <div className="mt-4 flex items-center gap-2 text-xs text-tertiaryText">
-                  <span>{proj.count} 个对话</span>
+                <div className="mt-4 flex items-center gap-2 text-sm text-tertiaryText">
+                  <span>{proj.knowledge}文档</span>
                   <span>·</span>
-                  <span>{proj.members} 名成员</span>
+                  <span>{proj.count}对话</span>
                 </div>
               </button>
             ))}

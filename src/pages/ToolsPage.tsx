@@ -1,11 +1,11 @@
 import React, { useMemo, useState } from 'react';
-import { DatePicker, Radio } from 'antd';
+import { Cascader, DatePicker, Radio, TimePicker } from 'antd';
 import dayjs from 'dayjs';
 import { useNavigate, useOutletContext } from 'react-router-dom';
-import { Menu, Plus, MoreHorizontal, Pencil, Copy, Trash2, Check, ChevronLeft, ChevronDown, ChevronRight, CalendarDays, Clock3, Folder } from 'lucide-react';
+import { Menu, Plus, MoreHorizontal, Pencil, Copy, Trash2, ChevronLeft, ChevronDown, Folder } from 'lucide-react';
 import { mockProjects } from '../mock/projects';
 import { BaseActionMenu, BaseButton, BaseInput, BaseModal, BaseTable, BaseToggle } from '../components';
-import type { BaseActionMenuItem, BaseTableColumn } from '../components';
+import type { BaseActionMenuItem, BaseTableColumn, BaseActionMenuProps } from '../components';
 import { type LayoutOutletContext } from '../components/Layout';
 
 const { RangePicker } = DatePicker;
@@ -44,17 +44,19 @@ interface LiteratureTrackForm {
 
 interface WeeklyScheduleForm {
   repeatMode: RepeatMode;
+  repeatSubValue: string;
   startDate: string;
   endDate: string;
   runAt: string;
   taskPrompt: string;
-  keepInSameConversation: boolean;
-  notifyByEmail: boolean;
-  emailRecipient: string;
   projectId: string | null;
 }
 
-type ModalTemplateId = 'template-paper-track' | 'template-meeting-brief';
+type ModalTemplateId =
+  | 'template-paper-track'
+  | 'template-meeting-brief'
+  | 'template-news-brief'
+  | 'template-custom';
 
 const taskTemplates: TaskTemplate[] = [
   {
@@ -127,13 +129,11 @@ const initialLiteratureTrackForm: LiteratureTrackForm = {
 
 const initialWeeklyScheduleForm: WeeklyScheduleForm = {
   repeatMode: 'weekly',
+  repeatSubValue: 'mon',
   startDate: '2026-06-04',
   endDate: '2026-08-04',
   runAt: '15:00',
   taskPrompt: '每周五 18:00 汇总本周实验进展、问题与下周安排。',
-  keepInSameConversation: true,
-  notifyByEmail: true,
-  emailRecipient: 'Mira',
   projectId: null,
 };
 
@@ -156,19 +156,75 @@ const frequencyOptions: Array<{ value: FetchFrequency; label: string }> = [
 
 const repeatModeOptions: Array<{ value: RepeatMode; label: string }> = [
   { value: 'none', label: '不重复' },
-  { value: 'monthly', label: '每月' },
   { value: 'weekly', label: '每周' },
+  { value: 'monthly', label: '每月' },
   { value: 'hourly', label: '每小时' },
 ];
 
-const repeatModeTimePrefix: Record<RepeatMode, string> = {
-  none: '一次',
-  monthly: '每月1日',
-  weekly: '周一',
+const repeatWeekdayOptions: Array<{ value: string; label: string }> = [
+  { value: 'mon', label: '周一' },
+  { value: 'tue', label: '周二' },
+  { value: 'wed', label: '周三' },
+  { value: 'thu', label: '周四' },
+  { value: 'fri', label: '周五' },
+  { value: 'sat', label: '周六' },
+  { value: 'sun', label: '周日' },
+];
+
+const repeatMonthDayOptions: Array<{ value: string; label: string }> = Array.from(
+  { length: 31 },
+  (_, index) => {
+    const day = String(index + 1);
+    return { value: day, label: `${day}号` };
+  },
+);
+
+const repeatModeCascaderOptions: Array<{
+  value: RepeatMode;
+  label: string;
+  children?: Array<{ value: string; label: string }>;
+}> = [
+  { value: 'none', label: '不重复' },
+  { value: 'weekly', label: '每周', children: repeatWeekdayOptions },
+  { value: 'monthly', label: '每月', children: repeatMonthDayOptions },
+  { value: 'hourly', label: '每小时' },
+];
+
+const repeatModeLabelMap: Record<RepeatMode, string> = {
+  none: '不重复',
+  weekly: '每周',
+  monthly: '每月',
   hourly: '每小时',
 };
 
-const emailRecipientOptions = ['Mira', '研发组邮箱'];
+const repeatWeekdayLabelMap = repeatWeekdayOptions.reduce<Record<string, string>>((acc, option) => {
+  acc[option.value] = option.label;
+  return acc;
+}, {});
+
+const getRepeatLabel = (repeatMode: RepeatMode, repeatSubValue: string) => {
+  if (repeatMode === 'weekly') {
+    return `每周${repeatWeekdayLabelMap[repeatSubValue] ?? '周一'}`;
+  }
+
+  if (repeatMode === 'monthly') {
+    return `每月${repeatSubValue || '1'}号`;
+  }
+
+  return repeatModeLabelMap[repeatMode];
+};
+
+const getRepeatTimePrefix = (repeatMode: RepeatMode, repeatSubValue: string) => {
+  if (repeatMode === 'weekly') {
+    return repeatWeekdayLabelMap[repeatSubValue] ?? '周一';
+  }
+
+  if (repeatMode === 'monthly') {
+    return `${repeatSubValue || '1'}号`;
+  }
+
+  return repeatMode === 'none' ? '一次' : '每小时';
+};
 
 const pubmedMatchOptions: Array<{ value: PubMedMatchMode; label: string }> = [
   { value: 'all', label: '全部关键词' },
@@ -193,60 +249,62 @@ export default function ToolsPage() {
     setShowWeeklyProjectDropdown(false);
   };
 
-  const modalTitle =
-    activeModalTemplateId === 'template-meeting-brief' ? '新建定时任务' : '设置文献订阅任务';
+  const isPaperTrackModal = activeModalTemplateId === 'template-paper-track';
+  const modalTitle = isPaperTrackModal ? '设置文献订阅任务' : '新建定时任务';
   const selectedWeeklyProject = mockProjects.find((project) => project.id === weeklyScheduleForm.projectId) ?? null;
 
+  const repeatCascaderValue = useMemo<Array<string | number>>(() => {
+    if (weeklyScheduleForm.repeatMode === 'weekly' || weeklyScheduleForm.repeatMode === 'monthly') {
+      return [
+        weeklyScheduleForm.repeatMode,
+        weeklyScheduleForm.repeatSubValue ||
+          (weeklyScheduleForm.repeatMode === 'weekly' ? 'mon' : '1'),
+      ];
+    }
+
+    return [weeklyScheduleForm.repeatMode];
+  }, [weeklyScheduleForm.repeatMode, weeklyScheduleForm.repeatSubValue]);
+
   const handleCreateFromTemplate = (template: TaskTemplate) => {
-    if (template.id === 'template-paper-track' || template.id === 'template-meeting-brief') {
+    if (template.id === 'template-paper-track') {
       setLiteratureForm({
         ...initialLiteratureTrackForm,
-        topic: template.id === 'template-meeting-brief' ? '每周工作总结' : '',
-        frequency: template.id === 'template-meeting-brief' ? 'weekly' : initialLiteratureTrackForm.frequency,
+        topic: '',
       });
-      if (template.id === 'template-meeting-brief') {
-        setWeeklyScheduleForm({
-          ...initialWeeklyScheduleForm,
-          taskPrompt: template.defaultPrompt,
-        });
-      }
+      setWeeklyScheduleForm(initialWeeklyScheduleForm);
       setShowWeeklyProjectDropdown(false);
-      setActiveModalTemplateId(template.id);
+      setActiveModalTemplateId('template-paper-track');
       setShowLiteratureModal(true);
       return;
     }
 
-    setTasks((prev) => [
-      {
-        id: `task-${Date.now()}`,
-        name: `${template.name} ${prev.length + 1}`,
-        prompt: template.defaultPrompt,
-        nextRun: '--',
-        trigger: template.trigger,
-        isEnabled: true,
-      },
-      ...prev,
-    ]);
+    setLiteratureForm({
+      ...initialLiteratureTrackForm,
+      topic: template.name,
+    });
+    setWeeklyScheduleForm({
+      ...initialWeeklyScheduleForm,
+      taskPrompt: template.defaultPrompt,
+      runAt: template.id === 'template-news-brief' ? '07:00' : initialWeeklyScheduleForm.runAt,
+    });
+    setShowWeeklyProjectDropdown(false);
+    setActiveModalTemplateId(template.id as ModalTemplateId);
+    setShowLiteratureModal(true);
   };
 
   const handleCreateCustomTask = () => {
-    const taskName = window.prompt('请输入任务名称', '新建任务');
-    if (!taskName) return;
-
-    const taskPrompt = window.prompt('请输入任务 Prompt', '描述你想让任务自动执行的内容');
-    if (!taskPrompt) return;
-
-    setTasks((prev) => [
-      {
-        id: `task-${Date.now()}`,
-        name: taskName.trim() || '新建任务',
-        prompt: taskPrompt.trim() || '描述你想让任务自动执行的内容',
-        nextRun: '--',
-        trigger: 'Daily at 09:00',
-        isEnabled: true,
-      },
-      ...prev,
-    ]);
+    setLiteratureForm({
+      ...initialLiteratureTrackForm,
+      topic: '',
+    });
+    setWeeklyScheduleForm({
+      ...initialWeeklyScheduleForm,
+      taskPrompt: '',
+      projectId: null,
+    });
+    setShowWeeklyProjectDropdown(false);
+    setActiveModalTemplateId('template-custom');
+    setShowLiteratureModal(true);
   };
 
   const handleToggleStatus = (taskId: string) => {
@@ -310,14 +368,30 @@ export default function ToolsPage() {
     }));
   };
 
+  const handleRepeatCascaderChange = (value: Array<string | number>) => {
+    const nextRepeatMode = String(value[0] ?? 'none') as RepeatMode;
+    const nextSubValue = value[1] ? String(value[1]) : '';
+
+    setWeeklyScheduleForm((prev) => ({
+      ...prev,
+      repeatMode: nextRepeatMode,
+      repeatSubValue:
+        nextRepeatMode === 'weekly'
+          ? nextSubValue || (prev.repeatMode === 'weekly' ? prev.repeatSubValue : 'mon') || 'mon'
+          : nextRepeatMode === 'monthly'
+            ? nextSubValue || (prev.repeatMode === 'monthly' ? prev.repeatSubValue : '1') || '1'
+            : '',
+    }));
+  };
+
   const buildLiteraturePrompt = () => {
-    if (activeModalTemplateId === 'template-meeting-brief') {
-      const repeatLabel = repeatModeOptions.find((option) => option.value === weeklyScheduleForm.repeatMode)?.label ?? '每周';
-      const emailLabel = weeklyScheduleForm.notifyByEmail
-        ? `发送至邮箱(${weeklyScheduleForm.emailRecipient})`
-        : '不发送邮箱';
+    if (!isPaperTrackModal) {
+      const repeatLabel = getRepeatLabel(
+        weeklyScheduleForm.repeatMode,
+        weeklyScheduleForm.repeatSubValue,
+      );
       const projectLabel = selectedWeeklyProject?.name ?? '未选择';
-      return `任务：${literatureForm.topic || '每周工作总结'}；项目：${projectLabel}；重复机制：${repeatLabel}；起止日期：${weeklyScheduleForm.startDate}~${weeklyScheduleForm.endDate}；执行时间：${weeklyScheduleForm.runAt}；任务内容：${weeklyScheduleForm.taskPrompt}；保留同一对话：${weeklyScheduleForm.keepInSameConversation ? '是' : '否'}；通知方式：${emailLabel}`;
+      return `任务：${literatureForm.topic || '定时任务'}；项目：${projectLabel}；重复机制：${repeatLabel}；起止日期：${weeklyScheduleForm.startDate}~${weeklyScheduleForm.endDate}；执行时间：${weeklyScheduleForm.runAt}；任务内容：${weeklyScheduleForm.taskPrompt}`;
     }
 
     const sourceLabel = literatureForm.sourceType === 'pubmed' ? 'PubMed' : 'bioRxiv';
@@ -337,26 +411,30 @@ export default function ToolsPage() {
     const trimmedKeywords = literatureForm.keywords.trim();
     const trimmedWeeklyPrompt = weeklyScheduleForm.taskPrompt.trim();
 
-    if (
-      !trimmedTopic ||
-      (activeModalTemplateId === 'template-meeting-brief' && !trimmedWeeklyPrompt) ||
-      (activeModalTemplateId !== 'template-meeting-brief' &&
-        (!trimmedKeywords ||
-          !literatureForm.periodStart ||
-          !literatureForm.periodEnd ||
-          literatureForm.periodStart > literatureForm.periodEnd))
-    ) {
+    if (!trimmedTopic) {
       return;
     }
 
-    const triggerLabel =
-      activeModalTemplateId === 'template-meeting-brief'
-        ? `${repeatModeOptions.find((option) => option.value === weeklyScheduleForm.repeatMode)?.label ?? '每周'} ${weeklyScheduleForm.startDate}~${weeklyScheduleForm.endDate} ${weeklyScheduleForm.runAt}`
-        : literatureForm.frequency === 'daily'
-          ? 'Daily at 09:00'
-          : literatureForm.frequency === 'weekly'
-            ? 'Weekly Mon 09:00'
-            : 'Hourly';
+    if (isPaperTrackModal) {
+      if (
+        !trimmedKeywords ||
+        !literatureForm.periodStart ||
+        !literatureForm.periodEnd ||
+        literatureForm.periodStart > literatureForm.periodEnd
+      ) {
+        return;
+      }
+    } else if (!trimmedWeeklyPrompt) {
+      return;
+    }
+
+    const triggerLabel = !isPaperTrackModal
+      ? `${getRepeatLabel(weeklyScheduleForm.repeatMode, weeklyScheduleForm.repeatSubValue)} ${weeklyScheduleForm.startDate}~${weeklyScheduleForm.endDate} ${weeklyScheduleForm.runAt}`
+      : literatureForm.frequency === 'daily'
+        ? 'Daily at 09:00'
+        : literatureForm.frequency === 'weekly'
+          ? 'Weekly Mon 09:00'
+          : 'Hourly';
 
     setTasks((prev) => [
       {
@@ -371,6 +449,43 @@ export default function ToolsPage() {
     ]);
 
     closeTaskConfigModal();
+  };
+
+  const weeklyProjectMenuItems = useMemo<BaseActionMenuItem[]>(() => {
+    const unselectedItem: BaseActionMenuItem = {
+      key: 'none',
+      label: '不选择项目',
+      active: !selectedWeeklyProject,
+    };
+
+    const projectItems = mockProjects.map<BaseActionMenuItem>((project) => ({
+      key: project.id,
+      label: <span className="truncate">{project.name}</span>,
+      active: selectedWeeklyProject?.id === project.id,
+    }));
+
+    return [unselectedItem, ...projectItems];
+  }, [selectedWeeklyProject]);
+
+  const weeklyProjectMenuFooterItems = useMemo<BaseActionMenuItem[]>(() => [
+    {
+      key: 'create',
+      label: '新建项目',
+      icon: <Plus size={16} />,
+    },
+  ], []);
+
+  const handleWeeklyProjectMenuClick: BaseActionMenuProps['onItemClick'] = (item) => {
+    if (item.key === 'create') {
+      setShowWeeklyProjectDropdown(false);
+      return;
+    }
+
+    setWeeklyScheduleForm((prev) => ({
+      ...prev,
+      projectId: item.key === 'none' ? null : item.key,
+    }));
+    setShowWeeklyProjectDropdown(false);
   };
 
   const taskTableColumns = useMemo<BaseTableColumn<UserTask>[]>(
@@ -533,19 +648,13 @@ export default function ToolsPage() {
         okButtonProps={{
           disabled:
             !literatureForm.topic.trim() ||
-            (activeModalTemplateId === 'template-meeting-brief' && !weeklyScheduleForm.taskPrompt.trim()) ||
-            (activeModalTemplateId !== 'template-meeting-brief' && !literatureForm.keywords.trim()),
+            (isPaperTrackModal ? !literatureForm.keywords.trim() : !weeklyScheduleForm.taskPrompt.trim()),
         }}
       >
         <div className="space-y-5">
                 <div>
                   <div className="mb-1.5 flex items-center gap-2">
                     <span className="text-sm font-medium text-primaryText">任务名称</span>
-                    <span className="text-[13px] text-tertiaryText">
-                      {activeModalTemplateId === 'template-meeting-brief'
-                        ? '建议填写本任务名称，默认已带入“每周工作总结”。'
-                        : '留空时会自动使用一个关键词生成“文献订阅”名称。'}
-                    </span>
                   </div>
                   <BaseInput
                     value={literatureForm.topic}
@@ -555,84 +664,69 @@ export default function ToolsPage() {
                         topic: event.target.value,
                       }))
                     }
-                    placeholder={activeModalTemplateId === 'template-meeting-brief' ? '例：每周工作总结' : '例：EGFR resistance'}
+                    placeholder="请输入任务名称"
                     size="medium"
                     containerClassName="!px-3.5"
                   />
                 </div>
 
-                {activeModalTemplateId === 'template-meeting-brief' ? (
+                {!isPaperTrackModal ? (
                   <>
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <div>
                         <div className="mb-1.5 text-sm font-medium text-primaryText">任务周期</div>
-                        <div className="relative flex h-11 items-center gap-2 rounded-lg border border-[borderGray] bg-white px-3.5">
-                          <input
-                            type="date"
-                            value={weeklyScheduleForm.startDate}
-                            onChange={(event) =>
-                              setWeeklyScheduleForm((prev) => ({
-                                ...prev,
-                                startDate: event.target.value,
-                              }))
-                            }
-                            className="min-w-0 flex-1 border-none bg-transparent p-0 text-sm text-primaryText outline-none"
-                          />
-                          <span className="text-sm text-secondaryText">~</span>
-                          <input
-                            type="date"
-                            value={weeklyScheduleForm.endDate}
-                            onChange={(event) =>
-                              setWeeklyScheduleForm((prev) => ({
-                                ...prev,
-                                endDate: event.target.value,
-                              }))
-                            }
-                            className="min-w-0 flex-1 border-none bg-transparent p-0 text-sm text-primaryText outline-none"
-                          />
-                          <CalendarDays size={16} className="text-[#98A2B3]" />
-                        </div>
+                        <RangePicker
+                          format="YYYY/MM/DD"
+                          className="task-period-picker w-full"
+                          popupClassName="task-period-picker-popup"
+                          value={[
+                            weeklyScheduleForm.startDate
+                              ? dayjs(weeklyScheduleForm.startDate, 'YYYY-MM-DD')
+                              : null,
+                            weeklyScheduleForm.endDate
+                              ? dayjs(weeklyScheduleForm.endDate, 'YYYY-MM-DD')
+                              : null,
+                          ]}
+                          onChange={(_, dateStrings) => {
+                            const [startDate, endDate] = dateStrings;
+                            setWeeklyScheduleForm((prev) => ({
+                              ...prev,
+                              startDate,
+                              endDate,
+                            }));
+                          }}
+                        />
                       </div>
 
                       <div>
                         <div className="mb-1.5 text-sm font-medium text-primaryText">触发时间</div>
                         <div className="grid grid-cols-2 gap-2.5">
                           <div className="relative">
-                            <select
-                              value={weeklyScheduleForm.repeatMode}
-                              onChange={(event) =>
-                                setWeeklyScheduleForm((prev) => ({
-                                  ...prev,
-                                  repeatMode: event.target.value as RepeatMode,
-                                }))
-                              }
-                              className="h-11 w-full appearance-none rounded-lg border border-[borderGray] bg-white px-3.5 pr-9 text-sm text-primaryText outline-none transition-colors focus:border-[#34D399]"
-                            >
-                              {repeatModeOptions.map((option) => (
-                                <option key={option.value} value={option.value}>
-                                  {option.label}
-                                </option>
-                              ))}
-                            </select>
-                            <ChevronRight size={16} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[#98A2B3]" />
+                            <Cascader
+                              value={repeatCascaderValue as unknown as RepeatMode[]}
+                              options={repeatModeCascaderOptions as unknown as { value: RepeatMode; label: string }[]}
+                              onChange={(value) => handleRepeatCascaderChange(value as Array<string | number>)}
+                              className="task-repeat-cascader w-full"
+                              popupClassName="task-repeat-cascader-popup"
+                              placeholder="请选择重复方式"
+                            />
                           </div>
 
-                          <div className="relative flex h-11 items-center rounded-lg border border-[borderGray] bg-white px-3 pr-9">
-                            <span className="mr-2 shrink-0 text-sm font-medium text-primaryText">
-                              {repeatModeTimePrefix[weeklyScheduleForm.repeatMode]}
-                            </span>
-                            <input
-                              type="time"
-                              value={weeklyScheduleForm.runAt}
-                              onChange={(event) =>
+                          <div>
+                            <TimePicker
+                              value={dayjs(weeklyScheduleForm.runAt, 'HH:mm')}
+                              format="HH:mm"
+                              minuteStep={1}
+                              allowClear={false}
+                              onChange={(value) =>
                                 setWeeklyScheduleForm((prev) => ({
                                   ...prev,
-                                  runAt: event.target.value,
+                                  runAt: value ? value.format('HH:mm') : prev.runAt,
                                 }))
                               }
-                              className="min-w-0 flex-1 border-none bg-transparent p-0 text-sm text-primaryText outline-none"
+                              className="task-run-time-picker w-full"
+                              popupClassName="task-run-time-picker-popup"
                             />
-                            <Clock3 size={15} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[#98A2B3]" />
                           </div>
                         </div>
                       </div>
@@ -656,149 +750,31 @@ export default function ToolsPage() {
                           rows={5}
                           className="w-full resize-none rounded-lg border border-[borderGray] px-3.5 pb-10 pt-2.5 text-sm text-primaryText outline-none transition-colors placeholder:text-tertiaryText focus:border-[#34D399]"
                         />
-                        <div className="absolute bottom-2.5 left-3 z-20">
-                          <button
-                            type="button"
-                            onClick={() => setShowWeeklyProjectDropdown((prev) => !prev)}
-                            className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-sm text-secondaryText transition-colors hover:bg-bgLight"
-                          >
-                            <Folder size={14} />
-                            <span className="max-w-[140px] truncate">
-                              {selectedWeeklyProject ? selectedWeeklyProject.name : '在项目中工作'}
-                            </span>
-                            <ChevronDown size={14} />
-                          </button>
-
-                          {showWeeklyProjectDropdown && (
-                            <>
-                              <div className="fixed inset-0 z-20" onClick={() => setShowWeeklyProjectDropdown(false)}></div>
-                              <div className="absolute bottom-full left-0 z-30 mb-2 w-60 overflow-hidden rounded-xl bg-white py-2 shadow-popover animate-in fade-in slide-in-from-bottom-2">
-                                <div className="max-h-[200px] overflow-y-auto">
-                                  <button
-                                    type="button"
-                                    className={`mx-2 flex w-[calc(100%-1rem)] items-center justify-between rounded-lg px-4 py-2.5 text-left text-sm transition-colors ${
-                                      !selectedWeeklyProject ? 'bg-green-100 font-medium text-green-700' : 'text-primaryText hover:bg-bgLight'
-                                    }`}
-                                    onClick={() => {
-                                      setWeeklyScheduleForm((prev) => ({
-                                        ...prev,
-                                        projectId: null,
-                                      }));
-                                      setShowWeeklyProjectDropdown(false);
-                                    }}
-                                  >
-                                    不选择项目
-                                  </button>
-                                  {mockProjects.map((project) => (
-                                    <button
-                                      key={project.id}
-                                      type="button"
-                                      className={`mx-2 flex w-[calc(100%-1rem)] items-center justify-between rounded-lg px-4 py-2.5 text-left text-sm transition-colors ${
-                                        selectedWeeklyProject?.id === project.id
-                                          ? 'bg-green-100 font-medium text-green-700'
-                                          : 'text-primaryText hover:bg-bgLight'
-                                      }`}
-                                      onClick={() => {
-                                        setWeeklyScheduleForm((prev) => ({
-                                          ...prev,
-                                          projectId: project.id,
-                                        }));
-                                        setShowWeeklyProjectDropdown(false);
-                                      }}
-                                    >
-                                      <span className="truncate">{project.name}</span>
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <div className="text-sm font-medium text-primaryText">保留在同一对话</div>
-                        <p className="mt-1 text-[13px] leading-5 text-tertiaryText">
-                          所有复盘任务的结果将显示在同一个对话中，方便不同运行之间进行查看和比较。
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setWeeklyScheduleForm((prev) => ({
-                            ...prev,
-                            keepInSameConversation: !prev.keepInSameConversation,
-                          }))
-                        }
-                        className={`inline-flex h-6 w-10 shrink-0 items-center rounded-full p-[2px] transition-colors ${
-                          weeklyScheduleForm.keepInSameConversation ? 'justify-end bg-[#10b981]' : 'justify-start bg-[#d9dee5]'
-                        }`}
-                        role="switch"
-                        aria-checked={weeklyScheduleForm.keepInSameConversation}
-                        aria-label={weeklyScheduleForm.keepInSameConversation ? '关闭同一对话保留' : '开启同一对话保留'}
-                      >
-                        <span className="h-5 w-5 rounded-full bg-white shadow" />
-                      </button>
-                    </div>
-
-                    <div>
-                      <div className="mb-2 text-sm font-medium text-primaryText">任务完成时通知方式</div>
-                      <div className="flex flex-wrap items-center gap-2.5">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setWeeklyScheduleForm((prev) => ({
-                              ...prev,
-                              notifyByEmail: !prev.notifyByEmail,
-                            }))
-                          }
-                          className="inline-flex items-center gap-2 rounded-md p-0.5 transition-opacity hover:opacity-90"
-                        >
-                          <span
-                            className={`inline-flex h-3.5 w-3.5 items-center justify-center rounded-sm ${
-                              weeklyScheduleForm.notifyByEmail
-                                ? 'bg-[#10c786]'
-                                : 'border border-[#d9e2ec] bg-white'
-                            }`}
-                          >
-                            <Check
-                              size={12}
-                              className={weeklyScheduleForm.notifyByEmail ? 'text-white' : 'text-transparent'}
-                            />
-                          </span>
-                          <span
-                            className={`text-base font-normal leading-none ${
-                              weeklyScheduleForm.notifyByEmail ? 'text-primaryText' : 'text-secondaryText'
-                            }`}
-                          >
-                            发送至邮箱
-                          </span>
-                        </button>
-
-                        <div className="relative">
-                          <select
-                            value={weeklyScheduleForm.emailRecipient}
-                            onChange={(event) =>
-                              setWeeklyScheduleForm((prev) => ({
-                                ...prev,
-                                emailRecipient: event.target.value,
-                              }))
+                        <div className="absolute bottom-4 left-3 z-20">
+                          <BaseActionMenu
+                            open={showWeeklyProjectDropdown}
+                            onOpenChange={setShowWeeklyProjectDropdown}
+                            placement="top-start"
+                            width={260}
+                            trigger={
+                              <span className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-sm text-secondaryText transition-colors hover:bg-bgLight">
+                                <Folder size={14} />
+                                <span className="max-w-[140px] truncate">
+                                  {selectedWeeklyProject ? selectedWeeklyProject.name : '工作项目'}
+                                </span>
+                                <ChevronDown size={14} />
+                              </span>
                             }
-                            disabled={!weeklyScheduleForm.notifyByEmail}
-                            className="h-8 min-w-[96px] appearance-none rounded-lg border border-[borderGray] bg-white px-2.5 pr-7 text-[13px] text-primaryText outline-none transition-colors focus:border-[#34D399] disabled:cursor-not-allowed disabled:bg-[#f8fafc] disabled:text-tertiaryText"
-                          >
-                            {emailRecipientOptions.map((recipient) => (
-                              <option key={recipient} value={recipient}>
-                                {recipient}
-                              </option>
-                            ))}
-                          </select>
-                          <ChevronDown size={12} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[#98A2B3]" />
+                            items={weeklyProjectMenuItems}
+                            onItemClick={handleWeeklyProjectMenuClick}
+                            className="!inline-flex"
+                            listClassName="max-h-[220px] overflow-y-auto"
+                            footerItems={weeklyProjectMenuFooterItems}
+                          />
                         </div>
                       </div>
                     </div>
+
                   </>
                 ) : (
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -850,7 +826,7 @@ export default function ToolsPage() {
                   </div>
                 )}
 
-                {activeModalTemplateId !== 'template-meeting-brief' && (
+                {isPaperTrackModal && (
                   <>
                     <div>
                       <div className="mb-2 text-sm font-medium text-primaryText">订阅来源</div>

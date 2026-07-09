@@ -1,26 +1,157 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
-import { ChevronLeft, Menu, Plus, Users } from 'lucide-react';
-import { BaseButton, BaseEmpty, BaseSelect } from '../components';
-import {
-  EXPERIMENTS_BY_PROJECT,
-  KNOWLEDGE_BY_PROJECT,
-  PROJECT_MEMBERS,
-  mockProjects,
-} from '../mock/projects';
+import { Menu, Plus, Search, Users } from 'lucide-react';
+import { BaseButton, BaseEmpty } from '../components';
+import { EXPERIMENTS_BY_PROJECT, PROJECT_MEMBERS, mockProjects } from '../mock/projects';
 import { type LayoutOutletContext } from '../components/Layout';
 
-type DetailTab = 'experiment' | 'knowledge';
+type DetailTab = 'experiment' | 'chat';
+
+const TAG_COLLAPSED_MAX_HEIGHT = 84;
+
+const WEEKDAY_TO_INDEX: Record<string, number> = {
+  日: 0,
+  天: 0,
+  一: 1,
+  二: 2,
+  三: 3,
+  四: 4,
+  五: 5,
+  六: 6,
+};
+
+const pad2 = (value: number) => String(value).padStart(2, '0');
+
+const formatDateToCnymdhm = (date: Date) =>
+  `${date.getFullYear()}年${pad2(date.getMonth() + 1)}月${pad2(date.getDate())}日 ${pad2(
+    date.getHours(),
+  )}:${pad2(date.getMinutes())}`;
+
+const parseHourMinute = (value: string) => {
+  const matched = value.match(/^(\d{1,2}):(\d{2})$/);
+  if (!matched) return null;
+  return { hours: Number(matched[1]), minutes: Number(matched[2]) };
+};
+
+const toWeekdayDate = (base: Date, targetWeekday: number, extraDaysBack = 0) => {
+  const date = new Date(base);
+  const baseWeekday = date.getDay();
+  let diff = baseWeekday - targetWeekday;
+  if (diff < 0) {
+    diff += 7;
+  }
+  date.setDate(date.getDate() - diff - extraDaysBack);
+  return date;
+};
+
+const formatChatDateTime = (rawDate: string, chatId: string) => {
+  const now = new Date();
+  const normalized = rawDate.trim();
+
+  if (normalized === '刚刚') {
+    return formatDateToCnymdhm(now);
+  }
+
+  const todayMatch = normalized.match(/^今天\s+(\d{1,2}:\d{2})$/);
+  if (todayMatch) {
+    const time = parseHourMinute(todayMatch[1]);
+    if (time) {
+      const date = new Date(now);
+      date.setHours(time.hours, time.minutes, 0, 0);
+      return formatDateToCnymdhm(date);
+    }
+  }
+
+  const yesterdayMatch = normalized.match(/^昨天\s+(\d{1,2}:\d{2})$/);
+  if (yesterdayMatch) {
+    const time = parseHourMinute(yesterdayMatch[1]);
+    if (time) {
+      const date = new Date(now);
+      date.setDate(date.getDate() - 1);
+      date.setHours(time.hours, time.minutes, 0, 0);
+      return formatDateToCnymdhm(date);
+    }
+  }
+
+  const weekdayMatch = normalized.match(/^周([一二三四五六日天])\s+(\d{1,2}:\d{2})$/);
+  if (weekdayMatch) {
+    const weekday = WEEKDAY_TO_INDEX[weekdayMatch[1]];
+    const time = parseHourMinute(weekdayMatch[2]);
+    if (weekday !== undefined && time) {
+      const date = toWeekdayDate(now, weekday);
+      date.setHours(time.hours, time.minutes, 0, 0);
+      return formatDateToCnymdhm(date);
+    }
+  }
+
+  const lastWeekdayMatch = normalized.match(/^上周([一二三四五六日天])\s+(\d{1,2}:\d{2})$/);
+  if (lastWeekdayMatch) {
+    const weekday = WEEKDAY_TO_INDEX[lastWeekdayMatch[1]];
+    const time = parseHourMinute(lastWeekdayMatch[2]);
+    if (weekday !== undefined && time) {
+      const date = toWeekdayDate(now, weekday, 7);
+      date.setHours(time.hours, time.minutes, 0, 0);
+      return formatDateToCnymdhm(date);
+    }
+  }
+
+  const fullDateMatch = normalized.match(
+    /^(\d{4})[.\-/年](\d{1,2})[.\-/月](\d{1,2})日?\s+(\d{1,2}):(\d{2})$/,
+  );
+  if (fullDateMatch) {
+    const date = new Date(
+      Number(fullDateMatch[1]),
+      Number(fullDateMatch[2]) - 1,
+      Number(fullDateMatch[3]),
+      Number(fullDateMatch[4]),
+      Number(fullDateMatch[5]),
+      0,
+      0,
+    );
+    return formatDateToCnymdhm(date);
+  }
+
+  const monthDayMatch = normalized.match(/^(\d{1,2})-(\d{1,2})\s+(\d{1,2}):(\d{2})$/);
+  if (monthDayMatch) {
+    const date = new Date(
+      now.getFullYear(),
+      Number(monthDayMatch[1]) - 1,
+      Number(monthDayMatch[2]),
+      Number(monthDayMatch[3]),
+      Number(monthDayMatch[4]),
+      0,
+      0,
+    );
+    return formatDateToCnymdhm(date);
+  }
+
+  const timestampMatch = chatId.match(/^c-(\d{13})$/);
+  if (timestampMatch) {
+    const date = new Date(Number(timestampMatch[1]));
+    if (!Number.isNaN(date.getTime())) {
+      return formatDateToCnymdhm(date);
+    }
+  }
+
+  const parsedDate = new Date(normalized);
+  if (!Number.isNaN(parsedDate.getTime())) {
+    return formatDateToCnymdhm(parsedDate);
+  }
+
+  return formatDateToCnymdhm(now);
+};
 
 export default function ProjectDetailPage() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  const { isSidebarOpen, setIsSidebarOpen } = useOutletContext<LayoutOutletContext>();
+  const { isSidebarOpen, setIsSidebarOpen, chats } = useOutletContext<LayoutOutletContext>();
 
   const [activeTab, setActiveTab] = useState<DetailTab>('experiment');
-  const [memberFilter, setMemberFilter] = useState<string>('all');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [tagFilter, setTagFilter] = useState<string>('all');
+  const [searchKeyword, setSearchKeyword] = useState('');
+  const [selectedTag, setSelectedTag] = useState('all');
+  const [isTagExpanded, setIsTagExpanded] = useState(false);
+  const [showTagToggle, setShowTagToggle] = useState(false);
+  const tagFilterRef = useRef<HTMLDivElement | null>(null);
 
   const project = useMemo(() => mockProjects.find((item) => item.id === id), [id]);
 
@@ -34,96 +165,72 @@ export default function ProjectDetailPage() {
     return EXPERIMENTS_BY_PROJECT[id] ?? [];
   }, [id]);
 
-  const knowledgeList = useMemo(() => {
-    if (!id) return [];
-    return KNOWLEDGE_BY_PROJECT[id] ?? [];
-  }, [id]);
+  const documentTagOptions = useMemo(() => {
+    const uniqueTags = Array.from(new Set(experimentList.flatMap((item) => item.tags)));
+    return ['all', ...uniqueTags];
+  }, [experimentList]);
+
+  const documentList = useMemo(() => {
+    if (activeTab !== 'experiment') {
+      return experimentList;
+    }
+
+    const keyword = searchKeyword.trim().toLowerCase();
+
+    return experimentList.filter((item) => {
+      if (selectedTag !== 'all' && !item.tags.includes(selectedTag)) {
+        return false;
+      }
+
+      if (!keyword) {
+        return true;
+      }
+
+      const searchableText = [item.title, item.summary, ...item.tags].join(' ').toLowerCase();
+      return searchableText.includes(keyword);
+    });
+  }, [activeTab, experimentList, searchKeyword, selectedTag]);
 
   useEffect(() => {
-    setMemberFilter('all');
-    setStatusFilter('all');
-    setTagFilter('all');
-  }, [activeTab]);
+    if (activeTab !== 'experiment') {
+      return;
+    }
 
-  const currentRawList = activeTab === 'experiment' ? experimentList : knowledgeList;
+    const checkTagOverflow = () => {
+      const container = tagFilterRef.current;
+      if (!container) {
+        setShowTagToggle(false);
+        return;
+      }
 
-  const tagOptions = useMemo(() => {
-    const uniqueTags = Array.from(
-      new Set(currentRawList.flatMap((item) => item.tags))
-    );
+      const hasOverflow = container.scrollHeight > TAG_COLLAPSED_MAX_HEIGHT + 1;
+      setShowTagToggle(hasOverflow);
+      if (!hasOverflow) {
+        setIsTagExpanded(false);
+      }
+    };
 
-    return [
-      {
-        label: activeTab === 'experiment' ? '实验目标' : '知识标签',
-        value: 'all',
-      },
-      ...uniqueTags.map((tag) => ({ label: tag, value: tag })),
-    ];
-  }, [activeTab, currentRawList]);
+    checkTagOverflow();
+    window.addEventListener('resize', checkTagOverflow);
+    return () => window.removeEventListener('resize', checkTagOverflow);
+  }, [activeTab, documentTagOptions]);
 
-  const memberOptions = useMemo(
-    () => [
-      { label: '成员', value: 'all' },
-      ...projectMembers.map((member) => ({
-        label: member.name,
-        value: member.id,
-      })),
-    ],
-    [projectMembers]
-  );
+  const conversationList = useMemo(() => {
+    const keyword = searchKeyword.trim().toLowerCase();
 
-  const statusOptions =
-    activeTab === 'experiment'
-      ? [
-          { label: '实验阶段', value: 'all' },
-          { label: '进行中', value: '进行中' },
-          { label: '已完成', value: '已完成' },
-        ]
-      : [
-          { label: '沉淀类型', value: 'all' },
-          { label: '对话沉淀', value: '对话沉淀' },
-          { label: '手工创建', value: '手工创建' },
-          { label: '外部导入', value: '外部导入' },
-        ];
+    if (!keyword || activeTab !== 'chat') {
+      return chats;
+    }
 
-  const filteredExperiments = useMemo(() => {
-    return experimentList.filter((item) => {
-      if (memberFilter !== 'all' && item.ownerId !== memberFilter) return false;
-      if (statusFilter !== 'all' && item.status !== statusFilter) return false;
-      if (tagFilter !== 'all' && !item.tags.includes(tagFilter)) return false;
-      return true;
+    return chats.filter((chat) => {
+      const searchableText = [chat.title, chat.date, formatChatDateTime(chat.date, chat.id)]
+        .join(' ')
+        .toLowerCase();
+      return searchableText.includes(keyword);
     });
-  }, [experimentList, memberFilter, statusFilter, tagFilter]);
-
-  const filteredKnowledge = useMemo(() => {
-    return knowledgeList.filter((item) => {
-      if (memberFilter !== 'all' && item.ownerId !== memberFilter) return false;
-      if (statusFilter !== 'all' && item.status !== statusFilter) return false;
-      if (tagFilter !== 'all' && !item.tags.includes(tagFilter)) return false;
-      return true;
-    });
-  }, [knowledgeList, memberFilter, statusFilter, tagFilter]);
-
-  const displayList =
-    activeTab === 'experiment' ? filteredExperiments : filteredKnowledge;
+  }, [activeTab, chats, searchKeyword]);
 
   const memberCount = projectMembers.length;
-
-  const projectTypeLabel = useMemo(() => {
-    if (!project) return '项目';
-    if (project.visibility === 'private') {
-      return project.privateType === 'team' ? '团队项目' : '个人项目';
-    }
-    return '公开项目';
-  }, [project]);
-
-  const statusStyleMap: Record<string, React.CSSProperties> = {
-    进行中: { backgroundColor: 'rgba(236, 253, 245, 1)', color: '#059669' },
-    已完成: { backgroundColor: 'rgba(239, 246, 255, 1)', color: '#2563eb' },
-    对话沉淀: { backgroundColor: 'rgba(236, 253, 245, 1)', color: '#059669' },
-    手工创建: { backgroundColor: 'rgba(245, 243, 255, 1)', color: '#7c3aed' },
-    外部导入: { backgroundColor: 'rgba(239, 246, 255, 1)', color: '#2563eb' },
-  };
 
   return (
     <div className="flex h-full w-full flex-col bg-white">
@@ -161,14 +268,6 @@ export default function ProjectDetailPage() {
             >
               管理成员
             </BaseButton>
-            <BaseButton
-              type="primary"
-              size="small"
-              rounded="large"
-              onClick={() => navigate(`/chat/new?projectId=${project.id}`)}
-            >
-              发起对话
-            </BaseButton>
           </div>
         )}
       </header>
@@ -191,9 +290,6 @@ export default function ProjectDetailPage() {
                   <Users size={13} className="text-secondaryText" />
                   <span>成员 {memberCount} 人</span>
                 </span>
-                <span className="inline-flex items-center rounded-full bg-[#f1f4f7] px-2.5 py-0.5 text-[13px] font-medium text-secondaryText">
-                  {projectTypeLabel}
-                </span>
               </div>
 
               <div className="mt-10 border-b border-[var(--color-line-subtle)]">
@@ -207,44 +303,34 @@ export default function ProjectDetailPage() {
                         : 'border-transparent text-tertiaryText'
                     }`}
                   >
-                    实验 {experimentList.length}
+                    文档 {experimentList.length}
                   </button>
                   <button
                     type="button"
-                    onClick={() => setActiveTab('knowledge')}
+                    onClick={() => setActiveTab('chat')}
                     className={`pb-2 text-sm font-medium border-b-2 transition-colors ${
-                      activeTab === 'knowledge'
+                      activeTab === 'chat'
                         ? 'border-[var(--color-primary)] text-primaryText'
                         : 'border-transparent text-tertiaryText'
                     }`}
                   >
-                    知识沉淀 {knowledgeList.length}
+                    对话 {chats.length}
                   </button>
                 </div>
               </div>
 
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <BaseSelect
-                    options={memberOptions}
-                    value={memberFilter}
-                    onChange={(value) => setMemberFilter(String(value))}
-                    size="small"
-                    className="min-w-[116px]"
+                <div className="relative w-full max-w-[320px]">
+                  <Search
+                    size={16}
+                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-tertiaryText"
                   />
-                  <BaseSelect
-                    options={statusOptions}
-                    value={statusFilter}
-                    onChange={(value) => setStatusFilter(String(value))}
-                    size="small"
-                    className="min-w-[128px]"
-                  />
-                  <BaseSelect
-                    options={tagOptions}
-                    value={tagFilter}
-                    onChange={(value) => setTagFilter(String(value))}
-                    size="small"
-                    className="min-w-[128px]"
+                  <input
+                    type="text"
+                    value={searchKeyword}
+                    onChange={(event) => setSearchKeyword(event.target.value)}
+                    placeholder={`搜索${activeTab === 'experiment' ? '文档' : '历史对话'}`}
+                    className="h-9 w-full rounded-lg border border-[var(--color-line-subtle)] bg-white pl-9 pr-3 text-sm text-primaryText transition-colors placeholder:text-tertiaryText hover:border-[var(--color-gray-3)] focus:border-[var(--color-primary)] focus:outline-none"
                   />
                 </div>
 
@@ -253,68 +339,109 @@ export default function ProjectDetailPage() {
                   size="small"
                   rounded="large"
                   icon={<Plus size={16} />}
-                  className="!h-auto !border-transparent !bg-transparent !px-0 !py-0 !text-sm !font-semibold !text-primaryText hover:!bg-transparent hover:!text-[var(--color-gray-6)]"
+                  className="!h-auto !border-transparent !bg-transparent !px-0 !py-0 !text-sm !font-semibold !text-[var(--color-primary)] hover:!bg-transparent hover:!text-[var(--color-primary-hover)]"
                 >
-                  {activeTab === 'experiment' ? '新建实验' : '新建知识'}
+                  {activeTab === 'experiment' ? '新建文档' : '发起对话'}
                 </BaseButton>
               </div>
 
-              {displayList.length > 0 ? (
-                <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-                  {displayList.map((item) => {
-                    const isExperimentCard = activeTab === 'experiment';
-                    const cardClassName = `rounded-lg border border-[var(--color-line-subtle)] bg-[var(--color-surface)] px-4 py-3.5 text-left transition-all ${
-                      isExperimentCard
-                        ? 'hover:border-[var(--color-gray-3)] hover:shadow-sm'
-                        : ''
-                    }`;
-                    const cardContent = (
-                      <>
-                        <div className="flex items-start justify-between gap-3">
-                          <h3 className="truncate text-base font-medium text-primaryText">
-                            {item.title}
-                          </h3>
-                          <span
-                            className="shrink-0 rounded px-2 py-0.5 text-xs font-medium"
-                            style={statusStyleMap[item.status]}
+              {activeTab === 'experiment' && (
+                <div className="mt-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div
+                      ref={tagFilterRef}
+                      className="flex flex-1 flex-wrap gap-2 overflow-hidden transition-[max-height] duration-200"
+                      style={{
+                        maxHeight:
+                          isTagExpanded || !showTagToggle
+                            ? undefined
+                            : `${TAG_COLLAPSED_MAX_HEIGHT}px`,
+                      }}
+                    >
+                      {documentTagOptions.map((tag) => {
+                        const isActive = selectedTag === tag;
+                        return (
+                          <button
+                            key={tag}
+                            type="button"
+                            onClick={() => setSelectedTag(tag)}
+                            className={`h-7 rounded-full border px-3 text-xs transition-colors ${
+                              isActive
+                                ? 'border-[var(--color-primary)] bg-[var(--color-primary-soft)] text-[var(--color-primary)]'
+                                : 'border-[var(--color-line-subtle)] bg-white text-secondaryText hover:border-[var(--color-gray-3)]'
+                            }`}
                           >
-                            {item.status}
-                          </span>
-                        </div>
+                            {tag === 'all' ? '全部' : tag}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {showTagToggle && (
+                      <button
+                        type="button"
+                        onClick={() => setIsTagExpanded((prev) => !prev)}
+                        className="shrink-0 text-xs text-tertiaryText transition-colors hover:text-primaryText"
+                      >
+                        {isTagExpanded ? '收起' : '展开'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
 
-                        <p className="mt-1.5 line-clamp-2 text-sm leading-5 text-secondaryText">
-                          {item.summary}
-                        </p>
-                      </>
-                    );
-
-                    if (!isExperimentCard) {
-                      return (
-                        <div key={item.id} className={cardClassName}>
-                          {cardContent}
-                        </div>
-                      );
-                    }
-
-                    return (
+              {activeTab === 'experiment' ? (
+                documentList.length > 0 ? (
+                  <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                    {documentList.map((item) => (
                       <button
                         key={item.id}
                         type="button"
                         onClick={() => navigate(`/project/${project.id}/experiment/${item.id}`)}
-                        className={cardClassName}
+                        className="rounded-lg border border-[var(--color-line-subtle)] bg-[var(--color-surface)] px-4 py-3.5 text-left transition-all hover:border-[var(--color-gray-3)] hover:shadow-sm"
                       >
-                        {cardContent}
+                        <h3 className="truncate text-base font-medium text-primaryText">{item.title}</h3>
+                        <p className="mt-1.5 line-clamp-2 text-sm leading-5 text-secondaryText">
+                          {item.summary}
+                        </p>
+                        {item.tags.length > 0 && (
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {item.tags.map((tag) => (
+                              <span
+                                key={`${item.id}-${tag}`}
+                                className="inline-flex items-center rounded-lg bg-[#f3f6f9] px-3 py-1 text-xs text-secondaryText"
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </button>
-                    );
-                  })}
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mt-4 rounded-lg border border-dashed border-[var(--color-border-soft)]">
+                    <BaseEmpty description="暂无匹配的文档" />
+                  </div>
+                )
+              ) : conversationList.length > 0 ? (
+                <div className="mt-4 space-y-2">
+                  {conversationList.map((chat) => (
+                    <button
+                      key={chat.id}
+                      type="button"
+                      onClick={() => navigate(`/chat/${chat.id}`)}
+                      className="w-full rounded-lg border border-[var(--color-line-subtle)] bg-[var(--color-surface)] px-4 py-3 text-left transition-all hover:border-[var(--color-gray-3)] hover:shadow-sm"
+                    >
+                      <div className="truncate text-sm font-medium text-primaryText">{chat.title}</div>
+                      <div className="mt-1 text-xs text-tertiaryText">
+                        {formatChatDateTime(chat.date, chat.id)}
+                      </div>
+                    </button>
+                  ))}
                 </div>
               ) : (
                 <div className="mt-4 rounded-lg border border-dashed border-[var(--color-border-soft)]">
-                  <BaseEmpty
-                    description={`暂无符合筛选条件的${
-                      activeTab === 'experiment' ? '实验' : '知识沉淀'
-                    }`}
-                  />
+                  <BaseEmpty description="暂无匹配的历史对话" />
                 </div>
               )}
             </section>

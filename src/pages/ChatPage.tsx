@@ -1,13 +1,23 @@
 import React, { useState, useRef, useEffect, useLayoutEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useParams, useOutletContext, useLocation } from 'react-router-dom';
-import { Menu, Folder, ChevronDown, ChevronRight, Plus, Send, FileText, FlaskConical, Search, X, Paperclip } from 'lucide-react';
+import { Menu, Folder, ChevronDown, ChevronRight, Plus, Send, FileText, FlaskConical, Search, X, Clock3 } from 'lucide-react';
 import MessageItem from '../components/chat/MessageItem';
-import InputArea from '../components/chat/InputArea';
+import InputArea, {
+CHAT_FILE_OPTIONS,
+CHAT_INPUT_GUIDE_TEXT,
+CHAT_SKILL_OPTIONS,
+insertFileReference,
+insertSkillCommand,
+resolveAtQuery,
+resolveSlashQuery,
+} from '../components/chat/InputArea';
 import QuickPrompts from '../components/chat/QuickPrompts';
 import ThinkingIndicator, { type StatusPhase, type SearchStep } from '../components/chat/ThinkingIndicator';
 import { ChatStreamError, streamChatResponse } from '../mock/mockApi';
 import { mockProjects } from '../mock/projects';
 import { type MockChat } from '../mock/chats';
+import { BaseActionMenu } from '../components';
+import type { BaseActionMenuItem, BaseActionMenuProps } from '../components';
 import { type LayoutOutletContext } from '../components/Layout';
 
 interface Message {
@@ -248,8 +258,16 @@ export default function ChatPage({ isNew }: { isNew?: boolean }) {
   const [workspaceWidth, setWorkspaceWidth] = useState(0);
   const prevSidebarOpenRef = useRef(isSidebarOpen);
   const suppressAutoCollapseRef = useRef(false);
-  const [inputVal, setInputVal] = useState('');
-  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+const [inputVal, setInputVal] = useState('');
+const [isInputFocused, setIsInputFocused] = useState(false);
+const [showSkillMenu, setShowSkillMenu] = useState(false);
+const [skillQuery, setSkillQuery] = useState('');
+const [activeSkillIndex, setActiveSkillIndex] = useState(-1);
+const [showFileMenu, setShowFileMenu] = useState(false);
+const [fileQuery, setFileQuery] = useState('');
+const [activeFileIndex, setActiveFileIndex] = useState(-1);
+const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+
   const [showProjectDropdown, setShowProjectDropdown] = useState(false);
   const [isKnowledgeExpanded, setIsKnowledgeExpanded] = useState(true);
   const [isExperimentsExpanded, setIsExperimentsExpanded] = useState(true);
@@ -261,6 +279,7 @@ export default function ChatPage({ isNew }: { isNew?: boolean }) {
   const chatScrollContainerRef = useRef<HTMLDivElement | null>(null);
   const shouldStickToBottomRef = useRef(true);
   const hasInitializedChatChangeRef = useRef(false);
+  const newChatTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
     // 首次进入历史对话时状态已是默认值，跳过一次重置可避免额外重渲染抖动。
@@ -509,6 +528,12 @@ export default function ChatPage({ isNew }: { isNew?: boolean }) {
     // 每次进入新建页都重置输入态，确保不会展示历史对话内容。
     setMessages([]);
     setInputVal('');
+    setShowSkillMenu(false);
+    setSkillQuery('');
+    setActiveSkillIndex(-1);
+    setShowFileMenu(false);
+    setFileQuery('');
+    setActiveFileIndex(-1);
     setIsTyping(false);
     setShowProjectDropdown(false);
     shouldStickToBottomRef.current = true;
@@ -528,6 +553,47 @@ export default function ChatPage({ isNew }: { isNew?: boolean }) {
     if (!currentChat?.projectId) return null;
     return mockProjects.find((project) => project.id === currentChat.projectId) ?? null;
   }, [currentChat?.projectId, isNewChat, selectedProject]);
+
+  const projectMenuItems = useMemo<BaseActionMenuItem[]>(() => {
+    const unselectedItem: BaseActionMenuItem = {
+      key: 'none',
+      label: '不选择项目',
+      active: !selectedProject,
+    };
+
+    const selectableItems = mockProjects.map<BaseActionMenuItem>((project) => ({
+      key: project.id,
+      label: <span className="truncate">{project.name}</span>,
+      active: selectedProject?.id === project.id,
+    }));
+
+    return [unselectedItem, ...selectableItems];
+  }, [selectedProject]);
+
+  const projectMenuFooterItems = useMemo<BaseActionMenuItem[]>(() => [
+    {
+      key: 'create',
+      label: '新建项目',
+      icon: <Plus size={16} />,
+    },
+  ], []);
+
+  const handleProjectMenuItemClick: BaseActionMenuProps['onItemClick'] = (item) => {
+    if (item.key === 'create') {
+      setShowProjectDropdown(false);
+      return;
+    }
+
+    if (item.key === 'none') {
+      setSelectedProject(null);
+      setShowProjectDropdown(false);
+      return;
+    }
+
+    const matchedProject = mockProjects.find((project) => project.id === item.key) ?? null;
+    setSelectedProject(matchedProject);
+    setShowProjectDropdown(false);
+  };
 
   const attachmentContent = useMemo<ProjectAttachmentContent>(() => {
     if (!currentProject) return attachmentContentFallback;
@@ -693,6 +759,100 @@ export default function ChatPage({ isNew }: { isNew?: boolean }) {
   }, [chatId, hasReceivedAssistantChunk, isNewChat, isTyping, messages, statusPhase]);
 
   // 发送首条消息时立即创建会话并绑定所选项目，确保近期对话分组正确。
+  const syncNewChatCommandMenuState = useCallback((nextValue: string, cursor: number | null | undefined) => {
+    const selection = cursor ?? nextValue.length;
+    const slashQuery = resolveSlashQuery(nextValue, selection);
+
+    if (slashQuery !== null) {
+      setShowSkillMenu(true);
+      setSkillQuery(slashQuery);
+      setActiveSkillIndex(-1);
+
+      setShowFileMenu(false);
+      setFileQuery('');
+      setActiveFileIndex(-1);
+      return;
+    }
+
+    const atQuery = resolveAtQuery(nextValue, selection);
+    if (atQuery !== null) {
+      setShowFileMenu(true);
+      setFileQuery(atQuery);
+      setActiveFileIndex(-1);
+
+      setShowSkillMenu(false);
+      setSkillQuery('');
+      setActiveSkillIndex(-1);
+      return;
+    }
+
+    setShowSkillMenu(false);
+    setSkillQuery('');
+    setActiveSkillIndex(-1);
+
+    setShowFileMenu(false);
+    setFileQuery('');
+    setActiveFileIndex(-1);
+  }, []);
+
+  const filteredSkills = useMemo(() => {
+    const keyword = skillQuery.trim().toLowerCase();
+    if (!keyword) return CHAT_SKILL_OPTIONS;
+
+    return CHAT_SKILL_OPTIONS.filter((skill) => {
+      const searchText = `${skill.id} ${skill.description} ${skill.source}`.toLowerCase();
+      return searchText.includes(keyword);
+    });
+  }, [skillQuery]);
+
+  const filteredFiles = useMemo(() => {
+    const keyword = fileQuery.trim().toLowerCase();
+    if (!keyword) {
+      return CHAT_FILE_OPTIONS.filter((file) => file.isRecent).slice(0, 10);
+    }
+
+    return CHAT_FILE_OPTIONS.filter((file) => {
+      const searchText = `${file.name} ${file.projectName} ${file.sourceType} ${file.operatorName ?? ''} ${file.operatedAt ?? ''}`.toLowerCase();
+      return searchText.includes(keyword);
+    });
+  }, [fileQuery]);
+
+  const applyNewChatSkillSelection = useCallback((skillId: string) => {
+    const textarea = newChatTextareaRef.current;
+    const selectionStart = textarea?.selectionStart ?? inputVal.length;
+    const selectionEnd = textarea?.selectionEnd ?? selectionStart;
+    const next = insertSkillCommand(inputVal, selectionStart, selectionEnd, skillId);
+
+    setInputVal(next.value);
+    setShowSkillMenu(false);
+    setSkillQuery('');
+    setActiveSkillIndex(-1);
+
+    requestAnimationFrame(() => {
+      if (!textarea) return;
+      textarea.focus();
+      textarea.setSelectionRange(next.cursor, next.cursor);
+    });
+  }, [inputVal]);
+
+  const applyNewChatFileSelection = useCallback((fileName: string) => {
+    const textarea = newChatTextareaRef.current;
+    const selectionStart = textarea?.selectionStart ?? inputVal.length;
+    const selectionEnd = textarea?.selectionEnd ?? selectionStart;
+    const next = insertFileReference(inputVal, selectionStart, selectionEnd, fileName);
+
+    setInputVal(next.value);
+    setShowFileMenu(false);
+    setFileQuery('');
+    setActiveFileIndex(-1);
+
+    requestAnimationFrame(() => {
+      if (!textarea) return;
+      textarea.focus();
+      textarea.setSelectionRange(next.cursor, next.cursor);
+    });
+  }, [inputVal]);
+
   const handleSend = useCallback(async (text: string) => {
     const trimmedText = text.trim();
     if (!trimmedText || isTyping) return;
@@ -727,6 +887,12 @@ export default function ChatPage({ isNew }: { isNew?: boolean }) {
     const nextMessages = [...requestMessages, { role: 'assistant', content: '' } as Message];
 
     setInputVal('');
+    setShowSkillMenu(false);
+    setSkillQuery('');
+    setActiveSkillIndex(-1);
+    setShowFileMenu(false);
+    setFileQuery('');
+    setActiveFileIndex(-1);
     setHasReceivedAssistantChunk(false);
     setIsTyping(true);
     setStatusPhase('thinking');
@@ -919,80 +1085,249 @@ export default function ChatPage({ isNew }: { isNew?: boolean }) {
             <div className="w-full max-w-[840px] mx-auto mb-6">
               <div className="relative bg-white rounded-3xl shadow-sm border border-borderGray flex flex-col transition-all focus-within:shadow-lg focus-within:border-borderGray">
                 <textarea
+                  ref={newChatTextareaRef}
                   value={inputVal}
-                  onChange={(e) => setInputVal(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
+                  onChange={(event) => {
+                    const nextValue = event.target.value;
+                    setInputVal(nextValue);
+                    syncNewChatCommandMenuState(nextValue, event.target.selectionStart);
+                  }}
+                  onClick={(event) => {
+                    syncNewChatCommandMenuState(event.currentTarget.value, event.currentTarget.selectionStart);
+                  }}
+                  onKeyUp={(event) => {
+                    if (['ArrowDown', 'ArrowUp', 'Enter', 'Escape'].includes(event.key)) return;
+                    syncNewChatCommandMenuState(event.currentTarget.value, event.currentTarget.selectionStart);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' && (event.shiftKey || event.metaKey || event.ctrlKey)) {
+                      event.preventDefault();
+                      const textarea = event.currentTarget;
+                      const selectionStart = textarea.selectionStart ?? inputVal.length;
+                      const selectionEnd = textarea.selectionEnd ?? selectionStart;
+                      const nextValue = `${inputVal.slice(0, selectionStart)}\n${inputVal.slice(selectionEnd)}`;
+                      const nextCursor = selectionStart + 1;
+
+                      setInputVal(nextValue);
+                      syncNewChatCommandMenuState(nextValue, nextCursor);
+
+                      requestAnimationFrame(() => {
+                        textarea.setSelectionRange(nextCursor, nextCursor);
+                      });
+                      return;
+                    }
+
+                    if (showSkillMenu) {
+                      if (event.key === 'ArrowDown') {
+                        event.preventDefault();
+                        setActiveSkillIndex((prev) => {
+                          if (filteredSkills.length === 0) return -1;
+                          if (prev < 0) return 0;
+                          return (prev + 1) % filteredSkills.length;
+                        });
+                        return;
+                      }
+
+                      if (event.key === 'ArrowUp') {
+                        event.preventDefault();
+                        setActiveSkillIndex((prev) => {
+                          if (filteredSkills.length === 0) return -1;
+                          if (prev < 0) return filteredSkills.length - 1;
+                          return (prev - 1 + filteredSkills.length) % filteredSkills.length;
+                        });
+                        return;
+                      }
+
+                      if (event.key === 'Escape') {
+                        event.preventDefault();
+                        setShowSkillMenu(false);
+                        setSkillQuery('');
+                        setActiveSkillIndex(-1);
+                        return;
+                      }
+
+                      if (event.key === 'Enter' && !event.shiftKey) {
+                        event.preventDefault();
+                        const targetSkill = activeSkillIndex >= 0 ? filteredSkills[activeSkillIndex] : undefined;
+                        if (targetSkill) {
+                          applyNewChatSkillSelection(targetSkill.id);
+                        }
+                        return;
+                      }
+                    }
+
+                    if (showFileMenu) {
+                      if (event.key === 'ArrowDown') {
+                        event.preventDefault();
+                        setActiveFileIndex((prev) => {
+                          if (filteredFiles.length === 0) return -1;
+                          if (prev < 0) return 0;
+                          return (prev + 1) % filteredFiles.length;
+                        });
+                        return;
+                      }
+
+                      if (event.key === 'ArrowUp') {
+                        event.preventDefault();
+                        setActiveFileIndex((prev) => {
+                          if (filteredFiles.length === 0) return -1;
+                          if (prev < 0) return filteredFiles.length - 1;
+                          return (prev - 1 + filteredFiles.length) % filteredFiles.length;
+                        });
+                        return;
+                      }
+
+                      if (event.key === 'Escape') {
+                        event.preventDefault();
+                        setShowFileMenu(false);
+                        setFileQuery('');
+                        setActiveFileIndex(-1);
+                        return;
+                      }
+
+                      if (event.key === 'Enter' && !event.shiftKey) {
+                        event.preventDefault();
+                        const targetFile = activeFileIndex >= 0 ? filteredFiles[activeFileIndex] : undefined;
+                        if (targetFile) {
+                          applyNewChatFileSelection(targetFile.name);
+                        }
+                        return;
+                      }
+                    }
+
+                    if (event.key === 'Enter' && !event.shiftKey) {
+                      event.preventDefault();
                       handleSend(inputVal);
                     }
                   }}
-                  placeholder="输入你的科研问题..."
+                  onFocus={() => setIsInputFocused(true)}
+                  onBlur={() => {
+                    setIsInputFocused(false);
+                    setShowSkillMenu(false);
+                    setActiveSkillIndex(-1);
+                    setShowFileMenu(false);
+                    setActiveFileIndex(-1);
+                  }}
+                  placeholder={isInputFocused ? CHAT_INPUT_GUIDE_TEXT : '输入你的科研问题...'}
                   className="w-full min-h-[90px] max-h-[200px] p-5 outline-none resize-none text-[14px] bg-transparent text-primaryText placeholder:text-tertiaryText leading-relaxed"
                 />
+
+                {showSkillMenu && (
+                  <div className="absolute inset-x-4 bottom-full mb-2 z-40" onMouseDown={(event) => event.preventDefault()}>
+                    <div className="overflow-hidden rounded-xl border border-[#e6ecf2] bg-white shadow-[0_8px_24px_rgba(15,23,42,0.12)]">
+                      <div className="flex items-center gap-2 border-b border-[#eef2f6] px-3 py-2 text-[13px] text-tertiaryText">
+                        <Search size={14} className="text-tertiaryText" />
+                        <span className="truncate">{skillQuery ? `搜索 skill：${skillQuery}` : '搜索 skill'}</span>
+                      </div>
+
+                      <div className="max-h-64 overflow-y-auto py-1">
+                        {filteredSkills.length === 0 ? (
+                          <div className="px-3 py-6 text-center text-sm text-tertiaryText">未找到匹配的 Skill</div>
+                        ) : (
+                          filteredSkills.map((skill, index) => (
+                            <button
+                              key={skill.id}
+                              type="button"
+                              className={`mx-2 flex w-[calc(100%-1rem)] items-center gap-2 rounded-lg px-3 py-2 text-left transition-colors ${
+                                index === activeSkillIndex ? 'bg-[#f4f7fb]' : 'hover:bg-[#f8fafc]'
+                              }`}
+                              onClick={() => applyNewChatSkillSelection(skill.id)}
+                            >
+                              <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded bg-[#eef3f8] text-[10px] font-semibold leading-none text-[#5f6b7a]">
+                                {skill.badge}
+                              </span>
+                              <span className="min-w-0 flex flex-1 items-center gap-1">
+                                <span className="text-[13px] font-semibold text-primaryText">{skill.id}</span>
+                                <span className="truncate text-[12px] text-tertiaryText">{skill.description}</span>
+                              </span>
+                              <span className="shrink-0 text-[11px] text-tertiaryText">{skill.source}</span>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {showFileMenu && (
+                  <div className="absolute inset-x-4 bottom-full mb-2 z-40" onMouseDown={(event) => event.preventDefault()}>
+                    <div className="overflow-hidden rounded-xl border border-[#e6ecf2] bg-white shadow-[0_8px_24px_rgba(15,23,42,0.12)]">
+                      <div className="flex items-center gap-2 border-b border-[#eef2f6] px-3 py-2 text-[13px] text-tertiaryText">
+                        <Search size={14} className="text-tertiaryText" />
+                        <span className="truncate">{fileQuery ? `搜索文件：${fileQuery}` : '搜索文件'}</span>
+                      </div>
+
+                      <div className="max-h-64 overflow-y-auto py-1">
+                        {!fileQuery && (
+                          <div className="px-3 py-2">
+                            <div className="flex items-center gap-1 text-[12px] text-tertiaryText">
+                              <Clock3 size={12} />
+                              <span>最近使用的文档</span>
+                            </div>
+                          </div>
+                        )}
+                        {filteredFiles.length === 0 ? (
+                          <div className="px-3 py-6 text-center text-sm text-tertiaryText">未找到匹配的文件</div>
+                        ) : (
+                          filteredFiles.map((file, index) => (
+                            <button
+                              key={file.id}
+                              type="button"
+                              className={`mx-2 flex w-[calc(100%-1rem)] items-center gap-2 rounded-lg px-3 py-2 text-left transition-colors ${
+                                index === activeFileIndex ? 'bg-[#f4f7fb]' : 'hover:bg-[#f8fafc]'
+                              }`}
+                              onClick={() => applyNewChatFileSelection(file.name)}
+                            >
+                              <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded bg-[#eef3f8] text-[#5f6b7a]">
+                                <FileText size={11} />
+                              </span>
+                              <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-primaryText">{file.name}</span>
+                              {!fileQuery && file.operatorName && file.operatedAt && (
+                                <span className="shrink-0 max-w-[55%] truncate text-right text-[12px] text-tertiaryText">
+                                  {`- by ${file.operatorName} ${file.operatedAt}`}
+                                </span>
+                              )}
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex justify-between items-center p-3 pt-0">
                   <div className="flex items-center gap-2 pl-1 relative">
-                    <button 
-                      onClick={() => setShowProjectDropdown(!showProjectDropdown)}
-                      className="flex items-center gap-1.5 px-4 py-1.5 rounded-full border border-borderGray text-[14px] text-tertiaryText hover:bg-bgLight transition-colors bg-white"
-                    >
-                      <span className="truncate max-w-[120px]">
-                        {selectedProject ? selectedProject.name : 'Work in a project'}
-                      </span>
-                      <ChevronDown size={14} />
-                    </button>
-                    
-                    {/* 项目选择下拉菜单 */}
-                    {showProjectDropdown && (
-                      <>
-                        <div className="fixed inset-0 z-30" onClick={() => setShowProjectDropdown(false)}></div>
-                        <div
-                          className="absolute bottom-full left-0 mb-2 z-40 w-64 rounded-xl bg-white shadow-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200 origin-bottom-left"
-                          onClick={(event) => event.stopPropagation()}
-                        >
-                          <div className="py-2 text-base text-primaryText font-normal space-y-1 px-2">
-                            <div className="max-h-[208px] overflow-y-auto pr-0.5">
-                              {mockProjects.map((project) => (
-                                <button
-                                  key={project.id}
-                                  type="button"
-                                  className={`w-full px-3 py-2.5 cursor-pointer transition-colors flex items-center justify-between rounded-lg text-left ${
-                                    selectedProject?.id === project.id
-                                      ? 'bg-bgLight text-primaryText font-medium'
-                                      : 'text-primaryText hover:bg-bgLight'
-                                  }`}
-                                  onClick={() => {
-                                    setSelectedProject(project);
-                                    setShowProjectDropdown(false);
-                                  }}
-                                >
-                                  <span className="truncate">{project.name}</span>
-                                </button>
-                              ))}
-                            </div>
-                            <button
-                              type="button"
-                              className="w-full text-left px-3 py-2.5 text-primaryText hover:bg-bgLight cursor-pointer transition-colors font-medium rounded-lg flex items-center gap-2"
-                              onClick={() => {
-                                setShowProjectDropdown(false);
-                              }}
-                            >
-                              <Plus size={16} />
-                              <span>新建项目</span>
-                            </button>
-                          </div>
-                        </div>
-                      </>
-                    )}
+                    <BaseActionMenu
+                      open={showProjectDropdown}
+                      onOpenChange={setShowProjectDropdown}
+                      placement="top-start"
+                      width={260}
+                      trigger={
+                        <span className="flex items-center gap-1.5 rounded-full border border-borderGray bg-white px-4 py-1.5 text-[14px] text-tertiaryText transition-colors hover:bg-bgLight">
+                          <span className="truncate max-w-[120px]">
+                            {selectedProject ? selectedProject.name : '工作项目'}
+                          </span>
+                          <ChevronDown size={14} />
+                        </span>
+                      }
+                      items={projectMenuItems}
+                      footerItems={projectMenuFooterItems}
+                      onItemClick={handleProjectMenuItemClick}
+                      className="!inline-flex"
+                      listClassName="max-h-[220px] overflow-y-auto"
+                    />
 
-                    <button className="w-8 h-8 rounded-full border border-borderGray flex items-center justify-center text-tertiaryText hover:bg-bgLight transition-colors bg-white">
-                      <Plus size={16} />
-                    </button>
+                    <div className="relative group">
+                      <button className="w-8 h-8 rounded-full border border-borderGray flex items-center justify-center text-tertiaryText hover:bg-bgLight transition-colors bg-white">
+                        <Plus size={16} />
+                      </button>
+                      <div className="pointer-events-none absolute bottom-full left-0 z-50 mb-2 hidden w-max whitespace-nowrap rounded-lg bg-[#2b313d] px-3 py-2 text-[13px] leading-6 text-white shadow-[0_8px_20px_rgba(15,23,42,0.25)] group-hover:block">
+                        <div>上传文件，支持各类文档和图片</div>
+                        <div>最多 50 个，每个 100 MB</div>
+                      </div>
+                    </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button className="w-8 h-8 rounded-full border border-borderGray flex items-center justify-center text-tertiaryText hover:bg-bgLight transition-colors bg-white">
-                      <Paperclip size={16} />
-                    </button>
                     <button 
                       onClick={() => handleSend(inputVal)}
                       className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${inputVal.trim() && !isTyping ? 'bg-primary text-white shadow-md hover:bg-primary-hover' : 'bg-tertiaryText text-white'}`}

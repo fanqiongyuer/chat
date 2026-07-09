@@ -213,6 +213,120 @@ box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
     background: var(--color-primary-soft);
   }
 
+  .task-repeat-cascader-popup .ant-cascader-menu-item-expand-icon {
+    display: none;
+  }
+
+  .task-repeat-cascader-popup .ant-cascader-menu-item-expand {
+    padding-inline-end: 12px;
+  }
+
+.task-repeat-cascader-popup .ant-cascader-menus {
+align-items: flex-start;
+}
+
+.task-repeat-cascader-popup .ant-cascader-menu {
+height: auto;
+max-height: 220px;
+min-height: 0;
+}
+
+  .task-repeat-cascader-popup .ant-cascader-menu-item,
+  .task-repeat-cascader-popup .ant-cascader-menu-item-content,
+  .task-repeat-cascader-popup .ant-cascader-menu-item-active .ant-cascader-menu-item-content {
+    color: var(--color-text-secondary);
+    font-weight: 400;
+  }
+
+  .task-repeat-cascader.ant-select {
+    width: 100%;
+    height: 36px !important;
+    min-height: 36px;
+    border-radius: 8px;
+  }
+
+  .task-repeat-cascader.ant-select .ant-select-selector,
+  .task-repeat-cascader.ant-select-single:not(.ant-select-customize-input)
+    .ant-select-selector {
+    height: 36px !important;
+    min-height: 36px !important;
+    border-radius: 8px !important;
+    border: 1px solid var(--color-border) !important;
+    background: var(--color-surface) !important;
+    box-shadow: none !important;
+    padding: 0 12px !important;
+    padding-block: 0 !important;
+    display: flex;
+    align-items: center;
+    transition: all 0.2s ease;
+  }
+
+  .task-repeat-cascader.ant-select:hover .ant-select-selector,
+  .task-repeat-cascader.ant-select.ant-select-focused .ant-select-selector,
+  .task-repeat-cascader.ant-select.ant-select-open .ant-select-selector {
+    border-color: var(--color-primary) !important;
+    box-shadow: 0 0 0 2px var(--ring-primary) !important;
+  }
+
+  .task-repeat-cascader.ant-select .ant-select-selection-item,
+  .task-repeat-cascader.ant-select .ant-select-selection-placeholder {
+    height: 34px;
+    line-height: 34px !important;
+    color: var(--color-text-primary);
+  }
+
+  .task-repeat-cascader.ant-select .ant-select-selection-search,
+  .task-repeat-cascader.ant-select .ant-select-selection-search-input {
+    height: 34px !important;
+  }
+
+  .task-repeat-cascader.ant-select .ant-select-arrow {
+    color: var(--color-text-tertiary);
+  }
+
+  .task-run-time-picker.ant-picker,
+  .task-run-time-picker.ant-picker.ant-picker-outlined {
+    height: 36px !important;
+    min-height: 36px !important;
+    border-radius: 8px !important;
+    border: 1px solid var(--color-border) !important;
+    box-shadow: none !important;
+    background: var(--color-surface);
+    padding: 0 12px;
+    transition: all 0.2s ease;
+  }
+
+  .task-run-time-picker.ant-picker:hover,
+  .task-run-time-picker.ant-picker.ant-picker-focused,
+  .task-run-time-picker.ant-picker.ant-picker-outlined:focus-within {
+    border-color: var(--color-primary) !important;
+    box-shadow: 0 0 0 2px var(--ring-primary) !important;
+  }
+
+  .task-run-time-picker.ant-picker .ant-picker-input {
+    display: flex;
+    align-items: center;
+    height: 34px;
+  }
+
+  .task-run-time-picker.ant-picker .ant-picker-input > input {
+    height: 34px;
+    font-size: 14px;
+    line-height: 34px;
+    color: var(--color-text-primary);
+  }
+
+  .task-run-time-picker.ant-picker .ant-picker-suffix,
+  .task-run-time-picker.ant-picker .ant-picker-clear {
+    color: var(--color-text-tertiary);
+  }
+
+  .task-run-time-picker-popup .ant-picker-panel-container {
+    border-radius: 8px !important;
+    border: 1px solid var(--color-border);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+  }
+
   /* 任务配置弹窗 Radio 主题色统一 */
   .tools-task-modal .task-radio-group .ant-radio-checked .ant-radio-inner,
   .tools-task-modal .task-radio-group .ant-radio-wrapper .ant-radio-checked .ant-radio-inner {
