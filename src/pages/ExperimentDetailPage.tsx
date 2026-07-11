@@ -147,12 +147,6 @@ export default function ExperimentDetailPage() {
                     <span>最近修改: {modifiedByName}</span>
                     <span>{activeTimeline?.updatedAt ?? experiment.updatedAt}</span>
                   </div>
-                  <button
-                    type="button"
-                    className="shrink-0 text-sm font-medium text-primaryText transition-colors hover:text-primaryText/80"
-                  >
-                    编辑
-                  </button>
                 </div>
                 <div className="mt-4 h-px bg-[var(--color-line-subtle)]" />
               </section>

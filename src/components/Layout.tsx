@@ -18,6 +18,7 @@ const AUTH_STORAGE_KEY = 'deeptrace-authenticated';
 const AUTH_SESSION_KEY = 'deeptrace-authenticated-session';
 const CHATS_STORAGE_KEY = 'deeptrace-chats';
 const CHAT_MESSAGES_STORAGE_KEY = 'deeptrace-chat-messages';
+const MAX_RECENT_CHATS = 15;
 function loadChatsFromStorage(): MockChat[] {
   if (typeof window === 'undefined') return [];
 
@@ -82,6 +83,11 @@ export default function Layout() {
   const [chats, setChats] = useState<MockChat[]>(() => loadChatsFromStorage());
   const [chatMenuOpenId, setChatMenuOpenId] = useState<string | null>(null);
   const [sortMode, setSortMode] = useState<'time' | 'project'>('time');
+  const [isSidebarScrolling, setIsSidebarScrolling] = useState(false);
+  const [editingChatId, setEditingChatId] = useState<string | null>(null);
+  const [editingChatTitle, setEditingChatTitle] = useState('');
+  const chatRenameInputRef = useRef<HTMLInputElement | null>(null);
+  const sidebarScrollTimerRef = useRef<number | null>(null);
 
   const handleLogout = () => {
     localStorage.removeItem(AUTH_STORAGE_KEY);
@@ -97,6 +103,12 @@ export default function Layout() {
   const handleDeleteChat = (chatId: string) => {
     setChats((prev) => prev.filter((chat) => chat.id !== chatId));
     setChatMenuOpenId(null);
+
+    if (editingChatId === chatId) {
+      setEditingChatId(null);
+      setEditingChatTitle('');
+    }
+
     removeChatMessagesFromStorage(chatId);
 
     const activeChatId = location.pathname.match(/^\/chat\/([^/]+)$/)?.[1];
@@ -120,6 +132,88 @@ export default function Layout() {
       return [...pinned, ...unpinned];
     });
     setChatMenuOpenId(null);
+  };
+
+  const startChatRename = (chat: MockChat) => {
+    setEditingChatId(chat.id);
+    setEditingChatTitle(chat.title);
+    setChatMenuOpenId(null);
+  };
+
+  const cancelChatRename = () => {
+    setEditingChatId(null);
+    setEditingChatTitle('');
+  };
+
+  const commitChatRename = (chatId: string) => {
+    const nextTitle = editingChatTitle.trim();
+
+    if (nextTitle) {
+      setChats((prev) => prev.map((chat) => (
+        chat.id === chatId ? { ...chat, title: nextTitle } : chat
+      )));
+    }
+
+    cancelChatRename();
+  };
+
+  const handleChatTitleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>, chatId: string) => {
+    event.stopPropagation();
+
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      commitChatRename(chatId);
+      return;
+    }
+
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      cancelChatRename();
+    }
+  };
+
+  const handleChatRowClick = (chatId: string) => {
+    if (editingChatId === chatId) {
+      chatRenameInputRef.current?.focus();
+      return;
+    }
+    navigate(`/chat/${chatId}`);
+  };
+
+  const renderChatTitle = (chat: MockChat, withPinIcon = false) => {
+    const isEditing = editingChatId === chat.id;
+
+    if (isEditing) {
+      return (
+        <div
+          className="flex min-w-0 items-center gap-2 flex-1"
+          onClick={(event) => {
+            event.stopPropagation();
+            chatRenameInputRef.current?.focus();
+          }}
+        >
+          {withPinIcon && <Pin size={14} className="shrink-0" />}
+          <input
+            ref={chatRenameInputRef}
+            value={editingChatTitle}
+            onChange={(event) => setEditingChatTitle(event.target.value)}
+            onKeyDown={(event) => handleChatTitleKeyDown(event, chat.id)}
+            onBlur={() => commitChatRename(chat.id)}
+            onClick={(event) => event.stopPropagation()}
+            className="w-full bg-transparent px-0 text-sm text-primaryText outline-none"
+            maxLength={80}
+            aria-label="重命名对话"
+          />
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex min-w-0 items-center gap-2 flex-1">
+        {withPinIcon && <Pin size={14} className="shrink-0" />}
+        <span className="truncate">{chat.title}</span>
+      </div>
+    );
   };
 
   const handleResizeStart = (event: React.MouseEvent<HTMLDivElement>) => {
@@ -166,6 +260,36 @@ export default function Layout() {
   useEffect(() => {
     window.localStorage.setItem(CHATS_STORAGE_KEY, JSON.stringify(chats));
   }, [chats]);
+
+  useEffect(() => {
+    if (!editingChatId) return;
+
+    const frameId = window.requestAnimationFrame(() => {
+      chatRenameInputRef.current?.focus();
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
+  }, [editingChatId]);
+
+  useEffect(() => {
+    return () => {
+      if (sidebarScrollTimerRef.current !== null) {
+        window.clearTimeout(sidebarScrollTimerRef.current);
+      }
+    };
+  }, []);
+
+  const handleSidebarScroll = () => {
+    setIsSidebarScrolling(true);
+    if (sidebarScrollTimerRef.current !== null) {
+      window.clearTimeout(sidebarScrollTimerRef.current);
+    }
+    sidebarScrollTimerRef.current = window.setTimeout(() => {
+      setIsSidebarScrolling(false);
+    }, 600);
+  };
 
   const settingsMenuItems = useMemo<BaseActionMenuItem[]>(() => [
     {
@@ -248,12 +372,11 @@ export default function Layout() {
 
   const renderChatActionControl = (chat: MockChat, isMenuOpen: boolean) => (
     <div className="ml-2 shrink-0 flex h-[14px] w-5 items-center justify-center">
-      <span className={`text-xs opacity-60 ${isMenuOpen ? 'hidden' : 'group-hover:hidden'}`}>{chat.count}</span>
       <BaseActionMenu
         open={isMenuOpen}
         onOpenChange={(open) => setChatMenuOpenId(open ? chat.id : null)}
         placement="bottom-end"
-        width={Math.max(136, Math.min(176, sidebarWidth - 56))}
+        width={Math.max(140, Math.min(176, sidebarWidth - 56))}
         trigger={<MoreHorizontal size={14} />}
         onTriggerClick={(event) => {
           event.stopPropagation();
@@ -262,6 +385,10 @@ export default function Layout() {
         footerItems={chatMenuFooterItems}
         onItemClick={(item, event) => {
           event.stopPropagation();
+          if (item.key === 'rename') {
+            startChatRename(chat);
+            return;
+          }
           if (item.key === 'pin') {
             handleTogglePinChat(chat.id);
             return;
@@ -304,6 +431,25 @@ export default function Layout() {
     () => chats.filter((chat) => chat.isPinned),
     [chats],
   );
+
+  const timeSortedUnpinnedChats = useMemo(
+    () => chats
+      .filter((chat) => !chat.isPinned)
+      .slice()
+      .sort((a, b) => b.id.localeCompare(a.id)),
+    [chats],
+  );
+
+  const visiblePinnedChats = useMemo(
+    () => (sortMode === 'time' ? pinnedChats.slice(0, MAX_RECENT_CHATS) : pinnedChats),
+    [pinnedChats, sortMode],
+  );
+
+  const visibleTimeChats = useMemo(() => {
+    if (sortMode !== 'time') return [];
+    const availableSlots = Math.max(MAX_RECENT_CHATS - visiblePinnedChats.length, 0);
+    return timeSortedUnpinnedChats.slice(0, availableSlots);
+  }, [sortMode, timeSortedUnpinnedChats, visiblePinnedChats.length]);
 
   useEffect(() => {
     if (!activeChat) return;
@@ -378,37 +524,45 @@ export default function Layout() {
           </div>
 
           {/* 对话历史 */}
-          <div className="flex-1 overflow-y-auto px-0 relative">
-            <div className="mx-[10px] mb-4 mt-0.5 flex items-center pl-[8px] pr-4 text-sm font-normal text-secondaryText">
-              <span className="opacity-60">近期对话</span>
+          <div
+            onScroll={handleSidebarScroll}
+            className={`flex-1 overflow-y-auto px-0 relative auto-hide-scrollbar ${
+              isSidebarScrolling ? 'is-scrolling is-scrolling-thin' : ''
+            }`}
+          >
+            <div className="sticky top-0 z-20 bg-bgLight px-[10px] pb-4 pt-0.5">
+              <div className="flex items-center pl-[8px] pr-4 text-sm font-normal text-secondaryText">
+                <span className="opacity-60">近期对话</span>
+              </div>
             </div>
             
-            {pinnedChats.length > 0 && (
+            {visiblePinnedChats.length > 0 && (
               <div className="mb-1">
                 <div className="flex flex-col gap-0.5 mt-0.5">
-                  {pinnedChats.map((chat) => {
+                  {visiblePinnedChats.map((chat) => {
                     const isActive = location.pathname === `/chat/${chat.id}`;
                     const isMenuOpen = chatMenuOpenId === chat.id;
 
                     return (
                       <div key={chat.id} className="relative">
                         <div
-                          onClick={() => navigate(`/chat/${chat.id}`)}
+                          onClick={() => handleChatRowClick(chat.id)}
                           className={`mx-[10px] text-sm pl-[10px] pr-2 py-1.5 rounded-md cursor-pointer transition-colors flex items-center justify-between group ${
-                            isActive ? 'text-primaryText bg-[#E4EAF0] font-normal' : 'text-secondaryText hover:text-primaryText hover:bg-[#E4EAF0] font-normal'
+                            editingChatId === chat.id
+                              ? 'text-primaryText bg-bgLight font-normal border border-[#22c55e]'
+                              : isActive
+                                ? 'text-primaryText bg-[#E4EAF0] font-normal'
+                                : 'text-secondaryText hover:text-primaryText hover:bg-[#E4EAF0] font-normal'
                           }`}
                         >
-                          <div className="flex min-w-0 items-center gap-2">
-                            {sortMode !== 'time' && <Pin size={14} className="shrink-0" />}
-                            <span className="truncate">{chat.title}</span>
-                          </div>
-                          {renderChatActionControl(chat, isMenuOpen)}
+                          {renderChatTitle(chat, sortMode !== 'time')}
+                          {editingChatId !== chat.id && renderChatActionControl(chat, isMenuOpen)}
                         </div>
                       </div>
                     );
                   })}
                 </div>
-                <div className="ml-[20px] mr-[36px] my-2 border-t border-borderGray/80" />
+                <div className="mx-[10px] my-2 border-t border-borderGray/80" />
               </div>
             )}
 
@@ -445,13 +599,17 @@ export default function Layout() {
                         return (
                           <div key={chat.id} className="relative">
                             <div 
-                              onClick={() => navigate(`/chat/${chat.id}`)}
+                              onClick={() => handleChatRowClick(chat.id)}
                               className={`mx-[10px] text-sm pl-[30px] pr-2 py-1.5 rounded-md cursor-pointer transition-colors flex items-center justify-between group ${
-                                isActive ? 'text-primaryText bg-[#E4EAF0] font-normal' : 'text-secondaryText hover:text-primaryText hover:bg-[#E4EAF0] font-normal'
+                                editingChatId === chat.id
+                                  ? 'text-primaryText bg-bgLight font-normal border border-[#22c55e]'
+                                  : isActive
+                                    ? 'text-primaryText bg-[#E4EAF0] font-normal'
+                                    : 'text-secondaryText hover:text-primaryText hover:bg-[#E4EAF0] font-normal'
                               }`}
                             >
-                              <span className="truncate">{chat.title}</span>
-                              {renderChatActionControl(chat, isMenuOpen)}
+                              {renderChatTitle(chat)}
+                              {editingChatId !== chat.id && renderChatActionControl(chat, isMenuOpen)}
                             </div>
                           </div>
                         );
@@ -497,13 +655,17 @@ export default function Layout() {
                         return (
                           <div key={chat.id} className="relative">
                             <div 
-                              onClick={() => navigate(`/chat/${chat.id}`)}
+                              onClick={() => handleChatRowClick(chat.id)}
                               className={`mx-[10px] text-sm pl-[30px] pr-2 py-1.5 rounded-md cursor-pointer transition-colors flex items-center justify-between group ${
-                                isActive ? 'text-primaryText bg-[#E4EAF0] font-normal' : 'text-secondaryText hover:text-primaryText hover:bg-[#E4EAF0] font-normal'
+                                editingChatId === chat.id
+                                  ? 'text-primaryText bg-bgLight font-normal border border-[#22c55e]'
+                                  : isActive
+                                    ? 'text-primaryText bg-[#E4EAF0] font-normal'
+                                    : 'text-secondaryText hover:text-primaryText hover:bg-[#E4EAF0] font-normal'
                               }`}
                             >
-                              <span className="truncate">{chat.title}</span>
-                              {renderChatActionControl(chat, isMenuOpen)}
+                              {renderChatTitle(chat)}
+                              {editingChatId !== chat.id && renderChatActionControl(chat, isMenuOpen)}
                             </div>
                           </div>
                         );
@@ -517,26 +679,23 @@ export default function Layout() {
             {/* 按时间排序视图 */}
             {sortMode === 'time' && (
               <div className="flex flex-col gap-0.5">
-                {chats
-                  .filter((chat) => !chat.isPinned)
-                  .slice()
-                  .sort((a, b) => {
-                    // 按对话ID倒序排列（新的在前）
-                    return b.id.localeCompare(a.id);
-                  })
-                  .map(chat => {
+                {visibleTimeChats.map(chat => {
                   const isActive = location.pathname === `/chat/${chat.id}`;
                   const isMenuOpen = chatMenuOpenId === chat.id;
                   return (
                     <div key={chat.id} className="relative">
                       <div 
-                        onClick={() => navigate(`/chat/${chat.id}`)}
+                        onClick={() => handleChatRowClick(chat.id)}
                         className={`mx-[10px] text-sm pl-[10px] pr-2 py-1.5 rounded-md cursor-pointer transition-colors flex items-center justify-between group ${
-                          isActive ? 'text-primaryText bg-[#E4EAF0] font-normal' : 'text-secondaryText hover:text-primaryText hover:bg-[#E4EAF0] font-normal'
+                          editingChatId === chat.id
+                            ? 'text-primaryText bg-bgLight font-normal border border-[#22c55e]'
+                            : isActive
+                              ? 'text-primaryText bg-[#E4EAF0] font-normal'
+                              : 'text-secondaryText hover:text-primaryText hover:bg-[#E4EAF0] font-normal'
                         }`}
                       >
-                        <span className="truncate">{chat.title}</span>
-                        {renderChatActionControl(chat, isMenuOpen)}
+                        {renderChatTitle(chat)}
+                        {editingChatId !== chat.id && renderChatActionControl(chat, isMenuOpen)}
                       </div>
                     </div>
                   );

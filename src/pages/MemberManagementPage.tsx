@@ -1,8 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { Menu, Plus, X, HelpCircle, AlertCircle, ShieldCheck } from 'lucide-react';
-import { BaseButton } from '../components';
+import { Menu, Plus, HelpCircle, AlertCircle, ShieldCheck, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { Radio, Select } from 'antd';
+import { BaseActionMenu, BaseButton, BaseModal, BasePagination, BaseTable } from '../components';
+import type { BaseActionMenuItem, BaseTableColumn } from '../components';
 import { type LayoutOutletContext } from '../components/Layout';
+import { mockProjects } from '../mock/projects';
 
 type MemberRole = '管理员' | '成员';
 
@@ -172,8 +175,40 @@ const initialTeamMembers: TeamMember[] = [
   },
 ];
 
-const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const generateInviteCode = () => Array.from({ length: 6 }, () => Math.floor(Math.random() * 10)).join('');
+
+const parseProjectNames = (projectsText: string) => {
+  const cleaned = projectsText.replace(/等\d+个(?:项目)?$/, '').trim();
+  if (!cleaned || cleaned === '未归属项目') {
+    return [];
+  }
+
+  return cleaned
+    .split(/[、,，]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+};
+
+const formatProjectsPreview = (projectsText: string) => {
+  const trimmed = projectsText.trim();
+  if (!trimmed || trimmed === '未归属项目') {
+    return '未归属项目';
+  }
+
+  const parsedNames = parseProjectNames(trimmed);
+  if (parsedNames.length === 0) {
+    return '未归属项目';
+  }
+
+  const countMatch = trimmed.match(/等(\d+)个(?:项目)?$/);
+  const totalCount = countMatch ? Number(countMatch[1]) : parsedNames.length;
+
+  if (totalCount <= 1) {
+    return parsedNames[0];
+  }
+
+  return `${parsedNames[0]}等${totalCount}个项目`;
+};
 
 export default function MemberManagementPage() {
   const { isSidebarOpen, setIsSidebarOpen } = useOutletContext<LayoutOutletContext>();
@@ -189,20 +224,57 @@ export default function MemberManagementPage() {
   const [selectedMember, setSelectedSelectedMember] = useState<TeamMember | null>(null);
 
   // 表单状态
-  const [formName, setFormName] = useState('');
-  const [formEmail, setFormEmail] = useState('');
   const [formRole, setFormRole] = useState<MemberRole>('成员');
-  const [formProjects, setFormProjects] = useState('');
-  const [formDailyToken, setFormDailyToken] = useState('100w');
+  const [formProjects, setFormProjects] = useState<string[]>([]);
 
-  const [errorMsg, setErrorMsg] = useState('');
+  const [memberActionMenuId, setMemberActionMenuId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   const adminCount = members.filter((m) => m.role === '管理员').length;
+
+  const roleOptions = useMemo(
+    () => [
+      { label: '成员', value: '成员' },
+      { label: '管理员', value: '管理员' },
+    ],
+    [],
+  );
+
+  const projectOptions = useMemo(() => {
+    const names = new Set<string>();
+
+    mockProjects.forEach((project) => {
+      names.add(project.name);
+    });
+
+    members.forEach((member) => {
+      parseProjectNames(member.projects).forEach((name) => names.add(name));
+    });
+
+    return Array.from(names).map((name) => ({ label: name, value: name }));
+  }, [members]);
+
+  const memberActionMenuItems = useMemo<BaseActionMenuItem[]>(() => [
+    { key: 'edit', label: '编辑', icon: <Pencil size={14} /> },
+    { key: 'remove', label: '移除', icon: <Trash2 size={14} />, danger: true },
+  ], []);
+
+  const pagedMembers = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return members.slice(start, start + pageSize);
+  }, [members, currentPage, pageSize]);
+
+  useEffect(() => {
+    const totalPages = Math.max(1, Math.ceil(members.length / pageSize));
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [members.length, pageSize, currentPage]);
 
   const handleOpenInvite = () => {
     setInviteCode(generateInviteCode());
     setInviteCodeCopied(false);
-    setErrorMsg('');
     setShowInviteModal(true);
   };
 
@@ -234,12 +306,8 @@ export default function MemberManagementPage() {
 
   const handleOpenEdit = (member: TeamMember) => {
     setSelectedSelectedMember(member);
-    setFormName(member.name);
-    setFormEmail(member.email);
     setFormRole(member.role);
-    setFormProjects(member.projects);
-    setFormDailyToken(member.dailyToken);
-    setErrorMsg('');
+    setFormProjects(parseProjectNames(member.projects));
     setShowEditModal(true);
   };
 
@@ -248,41 +316,21 @@ export default function MemberManagementPage() {
     setShowDeleteConfirm(true);
   };
 
-  const handleEditSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleEditSubmit = () => {
     if (!selectedMember) return;
 
-    const trimmedName = formName.trim();
-    const trimmedEmail = formEmail.trim().toLowerCase();
-    const trimmedProjects = formProjects.trim() || '未归属项目';
-
-    if (!trimmedName) {
-      setErrorMsg('请输入成员姓名');
-      return;
-    }
-    if (!emailPattern.test(trimmedEmail)) {
-      setErrorMsg('请输入有效的邮箱地址');
-      return;
-    }
-
-    const emailExists = members.some(
-      (m) => m.id !== selectedMember.id && m.email.toLowerCase() === trimmedEmail,
-    );
-    if (emailExists) {
-      setErrorMsg('该邮箱已被占用，请使用其他邮箱');
-      return;
-    }
+    const normalizedProjects = formProjects
+      .map((item) => item.trim())
+      .filter(Boolean);
+    const projectsText = normalizedProjects.length > 0 ? normalizedProjects.join('、') : '未归属项目';
 
     setTeamMembers((prev) =>
       prev.map((m) =>
         m.id === selectedMember.id
           ? {
               ...m,
-              name: trimmedName,
-              email: trimmedEmail,
               role: formRole,
-              projects: trimmedProjects,
-              dailyToken: formDailyToken,
+              projects: projectsText,
             }
           : m,
       ),
@@ -295,6 +343,95 @@ export default function MemberManagementPage() {
     setTeamMembers((prev) => prev.filter((m) => m.id !== selectedMember.id));
     setShowDeleteConfirm(false);
   };
+
+  const memberTableColumns = useMemo<BaseTableColumn<TeamMember>[]>(
+    () => [
+      {
+        title: '姓名',
+        dataIndex: 'name',
+        width: '24%',
+        render: (_, member) => (
+          <div className="flex min-w-0 items-center pr-2">
+            <div className="mr-3 h-10 w-10 shrink-0 rounded-full border border-[#e2e8f0] bg-bgLight text-[11px] font-medium text-secondaryText flex items-center justify-center">
+              {member.name.slice(0, 2)}
+            </div>
+            <div className="min-w-0">
+              <p className="truncate font-medium text-primaryText">{member.name}</p>
+              <p className="mt-0.5 truncate text-[13px] text-secondaryText">{member.email}</p>
+            </div>
+          </div>
+        ),
+      },
+      {
+        title: (
+          <span className="flex items-center gap-1">
+            团队角色
+            <button
+              className="text-[#8a94a0] hover:text-[#8a94a0]"
+              title="管理员拥有全部权限；成员可协同开发与查看数据。"
+            >
+              <HelpCircle size={14} />
+            </button>
+          </span>
+        ),
+        dataIndex: 'role',
+        width: '14%',
+        render: (role) => <span className="text-primaryText">{role}</span>,
+      },
+      {
+        title: '加入时间',
+        dataIndex: 'joinDate',
+        width: '14%',
+        render: (joinDate) => <span className="text-secondaryText">{joinDate}</span>,
+      },
+      {
+        title: '归属项目',
+        dataIndex: 'projects',
+        width: '34%',
+        render: (projects) => {
+          const projectsText = String(projects);
+          const previewText = formatProjectsPreview(projectsText);
+
+          return (
+            <span className="block truncate text-secondaryText" title={projectsText}>
+              {previewText}
+            </span>
+          );
+        },
+      },
+      {
+        title: '操作',
+        dataIndex: 'id',
+        width: '8%',
+        align: 'left',
+        render: (_, member) => (
+          <BaseActionMenu
+            open={memberActionMenuId === member.id}
+            onOpenChange={(open) => setMemberActionMenuId(open ? member.id : null)}
+            placement="bottom-end"
+            width={132}
+            menuClassName="!min-w-[132px]"
+            trigger={(
+              <span className="inline-flex rounded-md p-1 text-secondaryText transition-colors hover:bg-bgLight hover:text-primaryText">
+                <MoreHorizontal size={16} />
+              </span>
+            )}
+            items={memberActionMenuItems}
+            onItemClick={(item, event) => {
+              event.stopPropagation();
+              setMemberActionMenuId(null);
+              if (item.key === 'edit') {
+                handleOpenEdit(member);
+                return;
+              }
+              handleOpenDelete(member);
+            }}
+          />
+        ),
+      },
+    ],
+    [memberActionMenuId, memberActionMenuItems],
+  );
 
   return (
     <div className="flex h-full w-full flex-col bg-white">
@@ -340,95 +477,37 @@ export default function MemberManagementPage() {
           </div>
 
           {/* 管理员安全警示 Banner */}
-          {adminCount < 2 ? (
+          {adminCount < 2 && (
             <div className="!mt-3 bg-[#fff8f6] border border-[#ffe4e0] text-[#ff4d4f] px-4 py-3.5 rounded-xl text-sm flex items-center gap-2.5 shadow-sm animate-in fade-in slide-in-from-top-1 duration-200">
               <AlertCircle size={16} className="text-[#ff4d4f] shrink-0" />
               <span className="font-normal">
                 当前管理员1名，建议至少保留2名管理员，避免团队配置和成员管理只有单点负责人
               </span>
             </div>
-          ) : (
-            <div className="!mt-3 bg-[#f0fdf4] border border-[#bbf7d0] text-[#166534] px-4 py-3.5 rounded-xl text-sm flex items-center gap-2.5 shadow-sm animate-in fade-in slide-in-from-top-1 duration-200">
-              <ShieldCheck size={16} className="text-[#16a34a] shrink-0" />
-              <span className="font-normal">
-                团队已配置多名管理员，保障了管理控制权的安全与高可用性
-              </span>
-            </div>
           )}
 
           {/* 表格区域 */}
           <section className="space-y-3">
-            <div className="task-table-scroll overflow-x-auto border-b border-[borderGray] bg-white">
-              <div className="min-w-[940px]">
-                {/* 表格标题行 */}
-                <div className="grid grid-cols-[1.5fr_1fr_1fr_2.5fr_0.75fr_0.75fr] border-b border-[#edf1f5] pl-0 pr-3 py-2 text-[13px] text-[#8a94a0]">
-                  <span>姓名</span>
-                  <span className="flex items-center gap-1">
-                    团队角色
-                    <button
-                      className="text-[#8a94a0] hover:text-[#8a94a0]"
-                      title="管理员拥有全部权限；成员可协同开发与查看数据。"
-                    >
-                      <HelpCircle size={14} />
-                    </button>
-                  </span>
-                  <span>加入时间</span>
-                  <span>归属项目</span>
-                  <span className="whitespace-nowrap">token限额</span>
-                  <span className="text-left">操作</span>
-                </div>
-
-                {/* 成员列表数据行 */}
-                {members.map((member) => (
-                  <div
-                    key={member.id}
-                    className="grid grid-cols-[1.5fr_1fr_1fr_2.5fr_0.75fr_0.75fr] items-center gap-2 border-b border-[#f1f4f7] pl-0 pr-3 py-2.5 text-[13px] last:border-b-0"
-                  >
-                    {/* 头像与姓名邮箱 */}
-                    <div className="flex items-center min-w-0 pr-2">
-                      <div className="w-10 h-10 rounded-full bg-bgLight flex items-center justify-center text-secondaryText font-medium text-[11px] border border-[#e2e8f0] mr-3 shrink-0">
-                        {member.name.slice(0, 2)}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="font-medium text-primaryText truncate">{member.name}</p>
-                        <p className="text-[13px] text-secondaryText truncate mt-0.5">{member.email}</p>
-                      </div>
-                    </div>
-
-                    {/* 团队角色 */}
-                    <span className="text-primaryText">{member.role}</span>
-
-                    {/* 加入时间 */}
-                    <span className="text-secondaryText">{member.joinDate}</span>
-
-                    {/* 归属项目 */}
-                    <span className="text-secondaryText truncate pr-4" title={member.projects}>
-                      {member.projects}
-                    </span>
-
-                    {/* token消耗/日 */}
-                    <span className="text-secondaryText whitespace-nowrap">{member.dailyToken}</span>
-
-                    {/* 操作 */}
-                    <div className="flex justify-start items-center gap-2 text-left whitespace-nowrap">
-                      <button
-                        type="button"
-                        onClick={() => handleOpenEdit(member)}
-                        className="text-primaryText hover:text-black transition-colors"
-                      >
-                        编辑
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleOpenDelete(member)}
-                        className="text-red-500 hover:text-red-700 transition-colors"
-                      >
-                        移除
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+            <div className="bg-white">
+              <BaseTable
+                className="task-table-scroll w-full [&_table]:min-w-[940px] [&_thead_th]:py-2 [&_thead_th]:text-[13px] [&_thead_th]:text-[#8a94a0] [&_tbody_td]:py-2.5 [&_tbody_td]:text-[13px]"
+                columns={memberTableColumns}
+                dataSource={pagedMembers}
+                rowKey="id"
+                striped={false}
+              />
+              <BasePagination
+                current={currentPage}
+                total={members.length}
+                pageSize={pageSize}
+                onChange={setCurrentPage}
+                showSizeChanger
+                pageSizeOptions={[5, 10, 20]}
+                onShowSizeChange={(_, nextPageSize) => {
+                  setPageSize(nextPageSize);
+                  setCurrentPage(1);
+                }}
+              />
             </div>
           </section>
 
@@ -441,212 +520,124 @@ export default function MemberManagementPage() {
       </div>
 
       {/* 邀请新成员弹窗 */}
-      {showInviteModal && (
-        <>
-          <div className="fixed inset-0 z-40 bg-black/20" onClick={() => setShowInviteModal(false)} />
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div
-              className="w-[340px] max-w-[calc(100vw-32px)] rounded-lg bg-white shadow-popover overflow-hidden animate-in fade-in zoom-in-95 duration-200"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between border-b border-[borderGray] px-6 py-3.5">
-                <h3 className="text-[17px] font-semibold text-primaryText">邀请新成员</h3>
-                <button
-                  type="button"
-                  onClick={() => setShowInviteModal(false)}
-                  className="rounded-full p-2 text-secondaryText transition-colors hover:bg-bgLight hover:text-primaryText"
-                >
-                  <X size={18} />
-                </button>
+      <BaseModal
+        visible={showInviteModal}
+        title="邀请新成员"
+        width={360}
+        maskClosable
+        onCancel={() => setShowInviteModal(false)}
+        footer={null}
+        bodyClassName="!px-6 !py-5"
+      >
+        <div>
+          <h4 className="text-[17px] font-semibold text-primaryText">邀请码</h4>
+
+          <div className="mt-4 grid grid-cols-6 gap-2">
+            {inviteCode.split('').map((digit, index) => (
+              <div
+                key={`${digit}-${index}`}
+                className="flex h-[44px] items-center justify-center rounded-lg bg-[#f5f6f8] text-[24px] font-medium text-primaryText"
+              >
+                {digit}
               </div>
-
-              <div className="px-6 py-5">
-                <h4 className="text-[17px] font-semibold text-primaryText">邀请码</h4>
-
-                <div className="mt-4 grid grid-cols-6 gap-2">
-                  {inviteCode.split('').map((digit, index) => (
-                    <div
-                      key={`${digit}-${index}`}
-                      className="h-[44px] rounded-lg bg-[#f5f6f8] flex items-center justify-center text-[24px] font-medium text-primaryText"
-                    >
-                      {digit}
-                    </div>
-                  ))}
-                </div>
-
-                <p className="mt-4 text-sm leading-6 text-[#98A2B3]">
-                  请将6位数字邀请码分享给新成员，新成员通过邀请码加入后默认为成员，管理员可在成员列表中调整权限
-                </p>
-
-                <button
-                  type="button"
-                  onClick={handleCopyInviteCode}
-                  className="mt-5 h-11 w-full rounded-lg bg-[#006D65] text-base font-semibold text-white transition-opacity hover:opacity-90"
-                >
-                  {inviteCodeCopied ? '已复制邀请码' : '复制邀请码'}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleRegenerateInviteCode}
-                  className="mt-3 w-full text-center text-base font-semibold text-[#006D65] hover:opacity-80"
-                >
-                  重新生成邀请码
-                </button>
-              </div>
-            </div>
+            ))}
           </div>
-        </>
-      )}
+
+          <p className="mt-4 text-sm leading-6 text-[#98A2B3]">
+            请将6位数字邀请码分享给新成员，新成员通过邀请码加入后默认为成员，管理员可在成员列表中调整权限
+          </p>
+
+          <BaseButton
+            type="primary"
+            size="large"
+            rounded="large"
+            fullWidth
+            className="mt-5"
+            onClick={handleCopyInviteCode}
+          >
+            {inviteCodeCopied ? '已复制邀请码' : '复制邀请码'}
+          </BaseButton>
+
+          <button
+            type="button"
+            onClick={handleRegenerateInviteCode}
+            className="mt-3 block w-full bg-transparent text-center text-sm font-semibold text-[var(--color-primary)] transition-opacity hover:opacity-80"
+          >
+            重新生成邀请码
+          </button>
+        </div>
+      </BaseModal>
 
       {/* 编辑成员弹窗 */}
-      {showEditModal && selectedMember && (
-        <>
-          <div className="fixed inset-0 z-40 bg-black/20" onClick={() => setShowEditModal(false)} />
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div
-              className="w-full max-w-[560px] rounded-2xl bg-white shadow-popover overflow-hidden animate-in fade-in zoom-in-95 duration-200"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between border-b border-[borderGray] px-6 py-4">
-                <h3 className="text-base font-semibold text-primaryText">编辑成员信息</h3>
-                <button
-                  type="button"
-                  onClick={() => setShowEditModal(false)}
-                  className="rounded-full p-1.5 text-secondaryText transition-colors hover:bg-bgLight hover:text-primaryText"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-
-              <form onSubmit={handleEditSubmit}>
-                <div className="space-y-4 px-6 py-5">
-                  <div>
-                    <label className="block text-sm font-medium text-primaryText mb-1.5">成员姓名</label>
-                    <input
-                      type="text"
-                      value={formName}
-                      onChange={(e) => setFormName(e.target.value)}
-                      placeholder="请输入成员姓名"
-                      className="w-full rounded-xl border border-[borderGray] px-3.5 py-2.5 text-sm text-primaryText outline-none transition-colors focus:border-black"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-primaryText mb-1.5">成员邮箱</label>
-                    <input
-                      type="email"
-                      value={formEmail}
-                      onChange={(e) => setFormEmail(e.target.value)}
-                      placeholder="name@company.com"
-                      className="w-full rounded-xl border border-[borderGray] px-3.5 py-2.5 text-sm text-primaryText outline-none transition-colors focus:border-black"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-primaryText mb-1.5">团队角色</label>
-                      <select
-                        value={formRole}
-                        onChange={(e) => setFormRole(e.target.value as MemberRole)}
-                        className="w-full rounded-xl border border-[borderGray] bg-white px-3.5 py-2.5 text-sm text-primaryText outline-none focus:border-black"
-                      >
-                        <option value="成员">成员</option>
-                        <option value="管理员">管理员</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-primaryText mb-1.5">每日 token 消耗限额</label>
-                      <select
-                        value={formDailyToken}
-                        onChange={(e) => setFormDailyToken(e.target.value)}
-                        className="w-full rounded-xl border border-[borderGray] bg-white px-3.5 py-2.5 text-sm text-primaryText outline-none focus:border-black"
-                      >
-                        <option value="30w">30w</option>
-                        <option value="50w">50w</option>
-                        <option value="80w">80w</option>
-                        <option value="100w">100w</option>
-                        <option value="120w">120w</option>
-                        <option value="150w">150w</option>
-                        <option value="200w">200w</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-primaryText mb-1.5">归属项目</label>
-                    <input
-                      type="text"
-                      value={formProjects}
-                      onChange={(e) => setFormProjects(e.target.value)}
-                      placeholder="例：CRISPR实验优化"
-                      className="w-full rounded-xl border border-[borderGray] px-3.5 py-2.5 text-sm text-primaryText outline-none transition-colors focus:border-black"
-                    />
-                  </div>
-
-                  {errorMsg && (
-                    <p className="text-xs text-red-500 font-medium">{errorMsg}</p>
-                  )}
+      <BaseModal
+        visible={showEditModal && !!selectedMember}
+        title="编辑成员信息"
+        width={560}
+        maskClosable={false}
+        cancelText="取消"
+        okText="保存修改"
+        onCancel={() => setShowEditModal(false)}
+        onConfirm={handleEditSubmit}
+        className="tools-task-modal"
+        bodyClassName="!px-6 !py-5"
+      >
+        {selectedMember && (
+          <div className="space-y-4">
+            <div>
+              <div className="mb-2 text-sm font-medium text-primaryText">团队角色</div>
+              <Radio.Group
+                value={formRole}
+                onChange={(event) => setFormRole(event.target.value as MemberRole)}
+                className="task-radio-group"
+              >
+                <div className="flex flex-wrap items-center gap-8">
+                  {roleOptions.map((option) => (
+                    <Radio key={option.value} value={option.value}>
+                      {option.label}
+                    </Radio>
+                  ))}
                 </div>
+              </Radio.Group>
+            </div>
 
-                <div className="flex items-center justify-end gap-3 border-t border-[borderGray] px-6 py-4">
-                  <button
-                    type="button"
-                    onClick={() => setShowEditModal(false)}
-                    className="rounded-full border border-[#d8e0ea] px-4 py-2 text-sm text-secondaryText transition-colors hover:bg-bgLight"
-                  >
-                    取消
-                  </button>
-                  <button
-                    type="submit"
-                    className="rounded-full bg-[#1f1f1f] px-5 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
-                  >
-                    保存修改
-                  </button>
-                </div>
-              </form>
+            <div>
+              <div className="mb-1.5 text-sm font-medium text-primaryText">归属项目</div>
+              <Select
+                mode="multiple"
+                value={formProjects}
+                options={projectOptions}
+                onChange={(values) => setFormProjects(values as string[])}
+                optionFilterProp="label"
+                allowClear
+                placeholder="请选择归属项目"
+                className="member-project-select w-full"
+                popupClassName="member-project-select-dropdown"
+              />
             </div>
           </div>
-        </>
-      )}
+        )}
+      </BaseModal>
 
       {/* 移除成员确认弹窗 */}
-      {showDeleteConfirm && selectedMember && (
-        <>
-          <div className="fixed inset-0 z-40 bg-black/20" onClick={() => setShowDeleteConfirm(false)} />
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div
-              className="w-full max-w-[400px] rounded-2xl bg-white shadow-popover overflow-hidden animate-in fade-in zoom-in-95 duration-200"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="px-6 pt-6 pb-4">
-                <h3 className="text-base font-semibold text-primaryText">确定要移除该成员吗？</h3>
-                <p className="text-sm text-secondaryText mt-2">
-                  您正在将成员 <span className="font-semibold text-primaryText">{selectedMember.name} ({selectedMember.email})</span> 移出该科研团队，此操作执行后无法撤销。
-                </p>
-              </div>
-
-              <div className="flex items-center justify-end gap-3 bg-[#f9fafb] px-6 py-3.5 border-t border-[borderGray]">
-                <button
-                  type="button"
-                  onClick={() => setShowDeleteConfirm(false)}
-                  className="rounded-full border border-[#d8e0ea] bg-white px-4 py-1.5 text-sm text-secondaryText transition-colors hover:bg-bgLight"
-                >
-                  取消
-                </button>
-                <button
-                  type="button"
-                  onClick={handleDeleteConfirm}
-                  className="rounded-full bg-red-600 px-4 py-1.5 text-sm font-medium text-white transition-opacity hover:bg-red-700"
-                >
-                  确认移除
-                </button>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
+      <BaseModal
+        visible={showDeleteConfirm && !!selectedMember}
+        title="确定要移除该成员吗？"
+        width={420}
+        maskClosable={false}
+        cancelText="取消"
+        okText="确认移除"
+        onCancel={() => setShowDeleteConfirm(false)}
+        onConfirm={handleDeleteConfirm}
+        okButtonProps={{
+          className: '!bg-[#F04438] !border-[#F04438] hover:!bg-[#D92D20] hover:!border-[#D92D20]',
+        }}
+      >
+        {selectedMember && (
+          <p className="text-sm text-secondaryText">
+            您正在将成员 <span className="font-semibold text-primaryText">{selectedMember.name} ({selectedMember.email})</span> 移出该科研团队，此操作执行后无法撤销。
+          </p>
+        )}
+      </BaseModal>
     </div>
   );
 }

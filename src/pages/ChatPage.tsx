@@ -16,7 +16,7 @@ import ThinkingIndicator, { type StatusPhase, type SearchStep } from '../compone
 import { ChatStreamError, streamChatResponse } from '../mock/mockApi';
 import { mockProjects } from '../mock/projects';
 import { type MockChat } from '../mock/chats';
-import { BaseActionMenu } from '../components';
+import { BaseActionMenu, BaseButton, BaseInput } from '../components';
 import type { BaseActionMenuItem, BaseActionMenuProps } from '../components';
 import { type LayoutOutletContext } from '../components/Layout';
 
@@ -76,6 +76,8 @@ interface Project {
   count: number;
   knowledge: number;
   members: number;
+  visibility?: 'private' | 'public';
+  privateType?: 'team' | 'personal';
 }
 
 type KnowledgeCategory = '方法' | '经验' | '文献';
@@ -266,7 +268,10 @@ const [activeSkillIndex, setActiveSkillIndex] = useState(-1);
 const [showFileMenu, setShowFileMenu] = useState(false);
 const [fileQuery, setFileQuery] = useState('');
 const [activeFileIndex, setActiveFileIndex] = useState(-1);
+const [projects, setProjects] = useState<Project[]>(() => mockProjects.map((project) => ({ ...project })));
 const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+const [showCreateProjectPopover, setShowCreateProjectPopover] = useState(false);
+const [newProjectName, setNewProjectName] = useState('');
 
   const [showProjectDropdown, setShowProjectDropdown] = useState(false);
   const [isKnowledgeExpanded, setIsKnowledgeExpanded] = useState(true);
@@ -280,6 +285,8 @@ const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const shouldStickToBottomRef = useRef(true);
   const hasInitializedChatChangeRef = useRef(false);
   const newChatTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const projectSelectorRef = useRef<HTMLDivElement | null>(null);
+  const createProjectPopoverRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     // 首次进入历史对话时状态已是默认值，跳过一次重置可避免额外重渲染抖动。
@@ -536,6 +543,8 @@ const [selectedProject, setSelectedProject] = useState<Project | null>(null);
     setActiveFileIndex(-1);
     setIsTyping(false);
     setShowProjectDropdown(false);
+    setShowCreateProjectPopover(false);
+    setNewProjectName('');
     shouldStickToBottomRef.current = true;
 
     const projectIdFromQuery = new URLSearchParams(location.search).get('projectId');
@@ -544,15 +553,15 @@ const [selectedProject, setSelectedProject] = useState<Project | null>(null);
       return;
     }
 
-    const matchedProject = mockProjects.find((project) => project.id === projectIdFromQuery);
+    const matchedProject = projects.find((project) => project.id === projectIdFromQuery);
     setSelectedProject(matchedProject ?? null);
-  }, [isNewChat, location.search]);
+  }, [isNewChat, location.search, projects]);
 
   const currentProject = useMemo<Project | null>(() => {
     if (isNewChat) return selectedProject;
     if (!currentChat?.projectId) return null;
-    return mockProjects.find((project) => project.id === currentChat.projectId) ?? null;
-  }, [currentChat?.projectId, isNewChat, selectedProject]);
+    return projects.find((project) => project.id === currentChat.projectId) ?? null;
+  }, [currentChat?.projectId, isNewChat, projects, selectedProject]);
 
   const projectMenuItems = useMemo<BaseActionMenuItem[]>(() => {
     const unselectedItem: BaseActionMenuItem = {
@@ -561,14 +570,14 @@ const [selectedProject, setSelectedProject] = useState<Project | null>(null);
       active: !selectedProject,
     };
 
-    const selectableItems = mockProjects.map<BaseActionMenuItem>((project) => ({
+    const selectableItems = projects.map<BaseActionMenuItem>((project) => ({
       key: project.id,
       label: <span className="truncate">{project.name}</span>,
       active: selectedProject?.id === project.id,
     }));
 
     return [unselectedItem, ...selectableItems];
-  }, [selectedProject]);
+  }, [projects, selectedProject]);
 
   const projectMenuFooterItems = useMemo<BaseActionMenuItem[]>(() => [
     {
@@ -580,20 +589,95 @@ const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
   const handleProjectMenuItemClick: BaseActionMenuProps['onItemClick'] = (item) => {
     if (item.key === 'create') {
-      setShowProjectDropdown(false);
+      setShowCreateProjectPopover(true);
+      setNewProjectName('');
       return;
     }
 
     if (item.key === 'none') {
       setSelectedProject(null);
       setShowProjectDropdown(false);
+      if (isNewChat) {
+        navigate('/chat/new', { replace: true });
+      }
       return;
     }
 
-    const matchedProject = mockProjects.find((project) => project.id === item.key) ?? null;
+    const matchedProject = projects.find((project) => project.id === item.key) ?? null;
     setSelectedProject(matchedProject);
     setShowProjectDropdown(false);
+    if (isNewChat && matchedProject) {
+      navigate(`/chat/new?projectId=${matchedProject.id}`, { replace: true });
+    }
   };
+
+  const handleCancelCreateProject = () => {
+    setShowCreateProjectPopover(false);
+    setNewProjectName('');
+  };
+
+  const handleConfirmCreateProject = () => {
+    const trimmedName = newProjectName.trim();
+    if (!trimmedName) return;
+
+    const duplicateProject = projects.find(
+      (project) => project.name.trim().toLowerCase() === trimmedName.toLowerCase(),
+    );
+    if (duplicateProject) {
+      setSelectedProject(duplicateProject);
+      setShowCreateProjectPopover(false);
+      setNewProjectName('');
+      navigate(`/chat/new?projectId=${duplicateProject.id}`, { replace: true });
+      return;
+    }
+
+    const nextProject: Project = {
+      id: `p-${Date.now()}`,
+      name: trimmedName,
+      desc: '新建项目',
+      count: 0,
+      knowledge: 0,
+      members: 1,
+      visibility: 'private',
+      privateType: 'personal',
+    };
+
+    // 同步到全局 mock 列表，确保“目录-项目-项目列表”可见
+    mockProjects.unshift({
+      id: nextProject.id,
+      name: nextProject.name,
+      desc: nextProject.desc,
+      count: nextProject.count,
+      knowledge: nextProject.knowledge,
+      members: nextProject.members,
+      visibility: 'private',
+      privateType: 'personal',
+    });
+
+    setProjects((prev) => [nextProject, ...prev]);
+    setSelectedProject(nextProject);
+    setShowCreateProjectPopover(false);
+    setNewProjectName('');
+    navigate(`/chat/new?projectId=${nextProject.id}`, { replace: true });
+  };
+
+  useEffect(() => {
+    if (!showCreateProjectPopover) return;
+
+    const handleDocumentMouseDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (createProjectPopoverRef.current?.contains(target)) return;
+      if (projectSelectorRef.current?.contains(target)) return;
+      setShowCreateProjectPopover(false);
+      setNewProjectName('');
+      setShowProjectDropdown(false);
+    };
+
+    document.addEventListener('mousedown', handleDocumentMouseDown);
+    return () => {
+      document.removeEventListener('mousedown', handleDocumentMouseDown);
+    };
+  }, [showCreateProjectPopover]);
 
   const attachmentContent = useMemo<ProjectAttachmentContent>(() => {
     if (!currentProject) return attachmentContentFallback;
@@ -1295,29 +1379,72 @@ const [selectedProject, setSelectedProject] = useState<Project | null>(null);
                   </div>
                 )}
 
-                <div className="flex justify-between items-center p-3 pt-0">
-                  <div className="flex items-center gap-2 pl-1 relative">
-                    <BaseActionMenu
-                      open={showProjectDropdown}
-                      onOpenChange={setShowProjectDropdown}
-                      placement="top-start"
-                      width={260}
-                      trigger={
-                        <span className="flex items-center gap-1.5 rounded-full border border-borderGray bg-white px-4 py-1.5 text-[14px] text-tertiaryText transition-colors hover:bg-bgLight">
-                          <span className="truncate max-w-[120px]">
-                            {selectedProject ? selectedProject.name : '工作项目'}
-                          </span>
-                          <ChevronDown size={14} />
-                        </span>
-                      }
-                      items={projectMenuItems}
-                      footerItems={projectMenuFooterItems}
-                      onItemClick={handleProjectMenuItemClick}
-                      className="!inline-flex"
-                      listClassName="max-h-[220px] overflow-y-auto"
-                    />
+            <div className="flex justify-between items-center p-3 pt-0">
+              <div ref={projectSelectorRef} className="flex items-center gap-2 pl-1 relative">
+                <BaseActionMenu
+                  open={showProjectDropdown}
+                  onOpenChange={(open) => {
+                    if (!open && showCreateProjectPopover) {
+                      return;
+                    }
+                    setShowProjectDropdown(open);
+                    if (!open) {
+                      setShowCreateProjectPopover(false);
+                      return;
+                    }
+                    setShowCreateProjectPopover(false);
+                  }}
+                  placement="top-start"
+                  width={260}
+                  trigger={
+                    <span className="flex items-center gap-1.5 rounded-full border border-borderGray bg-white px-4 py-1.5 text-[14px] text-tertiaryText transition-colors hover:bg-bgLight">
+                      <span className="truncate max-w-[120px]">
+                        {selectedProject ? selectedProject.name : '工作项目'}
+                      </span>
+                      <ChevronDown size={14} />
+                    </span>
+                  }
+                  items={projectMenuItems}
+                  footerItems={projectMenuFooterItems}
+                  onItemClick={handleProjectMenuItemClick}
+                  className="!inline-flex"
+                  listClassName="max-h-[220px] overflow-y-auto"
+                />
 
-                    <div className="relative group">
+                {showCreateProjectPopover && (
+                  <div
+                    ref={createProjectPopoverRef}
+                    className="absolute left-[272px] bottom-[calc(100%+8px)] z-[1301] w-[300px] rounded-xl border border-[#e6ecf2] bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.12)]"
+                  >
+                    <div className="space-y-3">
+                      <div>
+                        <div className="mb-1.5 text-sm font-semibold text-primaryText">新建项目</div>
+                        <BaseInput
+                          value={newProjectName}
+                          onChange={(event) => setNewProjectName(event.target.value)}
+                          placeholder="请输入项目名称"
+                          size="medium"
+                          containerClassName="!px-3"
+                        />
+                      </div>
+                      <div className="flex items-center justify-end gap-2">
+                        <BaseButton type="secondary" size="small" onClick={handleCancelCreateProject}>
+                          取消
+                        </BaseButton>
+                        <BaseButton
+                          type="primary"
+                          size="small"
+                          onClick={handleConfirmCreateProject}
+                          disabled={!newProjectName.trim()}
+                        >
+                          确认
+                        </BaseButton>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="relative group">
                       <button className="w-8 h-8 rounded-full border border-borderGray flex items-center justify-center text-tertiaryText hover:bg-bgLight transition-colors bg-white">
                         <Plus size={16} />
                       </button>

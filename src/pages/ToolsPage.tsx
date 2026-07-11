@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Cascader, DatePicker, Radio, TimePicker } from 'antd';
 import dayjs from 'dayjs';
 import { useNavigate, useOutletContext } from 'react-router-dom';
-import { Menu, Plus, MoreHorizontal, Pencil, Copy, Trash2, ChevronLeft, ChevronDown, Folder } from 'lucide-react';
+import { Menu, Plus, MoreHorizontal, Pencil, Trash2, ChevronLeft, ChevronDown, Folder } from 'lucide-react';
 import { mockProjects } from '../mock/projects';
 import { BaseActionMenu, BaseButton, BaseInput, BaseModal, BaseTable, BaseToggle } from '../components';
 import type { BaseActionMenuItem, BaseTableColumn, BaseActionMenuProps } from '../components';
@@ -18,6 +18,8 @@ interface TaskTemplate {
   trigger: string;
 }
 
+type TaskType = 'schedule' | 'literature';
+
 interface UserTask {
   id: string;
   name: string;
@@ -25,6 +27,10 @@ interface UserTask {
   nextRun: string;
   trigger: string;
   isEnabled: boolean;
+  taskType?: TaskType;
+  templateId?: ModalTemplateId;
+  scheduleConfig?: WeeklyScheduleForm;
+  literatureConfig?: LiteratureTrackForm;
 }
 
 type FetchFrequency = 'daily' | 'weekly' | 'hourly';
@@ -90,6 +96,7 @@ const initialUserTasks: UserTask[] = [
     nextRun: '--',
     trigger: 'Daily at 23:49',
     isEnabled: true,
+    taskType: 'schedule',
   },
   {
     id: 'task-2',
@@ -98,6 +105,7 @@ const initialUserTasks: UserTask[] = [
     nextRun: '6.28 08:47',
     trigger: 'Daily at 08:47',
     isEnabled: true,
+    taskType: 'schedule',
   },
   {
     id: 'task-3',
@@ -106,6 +114,7 @@ const initialUserTasks: UserTask[] = [
     nextRun: '--',
     trigger: 'Daily at 09:02',
     isEnabled: false,
+    taskType: 'schedule',
   },
   {
     id: 'task-4',
@@ -114,6 +123,26 @@ const initialUserTasks: UserTask[] = [
     nextRun: '6.28 15:45',
     trigger: 'Daily at 15:45',
     isEnabled: true,
+    taskType: 'schedule',
+  },
+  {
+    id: 'task-5',
+    name: '肿瘤免疫文献订阅',
+    prompt: '主题：肿瘤免疫文献订阅；关键词：PD-1, CTLA-4, CAR-T；来源：PubMed；任务周期：2026-07-01 ~ 2026-09-30；PubMed 匹配：全部关键词',
+    nextRun: '7.11 09:00',
+    trigger: 'Daily at 09:00',
+    isEnabled: true,
+    taskType: 'literature',
+    templateId: 'template-paper-track',
+    literatureConfig: {
+      topic: '肿瘤免疫文献订阅',
+      periodStart: '2026-07-01',
+      periodEnd: '2026-09-30',
+      frequency: 'daily',
+      sourceType: 'pubmed',
+      keywords: 'PD-1, CTLA-4, CAR-T',
+      pubmedMatchMode: 'all',
+    },
   },
 ];
 
@@ -202,6 +231,21 @@ const repeatWeekdayLabelMap = repeatWeekdayOptions.reduce<Record<string, string>
   return acc;
 }, {});
 
+const repeatWeekdayValueMap = Object.entries(repeatWeekdayLabelMap).reduce<Record<string, string>>((acc, [value, label]) => {
+  acc[label] = value;
+  return acc;
+}, {});
+
+const englishWeekdayValueMap: Record<string, string> = {
+  mon: 'mon',
+  tue: 'tue',
+  wed: 'wed',
+  thu: 'thu',
+  fri: 'fri',
+  sat: 'sat',
+  sun: 'sun',
+};
+
 const getRepeatLabel = (repeatMode: RepeatMode, repeatSubValue: string) => {
   if (repeatMode === 'weekly') {
     return `每周${repeatWeekdayLabelMap[repeatSubValue] ?? '周一'}`;
@@ -232,6 +276,131 @@ const pubmedMatchOptions: Array<{ value: PubMedMatchMode; label: string }> = [
   { value: 'advanced', label: '高级表达式' },
 ];
 
+const pubmedMatchLabelValueMap: Record<string, PubMedMatchMode> = {
+  全部关键词: 'all',
+  任一关键词: 'any',
+  高级表达式: 'advanced',
+};
+
+const parseScheduleFormFromTask = (task: UserTask): WeeklyScheduleForm => {
+  if (task.scheduleConfig) {
+    return {
+      ...initialWeeklyScheduleForm,
+      ...task.scheduleConfig,
+      taskPrompt: task.scheduleConfig.taskPrompt || task.prompt,
+    };
+  }
+
+  const timeMatch = task.trigger.match(/(\d{1,2}:\d{2})/);
+  const rangeMatch = task.trigger.match(/(\d{4}-\d{2}-\d{2})~(\d{4}-\d{2}-\d{2})/);
+  const weeklyCnMatch = task.trigger.match(/每周(周[一二三四五六日])/);
+  const weeklyEnMatch = task.trigger.match(/^Weekly\s+(Mon|Tue|Wed|Thu|Fri|Sat|Sun)/i);
+  const monthlyMatch = task.trigger.match(/每月(\d{1,2})号/);
+
+  let repeatMode: RepeatMode = initialWeeklyScheduleForm.repeatMode;
+  let repeatSubValue = initialWeeklyScheduleForm.repeatSubValue;
+
+  if (task.trigger.startsWith('每周') || /^Weekly/i.test(task.trigger)) {
+    repeatMode = 'weekly';
+    repeatSubValue = weeklyCnMatch
+      ? repeatWeekdayValueMap[weeklyCnMatch[1]] ?? 'mon'
+      : weeklyEnMatch
+        ? englishWeekdayValueMap[weeklyEnMatch[1].toLowerCase()] ?? 'mon'
+        : 'mon';
+  } else if (task.trigger.startsWith('每月')) {
+    repeatMode = 'monthly';
+    repeatSubValue = monthlyMatch?.[1] ?? '1';
+  } else if (task.trigger.startsWith('每小时') || /^Hourly/i.test(task.trigger)) {
+    repeatMode = 'hourly';
+    repeatSubValue = '';
+  } else if (task.trigger.startsWith('不重复') || /^Daily/i.test(task.trigger)) {
+    repeatMode = 'none';
+    repeatSubValue = '';
+  }
+
+  const normalizedRunAt = timeMatch
+    ? `${timeMatch[1].split(':')[0].padStart(2, '0')}:${timeMatch[1].split(':')[1]}`
+    : initialWeeklyScheduleForm.runAt;
+
+  return {
+    ...initialWeeklyScheduleForm,
+    repeatMode,
+    repeatSubValue,
+    startDate: rangeMatch?.[1] ?? initialWeeklyScheduleForm.startDate,
+    endDate: rangeMatch?.[2] ?? initialWeeklyScheduleForm.endDate,
+    runAt: normalizedRunAt,
+    taskPrompt: task.prompt,
+    projectId: null,
+  };
+};
+
+const parseLiteratureFormFromTask = (task: UserTask): LiteratureTrackForm => {
+  if (task.literatureConfig) {
+    return {
+      ...initialLiteratureTrackForm,
+      ...task.literatureConfig,
+      topic: task.literatureConfig.topic || task.name,
+    };
+  }
+
+  const topicMatch = task.prompt.match(/主题：([^；;]+)/);
+  const keywordsMatch = task.prompt.match(/关键词：([^；;]+)/);
+  const sourceMatch = task.prompt.match(/来源：([^；;]+)/);
+  const periodMatch = task.prompt.match(/任务周期：\s*(\d{4}-\d{2}-\d{2})\s*~\s*(\d{4}-\d{2}-\d{2})/);
+  const matchModeMatch = task.prompt.match(/PubMed 匹配：([^；;]+)/);
+
+  let frequency: FetchFrequency = initialLiteratureTrackForm.frequency;
+  if (/^Weekly/i.test(task.trigger)) {
+    frequency = 'weekly';
+  } else if (/^Hourly/i.test(task.trigger) || task.trigger.startsWith('每小时')) {
+    frequency = 'hourly';
+  } else if (/^Daily/i.test(task.trigger)) {
+    frequency = 'daily';
+  }
+
+  const sourceLabel = sourceMatch?.[1]?.trim() ?? '';
+  const sourceType: SourceType = sourceLabel.toLowerCase().includes('biorxiv') ? 'biorxiv' : 'pubmed';
+  const matchModeLabel = matchModeMatch?.[1]?.trim() ?? '';
+
+  return {
+    ...initialLiteratureTrackForm,
+    topic: topicMatch?.[1]?.trim() || task.name,
+    keywords: keywordsMatch?.[1]?.trim() || initialLiteratureTrackForm.keywords,
+    sourceType,
+    periodStart: periodMatch?.[1] ?? initialLiteratureTrackForm.periodStart,
+    periodEnd: periodMatch?.[2] ?? initialLiteratureTrackForm.periodEnd,
+    pubmedMatchMode: pubmedMatchLabelValueMap[matchModeLabel] ?? initialLiteratureTrackForm.pubmedMatchMode,
+    frequency,
+  };
+};
+
+const isLiteratureTask = (task: UserTask) => {
+  if (task.taskType === 'literature' || task.templateId === 'template-paper-track') {
+    return true;
+  }
+
+  return task.prompt.includes('关键词：') && task.prompt.includes('来源：') && task.prompt.includes('PubMed 匹配：');
+};
+
+const TASK_PROMPT_LINE_CHAR_LIMIT = 30;
+const TASK_PROMPT_MAX_LINES = 3;
+
+const buildTaskPromptPreview = (prompt: string) => {
+  const promptChars = Array.from(prompt ?? '');
+  const maxChars = TASK_PROMPT_LINE_CHAR_LIMIT * TASK_PROMPT_MAX_LINES;
+  const hasOverflow = promptChars.length > maxChars;
+  const visibleChars = hasOverflow
+    ? [...promptChars.slice(0, Math.max(maxChars - 3, 0)), '.', '.', '.']
+    : promptChars;
+
+  const lines: string[] = [];
+  for (let i = 0; i < visibleChars.length; i += TASK_PROMPT_LINE_CHAR_LIMIT) {
+    lines.push(visibleChars.slice(i, i + TASK_PROMPT_LINE_CHAR_LIMIT).join(''));
+  }
+
+  return lines.join('\n');
+};
+
 export default function ToolsPage() {
   const navigate = useNavigate();
   const { isSidebarOpen, setIsSidebarOpen } = useOutletContext<LayoutOutletContext>();
@@ -239,6 +408,8 @@ export default function ToolsPage() {
   const [actionMenuTaskId, setActionMenuTaskId] = useState<string | null>(null);
   const [showLiteratureModal, setShowLiteratureModal] = useState(false);
   const [activeModalTemplateId, setActiveModalTemplateId] = useState<ModalTemplateId | null>(null);
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [pendingDeleteTaskId, setPendingDeleteTaskId] = useState<string | null>(null);
   const [literatureForm, setLiteratureForm] = useState<LiteratureTrackForm>(initialLiteratureTrackForm);
   const [weeklyScheduleForm, setWeeklyScheduleForm] = useState<WeeklyScheduleForm>(initialWeeklyScheduleForm);
   const [showWeeklyProjectDropdown, setShowWeeklyProjectDropdown] = useState(false);
@@ -246,12 +417,20 @@ export default function ToolsPage() {
   const closeTaskConfigModal = () => {
     setShowLiteratureModal(false);
     setActiveModalTemplateId(null);
+    setEditingTaskId(null);
     setShowWeeklyProjectDropdown(false);
   };
 
   const isPaperTrackModal = activeModalTemplateId === 'template-paper-track';
-  const modalTitle = isPaperTrackModal ? '设置文献订阅任务' : '新建定时任务';
+  const isEditingTask = editingTaskId !== null;
+  const modalTitle = isPaperTrackModal
+    ? isEditingTask ? '修改文献订阅任务' : '设置文献订阅任务'
+    : isEditingTask ? '修改定时任务' : '新建定时任务';
   const selectedWeeklyProject = mockProjects.find((project) => project.id === weeklyScheduleForm.projectId) ?? null;
+  const pendingDeleteTask = useMemo(
+    () => tasks.find((task) => task.id === pendingDeleteTaskId) ?? null,
+    [tasks, pendingDeleteTaskId],
+  );
 
   const repeatCascaderValue = useMemo<Array<string | number>>(() => {
     if (weeklyScheduleForm.repeatMode === 'weekly' || weeklyScheduleForm.repeatMode === 'monthly') {
@@ -273,6 +452,7 @@ export default function ToolsPage() {
       });
       setWeeklyScheduleForm(initialWeeklyScheduleForm);
       setShowWeeklyProjectDropdown(false);
+      setEditingTaskId(null);
       setActiveModalTemplateId('template-paper-track');
       setShowLiteratureModal(true);
       return;
@@ -288,6 +468,7 @@ export default function ToolsPage() {
       runAt: template.id === 'template-news-brief' ? '07:00' : initialWeeklyScheduleForm.runAt,
     });
     setShowWeeklyProjectDropdown(false);
+    setEditingTaskId(null);
     setActiveModalTemplateId(template.id as ModalTemplateId);
     setShowLiteratureModal(true);
   };
@@ -303,6 +484,7 @@ export default function ToolsPage() {
       projectId: null,
     });
     setShowWeeklyProjectDropdown(false);
+    setEditingTaskId(null);
     setActiveModalTemplateId('template-custom');
     setShowLiteratureModal(true);
   };
@@ -320,45 +502,51 @@ export default function ToolsPage() {
     );
   };
 
-  const handleRenameTask = (taskId: string) => {
+  const handleEditTask = (taskId: string) => {
     const targetTask = tasks.find((task) => task.id === taskId);
     if (!targetTask) return;
 
-    const nextName = window.prompt('修改任务名称', targetTask.name);
-    if (!nextName) return;
+    const nextIsLiteratureTask = isLiteratureTask(targetTask);
 
-    setTasks((prev) =>
-      prev.map((task) =>
-        task.id === taskId
-          ? {
-              ...task,
-              name: nextName.trim() || task.name,
-            }
-          : task,
-      ),
+    setEditingTaskId(taskId);
+    setShowWeeklyProjectDropdown(false);
+
+    if (nextIsLiteratureTask) {
+      setActiveModalTemplateId('template-paper-track');
+      setLiteratureForm(parseLiteratureFormFromTask(targetTask));
+      setWeeklyScheduleForm(initialWeeklyScheduleForm);
+      setShowLiteratureModal(true);
+      setActionMenuTaskId(null);
+      return;
+    }
+
+    setActiveModalTemplateId(
+      targetTask.templateId && targetTask.templateId !== 'template-paper-track'
+        ? targetTask.templateId
+        : 'template-custom',
     );
+    setLiteratureForm({
+      ...initialLiteratureTrackForm,
+      topic: targetTask.name,
+    });
+    setWeeklyScheduleForm(parseScheduleFormFromTask(targetTask));
+    setShowLiteratureModal(true);
     setActionMenuTaskId(null);
   };
 
-  const handleCopyTask = (taskId: string) => {
-    const sourceTask = tasks.find((task) => task.id === taskId);
-    if (!sourceTask) return;
-
-    setTasks((prev) => [
-      {
-        ...sourceTask,
-        id: `task-copy-${Date.now()}`,
-        name: `${sourceTask.name} 副本`,
-        nextRun: '--',
-      },
-      ...prev,
-    ]);
+  const handleRequestDeleteTask = (taskId: string) => {
+    setPendingDeleteTaskId(taskId);
     setActionMenuTaskId(null);
   };
 
-  const handleDeleteTask = (taskId: string) => {
-    setTasks((prev) => prev.filter((task) => task.id !== taskId));
-    setActionMenuTaskId(null);
+  const handleCancelDeleteTask = () => {
+    setPendingDeleteTaskId(null);
+  };
+
+  const handleConfirmDeleteTask = () => {
+    if (!pendingDeleteTaskId) return;
+    setTasks((prev) => prev.filter((task) => task.id !== pendingDeleteTaskId));
+    setPendingDeleteTaskId(null);
   };
 
   const handleSourceTypeChange = (sourceType: SourceType) => {
@@ -428,22 +616,70 @@ export default function ToolsPage() {
       return;
     }
 
+    const normalizedScheduleForm: WeeklyScheduleForm = {
+      ...weeklyScheduleForm,
+      startDate: weeklyScheduleForm.startDate.replace(/\//g, '-'),
+      endDate: weeklyScheduleForm.endDate.replace(/\//g, '-'),
+      taskPrompt: trimmedWeeklyPrompt,
+    };
+
+    const normalizedLiteratureForm: LiteratureTrackForm = {
+      ...literatureForm,
+      topic: trimmedTopic,
+      keywords: trimmedKeywords,
+      periodStart: literatureForm.periodStart.replace(/\//g, '-'),
+      periodEnd: literatureForm.periodEnd.replace(/\//g, '-'),
+    };
+
     const triggerLabel = !isPaperTrackModal
-      ? `${getRepeatLabel(weeklyScheduleForm.repeatMode, weeklyScheduleForm.repeatSubValue)} ${weeklyScheduleForm.startDate}~${weeklyScheduleForm.endDate} ${weeklyScheduleForm.runAt}`
-      : literatureForm.frequency === 'daily'
+      ? `${getRepeatLabel(normalizedScheduleForm.repeatMode, normalizedScheduleForm.repeatSubValue)} ${normalizedScheduleForm.startDate}~${normalizedScheduleForm.endDate} ${normalizedScheduleForm.runAt}`
+      : normalizedLiteratureForm.frequency === 'daily'
         ? 'Daily at 09:00'
-        : literatureForm.frequency === 'weekly'
+        : normalizedLiteratureForm.frequency === 'weekly'
           ? 'Weekly Mon 09:00'
           : 'Hourly';
+
+    const nextTaskPayload: Omit<UserTask, 'id' | 'nextRun' | 'isEnabled'> = isPaperTrackModal
+      ? {
+          name: trimmedTopic,
+          prompt: buildLiteraturePrompt(),
+          trigger: triggerLabel,
+          taskType: 'literature',
+          templateId: 'template-paper-track',
+          literatureConfig: normalizedLiteratureForm,
+          scheduleConfig: undefined,
+        }
+      : {
+          name: trimmedTopic,
+          prompt: buildLiteraturePrompt(),
+          trigger: triggerLabel,
+          taskType: 'schedule',
+          templateId: activeModalTemplateId ?? 'template-custom',
+          scheduleConfig: normalizedScheduleForm,
+          literatureConfig: undefined,
+        };
+
+    if (editingTaskId) {
+      setTasks((prev) =>
+        prev.map((task) =>
+          task.id === editingTaskId
+            ? {
+                ...task,
+                ...nextTaskPayload,
+              }
+            : task,
+        ),
+      );
+      closeTaskConfigModal();
+      return;
+    }
 
     setTasks((prev) => [
       {
         id: `task-${Date.now()}`,
-        name: trimmedTopic,
-        prompt: buildLiteraturePrompt(),
         nextRun: '--',
-        trigger: triggerLabel,
         isEnabled: true,
+        ...nextTaskPayload,
       },
       ...prev,
     ]);
@@ -500,7 +736,11 @@ export default function ToolsPage() {
         title: '任务内容',
         dataIndex: 'prompt',
         width: '40%',
-        render: (prompt) => <span className="truncate text-secondaryText">{prompt}</span>,
+        render: (prompt) => (
+          <span className="whitespace-pre-line break-all text-secondaryText">
+            {buildTaskPromptPreview(String(prompt ?? ''))}
+          </span>
+        ),
       },
       {
         title: '下次运行',
@@ -535,7 +775,6 @@ export default function ToolsPage() {
         render: (_, task) => {
           const actionItems: BaseActionMenuItem[] = [
             { key: 'rename', label: '编辑', icon: <Pencil size={14} /> },
-            { key: 'copy', label: '复制', icon: <Copy size={14} /> },
             { key: 'delete', label: '删除', icon: <Trash2 size={14} />, danger: true },
           ];
 
@@ -544,7 +783,8 @@ export default function ToolsPage() {
               open={actionMenuTaskId === task.id}
               onOpenChange={(open) => setActionMenuTaskId(open ? task.id : null)}
               placement="bottom-end"
-              width={144}
+              width={132}
+              menuClassName="!min-w-[132px]"
               trigger={
                 <span className="inline-flex rounded-md p-1 text-secondaryText transition-colors hover:bg-bgLight hover:text-primaryText">
                   <MoreHorizontal size={16} />
@@ -553,14 +793,10 @@ export default function ToolsPage() {
               items={actionItems}
               onItemClick={(item) => {
                 if (item.key === 'rename') {
-                  handleRenameTask(task.id);
+                  handleEditTask(task.id);
                   return;
                 }
-                if (item.key === 'copy') {
-                  handleCopyTask(task.id);
-                  return;
-                }
-                handleDeleteTask(task.id);
+                handleRequestDeleteTask(task.id);
               }}
             />
           );
@@ -637,11 +873,29 @@ export default function ToolsPage() {
       </div>
 
       <BaseModal
+        visible={pendingDeleteTaskId !== null}
+        title="确认删除任务"
+        width={420}
+        maskClosable={false}
+        cancelText="取消"
+        okText="删除"
+        onCancel={handleCancelDeleteTask}
+        onConfirm={handleConfirmDeleteTask}
+        okButtonProps={{
+          className: '!bg-[#F04438] !border-[#F04438] hover:!bg-[#D92D20] hover:!border-[#D92D20]',
+        }}
+      >
+        <p className="text-sm text-primaryText">
+          任务删除后将无法恢复，您确定要删除吗？
+        </p>
+      </BaseModal>
+
+      <BaseModal
         visible={showLiteratureModal}
         title={modalTitle}
         width={600}
         className="tools-task-modal"
-        okText="创建任务"
+        okText={isEditingTask ? '保存修改' : '创建任务'}
         cancelText="取消"
         onCancel={closeTaskConfigModal}
         onConfirm={handleCreateLiteratureTask}
