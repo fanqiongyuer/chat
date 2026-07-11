@@ -8,9 +8,6 @@ type SettingsTab = 'general' | 'ai-model';
 
 interface SettingsState {
   // 通用设置
-  desktopNotification: boolean;
-  soundNotification: boolean;
-  emailNotification: boolean;
   avatarFileName: string;
 
   // AI 模型配置
@@ -45,9 +42,6 @@ const contextLengthOptions = [
 ];
 
 const initialSettings: SettingsState = {
-  desktopNotification: true,
-  soundNotification: false,
-  emailNotification: true,
   avatarFileName: '未上传新头像',
 
   defaultModel: 'gpt-4o',
@@ -163,34 +157,6 @@ export default function SystemSettingsDetailPage() {
         </div>
       </div>
 
-      <div>
-        <SectionTitle>通知设置</SectionTitle>
-        <div className="rounded-lg bg-[var(--color-surface)]">
-          <div className="px-0">
-            <SettingRow label="桌面通知" description="任务完成后显示桌面通知">
-              <BaseToggle
-                checked={settings.desktopNotification}
-                onChange={(v) => updateSetting('desktopNotification', v)}
-                size="small"
-              />
-            </SettingRow>
-            <SettingRow label="声音提醒" description="收到新消息时播放提示音">
-              <BaseToggle
-                checked={settings.soundNotification}
-                onChange={(v) => updateSetting('soundNotification', v)}
-                size="small"
-              />
-            </SettingRow>
-            <SettingRow label="邮件通知" description="关键事件通过邮件通知">
-              <BaseToggle
-                checked={settings.emailNotification}
-                onChange={(v) => updateSetting('emailNotification', v)}
-                size="small"
-              />
-            </SettingRow>
-          </div>
-        </div>
-      </div>
     </div>
   );
 
