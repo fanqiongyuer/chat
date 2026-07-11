@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useLayoutEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useParams, useOutletContext, useLocation } from 'react-router-dom';
-import { Menu, Folder, ChevronDown, ChevronRight, Plus, Send, FileText, FlaskConical, Search, X, Clock3 } from 'lucide-react';
+import { Menu, Folder, ChevronDown, ChevronRight, Plus, Send, FileText, FlaskConical, Search, X, Clock3, Copy, Check } from 'lucide-react';
 import MessageItem from '../components/chat/MessageItem';
 import InputArea, {
 CHAT_FILE_OPTIONS,
@@ -16,7 +16,7 @@ import ThinkingIndicator, { type StatusPhase, type SearchStep } from '../compone
 import { ChatStreamError, streamChatResponse } from '../mock/mockApi';
 import { mockProjects } from '../mock/projects';
 import { type MockChat } from '../mock/chats';
-import { BaseActionMenu, BaseButton, BaseInput } from '../components';
+import { BaseActionMenu, BaseButton, BaseInput, BaseModal } from '../components';
 import type { BaseActionMenuItem, BaseActionMenuProps } from '../components';
 import { type LayoutOutletContext } from '../components/Layout';
 
@@ -287,6 +287,72 @@ const [newProjectName, setNewProjectName] = useState('');
   const newChatTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const projectSelectorRef = useRef<HTMLDivElement | null>(null);
   const createProjectPopoverRef = useRef<HTMLDivElement | null>(null);
+
+  const isShareMode = useMemo(
+    () => !isNewChat && new URLSearchParams(location.search).get('share') === '1',
+    [isNewChat, location.search],
+  );
+  const [selectedShareMessageKeys, setSelectedShareMessageKeys] = useState<Set<string>>(new Set());
+  const [createdShareLink, setCreatedShareLink] = useState('');
+  const [shareLinkCopied, setShareLinkCopied] = useState(false);
+  const [isShareLinkModalOpen, setIsShareLinkModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (!isShareMode) {
+      setSelectedShareMessageKeys(new Set());
+      setCreatedShareLink('');
+      setShareLinkCopied(false);
+      setIsShareLinkModalOpen(false);
+      return;
+    }
+
+    const allMessageKeys = messages.map((_, idx) => `${chatId ?? 'new'}-${idx}`);
+    setSelectedShareMessageKeys(new Set(allMessageKeys));
+    setCreatedShareLink('');
+    setShareLinkCopied(false);
+    setIsShareLinkModalOpen(false);
+  }, [chatId, isShareMode, messages]);
+
+  const toggleShareMessage = useCallback((messageKey: string) => {
+    setSelectedShareMessageKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(messageKey)) {
+        next.delete(messageKey);
+      } else {
+        next.add(messageKey);
+      }
+      return next;
+    });
+    setCreatedShareLink('');
+    setShareLinkCopied(false);
+    setIsShareLinkModalOpen(false);
+  }, []);
+
+  const selectedShareCount = selectedShareMessageKeys.size;
+
+  const handleCancelShareMode = useCallback(() => {
+    if (!chatId) return;
+    navigate(`/chat/${chatId}`, { replace: true });
+  }, [chatId, navigate]);
+
+  const handleCreateShareLink = useCallback(() => {
+    if (!chatId || selectedShareCount <= 0) return;
+    const shareId = Math.random().toString(36).slice(2, 10);
+    setCreatedShareLink(`${window.location.origin}/share/${chatId}?sid=${shareId}`);
+    setShareLinkCopied(false);
+    setIsShareLinkModalOpen(true);
+  }, [chatId, selectedShareCount]);
+
+  const handleCopyShareLink = useCallback(async () => {
+    if (!createdShareLink) return;
+
+    try {
+      await navigator.clipboard.writeText(createdShareLink);
+      setShareLinkCopied(true);
+    } catch {
+      // 忽略复制失败
+    }
+  }, [createdShareLink]);
 
   useEffect(() => {
     // 首次进入历史对话时状态已是默认值，跳过一次重置可避免额外重渲染抖动。
@@ -1475,20 +1541,48 @@ const [newProjectName, setNewProjectName] = useState('');
               onScroll={handleChatScroll}
               className="flex-1 overflow-y-auto [scrollbar-gutter:stable_both-edges] px-4 sm:px-8 py-8 pt-20 flex flex-col items-center"
             >
-              <div className="w-full flex flex-col gap-8" style={{ maxWidth: chatContentMaxWidth }}>
+              <div className={`w-full flex flex-col ${isShareMode ? 'gap-3' : 'gap-8'}`} style={{ maxWidth: chatContentMaxWidth }}>
                 {messages.map((msg, idx) => {
                   const actionKey = `${chatId ?? 'new'}-${idx}`;
+                  const isChecked = selectedShareMessageKeys.has(actionKey);
 
                   return (
-                    <MessageItem
-                      key={idx}
-                      msg={msg}
-                      actionKey={actionKey}
-                      feedback={assistantFeedbackMap[actionKey]}
-                      onFeedback={setAssistantFeedback}
-                      onRefresh={() => regenerateAssistantMessage(idx)}
-                      isTyping={isTyping}
-                    />
+                    <div key={actionKey} className={isShareMode ? 'flex w-full items-start gap-2' : ''}>
+                      {isShareMode && (
+                        <button
+                          type="button"
+                          onClick={() => toggleShareMessage(actionKey)}
+                          className="mt-3 shrink-0 rounded-md p-1 text-[#9aa0a6] transition-colors hover:bg-[#f3f5f7]"
+                          aria-label={isChecked ? '取消选择消息' : '选择消息'}
+                        >
+                          {isChecked ? (
+                            <span className="inline-flex h-[18px] w-[18px] items-center justify-center rounded-[5px] bg-primary text-white">
+                              <Check size={12} strokeWidth={2.8} />
+                            </span>
+                          ) : (
+                            <span className="inline-flex h-[18px] w-[18px] rounded-[5px] border border-[#c9d1dc] bg-white" />
+                          )}
+                        </button>
+                      )}
+                      <div
+                        className={
+                          isShareMode
+                            ? `min-w-0 flex-1 rounded-xl transition-colors ${
+                                isChecked ? 'bg-[#f3f4f6]' : 'bg-transparent hover:bg-[#f7f8fa]'
+                              } ${msg.role === 'user' ? 'py-2.5' : 'py-1.5'} px-2`
+                            : ''
+                        }
+                      >
+                        <MessageItem
+                          msg={msg}
+                          actionKey={actionKey}
+                          feedback={assistantFeedbackMap[actionKey]}
+                          onFeedback={setAssistantFeedback}
+                          onRefresh={() => regenerateAssistantMessage(idx)}
+                          isTyping={isTyping}
+                        />
+                      </div>
+                    </div>
                   );
                 })}
 {isTyping && !(statusPhase === 'generating' && hasReceivedAssistantChunk) && (
@@ -1501,13 +1595,64 @@ const [newProjectName, setNewProjectName] = useState('');
               </div>
             </div>
             
-            {/* 底部悬浮输入区域 */}
-            <div className="w-full mx-auto px-6 pb-6 pt-2 bg-gradient-to-t from-white via-white to-transparent shrink-0" style={{ maxWidth: chatInputMaxWidth }}>
-              <InputArea onSend={handleSend} disabled={isTyping} />
-              <div className="text-center text-xs text-tertiaryText mt-3">
-                AI 内容可能有误差，请在实验前核实。
+            {isShareMode ? (
+              <>
+                <div className="w-full shrink-0 border-t border-[#efefef] bg-white/95 px-6 py-3 backdrop-blur">
+                  <div className="mx-auto flex w-full items-center justify-between gap-4" style={{ maxWidth: chatInputMaxWidth }}>
+                    <div className="min-w-0">
+                      <div className="text-sm text-secondaryText">已选择 {selectedShareCount} 条对话</div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <BaseButton type="secondary" size="small" onClick={handleCancelShareMode}>
+                        取消
+                      </BaseButton>
+                      <BaseButton
+                        type="primary"
+                        size="small"
+                        disabled={selectedShareCount <= 0}
+                        onClick={handleCreateShareLink}
+                      >
+                        创建分享链接
+                      </BaseButton>
+                    </div>
+                  </div>
+                </div>
+
+                <BaseModal
+                  visible={isShareLinkModalOpen}
+                  title="创建分享链接"
+                  width={450}
+                  onCancel={() => setIsShareLinkModalOpen(false)}
+                  footer={null}
+                >
+                  <div className="space-y-4">
+                    <p className="m-0 text-[14px] leading-6 text-primaryText">
+                      任何获得链接的实验室成员均可以查看你分享的对话，请检查是否包含敏感/隐私内容。
+                    </p>
+                    <div className="flex items-center gap-2 rounded-full border border-[#e5e7eb] bg-[#f8fafc] p-1.5 pl-4">
+                      <span className="min-w-0 flex-1 truncate text-[14px] text-secondaryText">
+                        {createdShareLink}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleCopyShareLink}
+                        className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover"
+                      >
+                        {shareLinkCopied ? <Check size={14} /> : <Copy size={14} />}
+                        <span>{shareLinkCopied ? '已复制' : '复制'}</span>
+                      </button>
+                    </div>
+                  </div>
+                </BaseModal>
+              </>
+            ) : (
+              <div className="w-full mx-auto px-6 pb-6 pt-2 bg-gradient-to-t from-white via-white to-transparent shrink-0" style={{ maxWidth: chatInputMaxWidth }}>
+                <InputArea onSend={handleSend} disabled={isTyping} />
+                <div className="text-center text-xs text-tertiaryText mt-3">
+                  AI 内容可能有误差，请在实验前核实。
+                </div>
               </div>
-            </div>
+            )}
           </>
         )}
         </div>

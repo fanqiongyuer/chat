@@ -389,6 +389,11 @@ export default function Layout() {
             startChatRename(chat);
             return;
           }
+          if (item.key === 'share') {
+            navigate(`/chat/${chat.id}?share=1`);
+            setChatMenuOpenId(null);
+            return;
+          }
           if (item.key === 'pin') {
             handleTogglePinChat(chat.id);
             return;
