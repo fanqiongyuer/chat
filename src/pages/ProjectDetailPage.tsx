@@ -1,11 +1,57 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
-import { Menu, Plus, Search, Users } from 'lucide-react';
-import { BaseButton, BaseEmpty } from '../components';
+import { ChevronDown, Menu, Plus, Search, Upload, Users } from 'lucide-react';
+import { Select } from 'antd';
+import { BaseButton, BaseDocumentUpload, BaseEmpty, BaseModal } from '../components';
 import { EXPERIMENTS_BY_PROJECT, PROJECT_MEMBERS, mockProjects } from '../mock/projects';
 import { type LayoutOutletContext } from '../components/Layout';
 
 type DetailTab = 'experiment' | 'chat';
+type MemberPermission = '浏览' | '编辑';
+
+interface ProjectMemberEntry {
+  id: string;
+  name: string;
+  permission: MemberPermission;
+}
+
+interface LabMemberDirectoryEntry {
+  id: string;
+  name: string;
+  email: string;
+}
+
+const MEMBER_PERMISSION_OPTIONS = [
+  { label: '浏览', value: '浏览' },
+  { label: '编辑', value: '编辑' },
+];
+
+const MEMBER_PERMISSION_ACTION_OPTIONS = [
+  { label: '浏览', value: '浏览' },
+  { label: '编辑', value: '编辑' },
+  { label: '移除', value: '移除' },
+];
+
+const LAB_MEMBER_DIRECTORY: LabMemberDirectoryEntry[] = [
+  { id: 'm-wangping', name: '王平', email: 'wangping@deptrace.ai' },
+  { id: 'm-songke', name: '宋可', email: 'songke@deptrace.ai' },
+  { id: 'm-wangzheyv', name: '王哲宇', email: 'wangzheyv@deptrace.ai' },
+  { id: 'm-teluoke', name: '特洛克', email: 'teluoke@deptrace.ai' },
+  { id: 'm-duyuesheng', name: '杜月笙', email: 'duyuesheng@deptrace.ai' },
+  { id: 'm-zhouyan', name: '周妍', email: 'zhouyan@deptrace.ai' },
+  { id: 'm-lijin', name: '李晋', email: 'lijin@deptrace.ai' },
+  { id: 'm-chenxi', name: '陈曦', email: 'chenxi@deptrace.ai' },
+  { id: 'm-hexiao', name: '何晓', email: 'hexiao@deptrace.ai' },
+  { id: 'm-liting', name: '李婷', email: 'liting@deptrace.ai' },
+  { id: 'm-maodan', name: '毛单', email: 'maodan@deptrace.ai' },
+  { id: 'm-xuqian', name: '徐倩', email: 'xuqian@deptrace.ai' },
+  { id: 'm-jiangchen', name: '蒋晨', email: 'jiangchen@deptrace.ai' },
+  { id: 'm-wanghao', name: '王浩', email: 'wanghao@deptrace.ai' },
+  { id: 'm-zhangmin', name: '张敏', email: 'zhangmin@deptrace.ai' },
+  { id: 'm-zhaoyang', name: '赵阳', email: 'zhaoyang@deptrace.ai' },
+  { id: 'm-sunli', name: '孙丽', email: 'sunli@deptrace.ai' },
+  { id: 'm-qiankun', name: '钱坤', email: 'qiankun@deptrace.ai' },
+];
 
 const TAG_COLLAPSED_MAX_HEIGHT = 84;
 
@@ -141,6 +187,14 @@ const formatChatDateTime = (rawDate: string, chatId: string) => {
   return formatDateToCnymdhm(now);
 };
 
+const createLocalDocId = () => `exp-local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+const getFileNameWithoutExt = (fileName: string) => {
+  const idx = fileName.lastIndexOf('.');
+  if (idx <= 0) return fileName;
+  return fileName.slice(0, idx);
+};
+
 export default function ProjectDetailPage() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
@@ -151,6 +205,13 @@ export default function ProjectDetailPage() {
   const [selectedTag, setSelectedTag] = useState('all');
   const [isTagExpanded, setIsTagExpanded] = useState(false);
   const [showTagToggle, setShowTagToggle] = useState(false);
+  const [showCreateDocModal, setShowCreateDocModal] = useState(false);
+  const [showMemberModal, setShowMemberModal] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [createDocError, setCreateDocError] = useState('');
+  const [memberModalError, setMemberModalError] = useState('');
+  const [selectedInviteMemberIds, setSelectedInviteMemberIds] = useState<string[]>([]);
+  const [invitePermission, setInvitePermission] = useState<MemberPermission>('浏览');
   const tagFilterRef = useRef<HTMLDivElement | null>(null);
 
   const project = useMemo(() => mockProjects.find((item) => item.id === id), [id]);
@@ -160,15 +221,158 @@ export default function ProjectDetailPage() {
     return PROJECT_MEMBERS[id] ?? [];
   }, [id]);
 
+  const [managedMembers, setManagedMembers] = useState<ProjectMemberEntry[]>([]);
+
+  useEffect(() => {
+    const nextMembers = projectMembers.map((member, index) => ({
+      id: member.id,
+      name: member.name,
+      permission: index === 0 ? '编辑' : '浏览',
+    }));
+    setManagedMembers(nextMembers);
+  }, [projectMembers]);
+
+  const inviteDirectoryMap = useMemo(
+    () => new Map(LAB_MEMBER_DIRECTORY.map((member) => [member.id, member])),
+    [],
+  );
+
+  const inviteCandidateOptions = useMemo(() => {
+    const joinedMemberIds = new Set(managedMembers.map((member) => member.id));
+    return LAB_MEMBER_DIRECTORY.filter((member) => !joinedMemberIds.has(member.id)).map((member) => ({
+      label: `${member.name}（${member.email}）`,
+      value: member.id,
+      searchText: `${member.name} ${member.email}`,
+    }));
+  }, [managedMembers]);
+
   const experimentList = useMemo(() => {
     if (!id) return [];
     return EXPERIMENTS_BY_PROJECT[id] ?? [];
   }, [id]);
 
-  const documentTagOptions = useMemo(() => {
-    const uniqueTags = Array.from(new Set(experimentList.flatMap((item) => item.tags)));
-    return ['all', ...uniqueTags];
+  const [localDocs, setLocalDocs] = useState(() => [...experimentList]);
+
+  useEffect(() => {
+    setLocalDocs([...experimentList]);
   }, [experimentList]);
+
+  const resetCreateDocForm = () => {
+    setSelectedFiles([]);
+    setCreateDocError('');
+  };
+
+  const openCreateDocModal = () => {
+    resetCreateDocForm();
+    setShowCreateDocModal(true);
+  };
+
+  const openMemberModal = () => {
+    setMemberModalError('');
+    setSelectedInviteMemberIds([]);
+    setInvitePermission('浏览');
+    setShowMemberModal(true);
+  };
+
+  const closeMemberModal = () => {
+    setShowMemberModal(false);
+    setMemberModalError('');
+    setSelectedInviteMemberIds([]);
+    setInvitePermission('浏览');
+  };
+
+  const handleImportDocClick = () => {
+    openCreateDocModal();
+  };
+
+  const closeCreateDocModal = () => {
+    setShowCreateDocModal(false);
+    resetCreateDocForm();
+  };
+
+  const handlePermissionChange = (memberId: string, permission: MemberPermission) => {
+    setManagedMembers((prev) =>
+      prev.map((member) =>
+        member.id === memberId
+          ? {
+              ...member,
+              permission,
+            }
+          : member,
+      ),
+    );
+  };
+
+  const handleMemberPermissionActionChange = (memberId: string, action: string | number) => {
+    if (action === '编辑') {
+      handlePermissionChange(memberId, '编辑');
+      return;
+    }
+
+    if (action === '浏览') {
+      handlePermissionChange(memberId, '浏览');
+      return;
+    }
+
+    if (action === '移除') {
+      setManagedMembers((prev) => prev.filter((member) => member.id !== memberId));
+    }
+  };
+
+  const handleInviteMember = () => {
+    if (selectedInviteMemberIds.length === 0) {
+      setMemberModalError('请先选择要邀请的成员');
+      return;
+    }
+
+    setManagedMembers((prev) => {
+      const joinedIds = new Set(prev.map((member) => member.id));
+      const membersToInvite = selectedInviteMemberIds
+        .map((memberId) => inviteDirectoryMap.get(memberId))
+        .filter((member): member is LabMemberDirectoryEntry => !!member)
+        .filter((member) => !joinedIds.has(member.id))
+        .map((member) => ({
+          id: member.id,
+          name: member.name,
+          permission: invitePermission,
+        }));
+
+      return membersToInvite.length > 0 ? [...prev, ...membersToInvite] : prev;
+    });
+
+    setSelectedInviteMemberIds([]);
+    setInvitePermission('浏览');
+    setMemberModalError('');
+  };
+
+  const handleCreateDocSubmit = () => {
+    if (selectedFiles.length === 0) {
+      setCreateDocError('请先选择至少一个文件');
+      return;
+    }
+
+    const uploadedDocs = selectedFiles.map((file) => {
+      const nameWithoutExt = getFileNameWithoutExt(file.name);
+      const extension = file.name.includes('.') ? file.name.split('.').pop()?.toLowerCase() : '';
+
+      return {
+        id: createLocalDocId(),
+        title: nameWithoutExt || file.name,
+        summary: `上传文件：${file.name}`,
+        ownerId: projectMembers[0]?.id ?? 'm-system',
+        status: '进行中' as const,
+        tags: extension ? ['外部导入', extension.toUpperCase()] : ['外部导入'],
+      };
+    });
+
+    setLocalDocs((prev) => [...uploadedDocs, ...prev]);
+    closeCreateDocModal();
+  };
+
+  const documentTagOptions = useMemo(() => {
+    const uniqueTags = Array.from(new Set(localDocs.flatMap((item) => item.tags)));
+    return ['all', ...uniqueTags];
+  }, [localDocs]);
 
   const documentList = useMemo(() => {
     if (activeTab !== 'experiment') {
@@ -177,7 +381,7 @@ export default function ProjectDetailPage() {
 
     const keyword = searchKeyword.trim().toLowerCase();
 
-    return experimentList.filter((item) => {
+      return localDocs.filter((item) => {
       if (selectedTag !== 'all' && !item.tags.includes(selectedTag)) {
         return false;
       }
@@ -189,7 +393,7 @@ export default function ProjectDetailPage() {
       const searchableText = [item.title, item.summary, ...item.tags].join(' ').toLowerCase();
       return searchableText.includes(keyword);
     });
-  }, [activeTab, experimentList, searchKeyword, selectedTag]);
+  }, [activeTab, localDocs, searchKeyword, selectedTag]);
 
   useEffect(() => {
     if (activeTab !== 'experiment') {
@@ -230,7 +434,7 @@ export default function ProjectDetailPage() {
     });
   }, [activeTab, chats, searchKeyword]);
 
-  const memberCount = projectMembers.length;
+  const memberCount = managedMembers.length;
 
   return (
     <div className="flex h-full w-full flex-col bg-white">
@@ -264,7 +468,7 @@ export default function ProjectDetailPage() {
               type="secondary"
               size="small"
               rounded="large"
-              onClick={() => navigate('/members')}
+              onClick={openMemberModal}
             >
               管理成员
             </BaseButton>
@@ -303,7 +507,7 @@ export default function ProjectDetailPage() {
                         : 'border-transparent text-tertiaryText'
                     }`}
                   >
-                    文档 {experimentList.length}
+                    文档 {localDocs.length}
                   </button>
                   <button
                     type="button"
@@ -334,15 +538,28 @@ export default function ProjectDetailPage() {
                   />
                 </div>
 
-                <BaseButton
-                  type="ghost"
-                  size="small"
-                  rounded="large"
-                  icon={<Plus size={16} />}
-                  className="!h-auto !border-transparent !bg-transparent !px-0 !py-0 !text-sm !font-semibold !text-[var(--color-primary)] hover:!bg-transparent hover:!text-[var(--color-primary-hover)]"
-                >
-                  {activeTab === 'experiment' ? '新建文档' : '发起对话'}
-                </BaseButton>
+                <div className="flex items-center gap-5">
+                  <BaseButton
+                    type="ghost"
+                    size="small"
+                    rounded="large"
+                    icon={activeTab === 'experiment' ? <Plus size={16} /> : undefined}
+                    className="!h-auto !gap-1 !border-transparent !bg-transparent !px-0 !py-0 !text-sm !font-semibold !text-[var(--color-primary)] hover:!bg-transparent hover:!text-[var(--color-primary-hover)]"
+                    onClick={activeTab === 'experiment' ? openCreateDocModal : undefined}
+                  >
+                    {activeTab === 'experiment' ? '新建' : '发起对话'}
+                  </BaseButton>
+                  {activeTab === 'experiment' && (
+                    <button
+                      type="button"
+                      onClick={handleImportDocClick}
+                      className="inline-flex items-center gap-1 text-sm font-medium text-[var(--color-primary)] transition-colors hover:text-[var(--color-primary-hover)] hover:underline"
+                    >
+                      <Upload size={14} />
+                      导入
+                    </button>
+                  )}
+                </div>
               </div>
 
               {activeTab === 'experiment' && (
@@ -448,6 +665,116 @@ export default function ProjectDetailPage() {
           )}
         </div>
       </div>
+
+      <BaseModal
+        visible={showCreateDocModal}
+        title="导入文档"
+        width={500}
+        maskClosable={false}
+        cancelText="取消"
+        okText="导入"
+        onCancel={closeCreateDocModal}
+        onConfirm={handleCreateDocSubmit}
+        bodyClassName="!px-6 !py-5"
+      >
+        <div className="space-y-4">
+          <div className="space-y-3">
+            <BaseDocumentUpload
+              value={selectedFiles}
+              maxCount={5}
+              maxSize={20 * 1024 * 1024}
+              onChange={setSelectedFiles}
+              onError={(error) => setCreateDocError(error.message)}
+            />
+          </div>
+
+          {createDocError && <div className="text-sm text-[var(--color-danger)]">{createDocError}</div>}
+        </div>
+      </BaseModal>
+
+      <BaseModal
+        visible={showMemberModal}
+        title="管理成员"
+        width={560}
+        maskClosable={false}
+        footer={null}
+        onCancel={closeMemberModal}
+        bodyClassName="!px-6 !py-5"
+      >
+        <div className="space-y-5">
+          <section className="space-y-3">
+            <div className="text-sm font-medium text-primaryText">加入新成员</div>
+            <div className="flex items-center gap-3">
+              <div className="flex flex-1 items-center rounded-lg border border-[var(--color-line-subtle)] bg-white px-2.5 py-1">
+                <div className="min-w-0 flex-1">
+                  <Select
+                    mode="multiple"
+                    showSearch
+                    bordered={false}
+                    value={selectedInviteMemberIds}
+                    options={inviteCandidateOptions}
+                    optionFilterProp="searchText"
+                    popupClassName="project-invite-member-dropdown"
+                    suffixIcon={null}
+                    placeholder="搜索姓名/邮箱并选择成员"
+                    onChange={(values) => {
+                      setSelectedInviteMemberIds(values as string[]);
+                      if (memberModalError) {
+                        setMemberModalError('');
+                      }
+                    }}
+                    className="w-full"
+                  />
+                </div>
+                <div className="mx-2 h-5 w-px bg-[var(--color-line-soft)]" />
+                <Select
+                  bordered={false}
+                  value={invitePermission}
+                  options={MEMBER_PERMISSION_OPTIONS}
+                  onChange={(value) => setInvitePermission((value as MemberPermission) ?? '浏览')}
+                  className="w-[76px]"
+                  popupClassName="project-member-permission-dropdown"
+                />
+              </div>
+              <BaseButton type="primary" size="medium" onClick={handleInviteMember}>
+                邀请成员
+              </BaseButton>
+            </div>
+            {memberModalError && <div className="text-sm text-[var(--color-danger)]">{memberModalError}</div>}
+          </section>
+
+          <section className="space-y-3 border-t border-[var(--color-line-soft)] pt-4">
+            {managedMembers.length > 0 ? (
+              <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
+                {managedMembers.map((member) => (
+                  <div
+                    key={member.id}
+                    className="flex items-center justify-between gap-3 rounded-lg border border-[var(--color-line-subtle)] bg-[var(--color-surface)] px-3 py-2.5"
+                  >
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-medium text-primaryText">{member.name}</div>
+                      <div className="mt-0.5 text-xs text-tertiaryText">项目成员</div>
+                    </div>
+                    <Select
+                      bordered={false}
+                      value={member.permission}
+                      options={MEMBER_PERMISSION_ACTION_OPTIONS}
+                      onChange={(value) => handleMemberPermissionActionChange(member.id, value)}
+                      className="member-permission-action-select w-[84px]"
+                      popupClassName="project-member-permission-dropdown"
+                      getPopupContainer={() => document.body}
+                    />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-lg border border-dashed border-[var(--color-border-soft)] px-3 py-5 text-center text-sm text-tertiaryText">
+                暂无成员
+              </div>
+            )}
+          </section>
+        </div>
+      </BaseModal>
     </div>
   );
 }

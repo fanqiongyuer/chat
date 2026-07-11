@@ -1,26 +1,54 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
-import { mockProjects } from '../mock/projects';
-import { ChevronLeft, Plus, Menu } from 'lucide-react';
-import { BaseButton } from '../components';
+import { mockProjects, type MockProject } from '../mock/projects';
+import { Plus, Menu } from 'lucide-react';
+import { BaseButton, BaseDocumentUpload, BaseInput, BaseModal } from '../components';
 import { type LayoutOutletContext } from '../components/Layout';
-
-type ProjectTab = 'private' | 'public';
 
 export default function ProjectsPage() {
   const navigate = useNavigate();
   const { isSidebarOpen, setIsSidebarOpen } = useOutletContext<LayoutOutletContext>();
-  const [activeTab, setActiveTab] = useState<ProjectTab>('private');
+  const [projects, setProjects] = useState<MockProject[]>(() => [...mockProjects]);
+  const [showCreateProjectModal, setShowCreateProjectModal] = useState(false);
+  const [projectName, setProjectName] = useState('');
+  const [projectDesc, setProjectDesc] = useState('');
+  const [projectDocs, setProjectDocs] = useState<File[]>([]);
+  const [createProjectError, setCreateProjectError] = useState('');
 
-  const filteredProjects = useMemo(
-    () => mockProjects.filter((proj) => proj.visibility === activeTab),
-    [activeTab]
-  );
+  const openCreateProjectModal = () => {
+    setProjectName('');
+    setProjectDesc('');
+    setProjectDocs([]);
+    setCreateProjectError('');
+    setShowCreateProjectModal(true);
+  };
 
-  const tabDescription =
-    activeTab === 'private'
-      ? '您可查看私有项目的对话，并编辑里面的知识内容'
-      : '公开项目仅可查看其中已开放的知识内容，无法查看对话和编辑内容';
+  const closeCreateProjectModal = () => {
+    setShowCreateProjectModal(false);
+    setCreateProjectError('');
+  };
+
+  const handleCreateProject = () => {
+    const trimmedName = projectName.trim();
+    if (!trimmedName) {
+      setCreateProjectError('请输入项目名称');
+      return;
+    }
+
+    const newProject: MockProject = {
+      id: `p-local-${Date.now()}`,
+      name: trimmedName,
+      desc: projectDesc.trim() || '暂无项目描述',
+      count: 0,
+      knowledge: projectDocs.length,
+      members: 1,
+      visibility: 'private',
+      privateType: 'team',
+    };
+
+    setProjects((prev) => [newProject, ...prev]);
+    closeCreateProjectModal();
+  };
 
   return (
     <div className="flex h-full w-full flex-col bg-white">
@@ -41,6 +69,7 @@ export default function ProjectsPage() {
           rounded="large"
           icon={<Plus size={14} />}
           className="shrink-0"
+          onClick={openCreateProjectModal}
         >
           创建新项目
         </BaseButton>
@@ -49,37 +78,10 @@ export default function ProjectsPage() {
         <div className="max-w-[1240px] mx-auto">
           <section className="pb-0">
             <h2 className="text-2xl font-semibold text-primaryText">科研项目</h2>
-            <div className="mt-6 flex items-end gap-8">
-              <button
-                type="button"
-                onClick={() => setActiveTab('private')}
-                className={`pb-2 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === 'private'
-                    ? 'border-[var(--color-primary)] text-primaryText'
-                    : 'border-transparent text-tertiaryText'
-                }`}
-              >
-                私有项目
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('public')}
-                className={`pb-2 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === 'public'
-                    ? 'border-[var(--color-primary)] text-primaryText'
-                    : 'border-transparent text-tertiaryText'
-                }`}
-              >
-                公开项目
-              </button>
-            </div>
-            <div className="border-t border-[var(--color-line-subtle)] pt-4 pb-2">
-              <p className="text-sm text-[var(--color-gray-4)]">{tabDescription}</p>
-            </div>
           </section>
 
-          <div className="mt-0 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {filteredProjects.map((proj) => (
+          <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {projects.map((proj) => (
               <button
                 key={proj.id}
                 type="button"
@@ -100,14 +102,68 @@ export default function ProjectsPage() {
               </button>
             ))}
 
-            {filteredProjects.length === 0 && (
+            {projects.length === 0 && (
               <div className="col-span-full rounded-lg border border-dashed border-[var(--color-border-soft)] px-4 py-10 text-center text-sm text-tertiaryText">
-                暂无{activeTab === 'private' ? '私有项目' : '公开项目'}
+                暂无项目
               </div>
             )}
           </div>
         </div>
       </div>
+
+      <BaseModal
+        visible={showCreateProjectModal}
+        title="创建新项目"
+        width={560}
+        maskClosable={false}
+        okText="创建"
+        cancelText="取消"
+        onCancel={closeCreateProjectModal}
+        onConfirm={handleCreateProject}
+        bodyClassName="!px-6 !py-5"
+      >
+        <div className="space-y-4">
+          <section className="space-y-2">
+            <div className="text-sm font-medium text-primaryText">
+              项目名称 <span className="text-[var(--color-danger)]">*</span>
+            </div>
+            <BaseInput
+              value={projectName}
+              placeholder="请输入项目名称"
+              onChange={(event) => {
+                setProjectName(event.target.value);
+                if (createProjectError) {
+                  setCreateProjectError('');
+                }
+              }}
+            />
+          </section>
+
+          <section className="space-y-2">
+            <div className="text-sm font-medium text-primaryText">项目描述（选填）</div>
+            <textarea
+              value={projectDesc}
+              onChange={(event) => setProjectDesc(event.target.value)}
+              placeholder="请输入项目描述"
+              rows={4}
+              className="w-full resize-none rounded-lg border border-[var(--color-border)] bg-white px-3 py-2 text-sm text-primaryText transition-colors placeholder:text-tertiaryText hover:border-[var(--color-gray-3)] focus:border-[var(--color-primary)] focus:outline-none"
+            />
+          </section>
+
+          <section className="space-y-2">
+            <div className="text-sm font-medium text-primaryText">项目文档（选填）</div>
+            <BaseDocumentUpload
+              value={projectDocs}
+              maxCount={5}
+              maxSize={20 * 1024 * 1024}
+              onChange={setProjectDocs}
+              onError={(error) => setCreateProjectError(error.message)}
+            />
+          </section>
+
+          {createProjectError && <div className="text-sm text-[var(--color-danger)]">{createProjectError}</div>}
+        </div>
+      </BaseModal>
     </div>
   );
 }

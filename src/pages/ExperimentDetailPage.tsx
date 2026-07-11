@@ -3,7 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { Menu } from 'lucide-react';
-import { BaseButton, BaseEmpty } from '../components';
+import { BaseButton, BaseEmpty, BaseModal } from '../components';
 import {
   EXPERIMENT_DETAILS_BY_PROJECT,
   PROJECT_MEMBERS,
@@ -24,6 +24,7 @@ export default function ExperimentDetailPage() {
   }>();
   const { isSidebarOpen, setIsSidebarOpen } = useOutletContext<LayoutOutletContext>();
   const [isContentScrolling, setIsContentScrolling] = useState(false);
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
   const contentScrollTimerRef = useRef<number | null>(null);
 
   const project = useMemo(
@@ -70,6 +71,19 @@ export default function ExperimentDetailPage() {
     contentScrollTimerRef.current = window.setTimeout(() => {
       setIsContentScrolling(false);
     }, 700);
+  };
+
+  const openDeleteConfirmModal = () => {
+    setShowDeleteConfirmModal(true);
+  };
+
+  const closeDeleteConfirmModal = () => {
+    setShowDeleteConfirmModal(false);
+  };
+
+  const handleDeleteConfirm = () => {
+    setShowDeleteConfirmModal(false);
+    navigate(parentPath ?? '/projects');
   };
 
   useEffect(() => {
@@ -120,8 +134,13 @@ export default function ExperimentDetailPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <BaseButton type="secondary" size="small" rounded="large">
-            修改文档权限
+          <BaseButton
+            type="secondary"
+            size="small"
+            rounded="large"
+            onClick={openDeleteConfirmModal}
+          >
+            删除
           </BaseButton>
           <BaseButton type="primary" size="small" rounded="large">
             编辑
@@ -212,6 +231,28 @@ export default function ExperimentDetailPage() {
           )}
         </div>
       </div>
+
+      <BaseModal
+        visible={showDeleteConfirmModal}
+        title="删除文档"
+        width={420}
+        maskClosable={false}
+        onCancel={closeDeleteConfirmModal}
+        footer={(
+          <div className="flex justify-end gap-2 border-t border-[var(--color-line-soft)] px-5 py-3">
+            <BaseButton type="secondary" size="medium" onClick={closeDeleteConfirmModal}>
+              取消
+            </BaseButton>
+            <BaseButton type="danger" size="medium" onClick={handleDeleteConfirm}>
+              删除
+            </BaseButton>
+          </div>
+        )}
+      >
+        <div className="text-sm leading-6 text-secondaryText">
+          删除文档后将不可回复，确认删除当前文档吗？
+        </div>
+      </BaseModal>
     </div>
   );
 }

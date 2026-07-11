@@ -21,8 +21,8 @@ export type { BaseInputProps } from './input';
 export { BaseSelect } from './select';
 export type { BaseSelectProps, BaseSelectOption } from './select';
 
-export { BaseUpload } from './upload';
-export type { BaseUploadProps } from './upload';
+export { BaseUpload, BaseDocumentUpload } from './upload';
+export type { BaseUploadProps, BaseDocumentUploadProps } from './upload';
 
 export { BaseActionMenu } from './action-menu';
 export type { BaseActionMenuProps, BaseActionMenuItem } from './action-menu';

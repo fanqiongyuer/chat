@@ -1,6 +1,6 @@
 import React, { useCallback, useRef } from 'react';
-import styles from './BaseUpload.module.css';
 import classNames from 'classnames';
+import styles from './BaseUpload.module.css';
 
 export interface BaseUploadProps {
   accept?: string;
@@ -12,7 +12,17 @@ export interface BaseUploadProps {
   children?: React.ReactNode;
   className?: string;
   dragable?: boolean;
+  placeholderTitle?: React.ReactNode;
+  placeholderDescription?: React.ReactNode;
+  placeholderIcon?: React.ReactNode;
+  maxCount?: number;
 }
+
+const formatSize = (bytes: number) => {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(0)} MB`;
+};
 
 export const BaseUpload = React.forwardRef<HTMLDivElement, BaseUploadProps>(
   (
@@ -26,6 +36,10 @@ export const BaseUpload = React.forwardRef<HTMLDivElement, BaseUploadProps>(
       children,
       className,
       dragable = true,
+      placeholderTitle,
+      placeholderDescription,
+      placeholderIcon,
+      maxCount,
     },
     ref
   ) => {
@@ -34,21 +48,38 @@ export const BaseUpload = React.forwardRef<HTMLDivElement, BaseUploadProps>(
 
     const handleFiles = useCallback(
       (files: FileList) => {
+        if (maxCount && files.length > maxCount) {
+          onError?.(new Error(`单次最多上传 ${maxCount} 个文件`));
+          return;
+        }
+
         if (maxSize) {
-          for (let i = 0; i < files.length; i++) {
+          for (let i = 0; i < files.length; i += 1) {
             if (files[i].size > maxSize) {
-              onError?.(new Error(`文件大小超过限制`));
+              onError?.(
+                new Error(`文件“${files[i].name}”超过大小限制（${formatSize(maxSize)}）`)
+              );
               return;
             }
           }
         }
         onChange?.(files);
       },
-      [maxSize, onChange, onError]
+      [maxCount, maxSize, onChange, onError]
     );
 
     const handleClick = () => {
       if (!disabled) {
+        inputRef.current?.click();
+      }
+    };
+
+    const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+      if (disabled) {
+        return;
+      }
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
         inputRef.current?.click();
       }
     };
@@ -92,11 +123,13 @@ export const BaseUpload = React.forwardRef<HTMLDivElement, BaseUploadProps>(
           className
         )}
         onClick={handleClick}
+        onKeyDown={handleKeyDown}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         role="button"
         tabIndex={disabled ? -1 : 0}
+        aria-disabled={disabled}
       >
         <input
           ref={inputRef}
@@ -109,7 +142,37 @@ export const BaseUpload = React.forwardRef<HTMLDivElement, BaseUploadProps>(
         />
         {children || (
           <div className={styles.uploadPlaceholder}>
-            <p>点击选择文件或拖拽到此</p>
+            <span className={styles.uploadIcon} aria-hidden>
+              {placeholderIcon ?? (
+                <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path
+                    d="M24 8V29"
+                    stroke="currentColor"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M16 16L24 8L32 16"
+                    stroke="currentColor"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M10 27V35C10 37.2091 11.7909 39 14 39H34C36.2091 39 38 37.2091 38 35V27"
+                    stroke="currentColor"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              )}
+            </span>
+            <div className={styles.uploadTitle}>{placeholderTitle ?? '点击或拖拽文件到此处上传'}</div>
+            <div className={styles.uploadDescription}>
+              {placeholderDescription ?? '支持单文件或批量上传'}
+            </div>
           </div>
         )}
       </div>
