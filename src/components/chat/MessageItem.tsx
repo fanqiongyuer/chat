@@ -33,6 +33,18 @@ interface Message {
   references?: MessageReference[];
 }
 
+interface PaperRecommendationItem {
+  title: string;
+  pmid: string;
+  doi: string;
+}
+
+interface PaperRecommendationPayload {
+  items: PaperRecommendationItem[];
+}
+
+const PAPER_LIST_MARKER = '[[PAPER_LIST_JSON]]';
+
 interface MessageItemProps {
   msg: Message;
   actionKey?: string;
@@ -262,6 +274,71 @@ const MermaidBlock: React.FC<{ rawCode: string }> = ({ rawCode }) => {
   );
 };
 
+const normalizePaperItem = (item: Partial<PaperRecommendationItem>): PaperRecommendationItem | null => {
+  const title = typeof item.title === 'string' ? item.title.trim() : '';
+  const pmid = typeof item.pmid === 'string' ? item.pmid.trim() : '';
+  const doi = typeof item.doi === 'string' ? item.doi.trim().replace(/[.,;；。]+$/g, '') : '';
+
+  if (!title || !pmid || !doi) return null;
+  return { title, pmid, doi };
+};
+
+const parsePaperRecommendationsFromPlainText = (content: string): PaperRecommendationPayload | null => {
+  const lines = content
+    .replace(/\r/g, '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (lines.length === 0) return null;
+
+  const items: PaperRecommendationItem[] = [];
+
+  lines.forEach((line, index) => {
+    const pmidMatch = line.match(/PMID\s*[:：]\s*(\d{4,})/i);
+    const doiMatch = line.match(/DOI\s*[:：]\s*([^\s,，;；]+)/i);
+    if (!pmidMatch || !doiMatch) return;
+
+    const titleBeforeMeta = line.slice(0, pmidMatch.index ?? 0).replace(/[，,;；:\-—]+\s*$/g, '').trim();
+    const fallbackTitle = lines[index - 1]?.replace(/^[-*•\d.\s)]+/, '').trim() ?? '';
+    const title = titleBeforeMeta || fallbackTitle;
+
+    const normalized = normalizePaperItem({
+      title,
+      pmid: pmidMatch[1],
+      doi: doiMatch[1],
+    });
+
+    if (normalized) items.push(normalized);
+  });
+
+  if (items.length === 0) return null;
+  return { items };
+};
+
+const parsePaperRecommendationPayload = (content: string): PaperRecommendationPayload | null => {
+  if (!content.startsWith(PAPER_LIST_MARKER)) {
+    return parsePaperRecommendationsFromPlainText(content);
+  }
+
+  const payloadText = content.slice(PAPER_LIST_MARKER.length).trim();
+  if (!payloadText) return null;
+
+  try {
+    const parsed = JSON.parse(payloadText) as { items?: Array<Partial<PaperRecommendationItem>> };
+    if (!Array.isArray(parsed.items)) return null;
+
+    const items = parsed.items
+      .map((item) => normalizePaperItem(item))
+      .filter((item): item is PaperRecommendationItem => item !== null);
+
+    if (items.length === 0) return null;
+    return { items };
+  } catch {
+    return parsePaperRecommendationsFromPlainText(payloadText);
+  }
+};
+
 const MessageItem: React.FC<MessageItemProps> = ({
   msg,
   actionKey,
@@ -284,6 +361,11 @@ const MessageItem: React.FC<MessageItemProps> = ({
     return /\$\$[\s\S]*?\$\$|(^|[^\\])\$[^\n$]+\$|\\\(|\\\[|\\begin\{|\\ce\{/.test(msg.content);
   }, [msg.content]);
   const hasEmojiShortcode = useMemo(() => /:[a-zA-Z0-9_+-]+:/.test(msg.content), [msg.content]);
+  const paperRecommendationPayload = useMemo(
+    () => (isUser ? null : parsePaperRecommendationPayload(msg.content)),
+    [isUser, msg.content],
+  );
+  const isPaperRecommendationMessage = Boolean(paperRecommendationPayload && paperRecommendationPayload.items.length > 0);
 
   useEffect(() => {
     if (!hasMathSyntax || mathRemarkPlugin || mathRehypePlugin) return;
@@ -535,28 +617,75 @@ const MessageItem: React.FC<MessageItemProps> = ({
           </div>
         ) : (
           <div className="flex w-full min-w-0 max-w-[85%] flex-col items-start gap-2">
-          <div
-            ref={markdownContainerRef}
-            className="prose prose-slate max-w-none break-words text-primaryText prose-p:my-3 prose-p:text-[14px] prose-p:leading-[1.8] prose-li:text-[14px] prose-li:leading-[1.75] prose-headings:text-primaryText prose-headings:tracking-[-0.01em] prose-h1:mt-6 prose-h1:mb-3 prose-h1:text-[20px] md:prose-h1:text-[22px] prose-h1:leading-[1.3] prose-h1:font-semibold prose-h2:mt-7 prose-h2:mb-3 prose-h2:text-[16px] prose-h2:leading-[1.35] prose-h2:font-semibold prose-h3:mt-6 prose-h3:mb-2 prose-h3:text-[16px] prose-h3:leading-[1.45] prose-h3:font-semibold prose-strong:text-primaryText prose-code:font-normal prose-code:before:content-none prose-code:after:content-none prose-hr:my-6 prose-li:my-1 prose-li:marker:text-secondaryText prose-ol:pl-6 prose-ul:pl-6 prose-a:text-primary prose-a:no-underline hover:prose-a:underline"
-          >
-            <ReactMarkdown
-              remarkPlugins={remarkPlugins}
-              rehypePlugins={rehypePlugins}
-              components={markdownComponents}
-            >
-              {msg.content}
-            </ReactMarkdown>
-          </div>
+            {isPaperRecommendationMessage && paperRecommendationPayload ? (
+              <div className="w-full space-y-2.5">
+                {paperRecommendationPayload.items.map((paper, index) => (
+                  <article
+                    key={`${paper.pmid}-${index}`}
+                    className="group not-prose inline-flex w-full items-center gap-3 rounded-xl border border-borderGray bg-surface px-3 py-2.5 shadow-sm"
+                  >
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary text-[11px] font-semibold tracking-wide text-white">
+                      文献
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="m-0 truncate text-base font-medium text-primaryText">{paper.title}</p>
+                      <p className="m-0 text-xs text-secondaryText">
+                        PMID:{' '}
+                        <a
+                          href={`https://pubmed.ncbi.nlm.nih.gov/${paper.pmid}/`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="font-medium text-primary no-underline hover:underline"
+                        >
+                          {paper.pmid}
+                        </a>
+                        {'  '}|{'  '}DOI:{' '}
+                        <a
+                          href={`https://doi.org/${paper.doi}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="font-medium text-primary no-underline hover:underline"
+                        >
+                          {paper.doi}
+                        </a>
+                      </p>
+                    </div>
+                    <a
+                      href={`https://pubmed.ncbi.nlm.nih.gov/${paper.pmid}/`}
+                      target="_blank"
+                      rel="noreferrer"
+                      aria-label="打开文献详情"
+                      className="shrink-0 rounded-md p-1 text-secondaryText opacity-0 transition-opacity group-hover:opacity-100 hover:bg-bgLight focus:opacity-100"
+                    >
+                      <ArrowRight size={14} />
+                    </a>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <div
+                ref={markdownContainerRef}
+                className="prose prose-slate max-w-none break-words text-primaryText prose-p:my-3 prose-p:text-[14px] prose-p:leading-[1.8] prose-li:text-[14px] prose-li:leading-[1.75] prose-headings:text-primaryText prose-headings:tracking-[-0.01em] prose-h1:mt-6 prose-h1:mb-3 prose-h1:text-[20px] md:prose-h1:text-[22px] prose-h1:leading-[1.3] prose-h1:font-semibold prose-h2:mt-7 prose-h2:mb-3 prose-h2:text-[16px] prose-h2:leading-[1.35] prose-h2:font-semibold prose-h3:mt-6 prose-h3:mb-2 prose-h3:text-[16px] prose-h3:leading-[1.45] prose-h3:font-semibold prose-strong:text-primaryText prose-code:font-normal prose-code:before:content-none prose-code:after:content-none prose-hr:my-6 prose-li:my-1 prose-li:marker:text-secondaryText prose-ol:pl-6 prose-ul:pl-6 prose-a:text-primary prose-a:no-underline hover:prose-a:underline"
+              >
+                <ReactMarkdown
+                  remarkPlugins={remarkPlugins}
+                  rehypePlugins={rehypePlugins}
+                  components={markdownComponents}
+                >
+                  {msg.content}
+                </ReactMarkdown>
+              </div>
+            )}
 
-          {msg.content && !streaming && actionKey && onFeedback && onRefresh && (
-            <AssistantActions
-              markdownContent={msg.content}
-              onRefresh={onRefresh}
-              feedback={feedback}
-              onFeedback={(type) => onFeedback(actionKey, type)}
-              disabled={streaming}
-            />
-          )}
+            {!isPaperRecommendationMessage && msg.content && !streaming && actionKey && onFeedback && onRefresh && (
+              <AssistantActions
+                markdownContent={msg.content}
+                onRefresh={onRefresh}
+                feedback={feedback}
+                onFeedback={(type) => onFeedback(actionKey, type)}
+                disabled={streaming}
+              />
+            )}
           </div>
         )}
       </div>

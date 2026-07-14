@@ -172,6 +172,23 @@ const BIO_PAPER_DOC_BUNDLE = [
   '可继续发送关键词触发单篇：`生物文献1` / `生物文献2` / `生物文献3`。',
 ].join('\n');
 
+const PAPER_LIST_MARKER = '[[PAPER_LIST_JSON]]';
+
+const PAPER_RECOMMENDATION_PAYLOAD = {
+  items: [
+    {
+      title: 'Integrating gut microbiome and host transcriptomics for the personalized management of IBD',
+      pmid: '4172135',
+      doi: '10.1080/17501911.2025.2591594',
+    },
+    {
+      title: 'Longitudinal multi-omics signatures predict flare-up risk in ulcerative colitis',
+      pmid: '39284511',
+      doi: '10.1136/gutjnl-2023-330217',
+    },
+  ],
+};
+
 const MOCK_RESPONSE_LIBRARY: Array<{ keywords: string[]; response: string }> = [
   {
     keywords: ['一句话介绍', '你能帮我做什么', '介绍你能'],
@@ -244,6 +261,10 @@ const MOCK_RESPONSE_LIBRARY: Array<{ keywords: string[]; response: string }> = [
   {
     keywords: ['生物文献3', '文献测试3', 'paper test 3'],
     response: BIO_PAPER_DOC_3,
+  },
+  {
+    keywords: ['查找文献', '找文献', '推荐文献', '文献列表', 'paper list', 'literature'],
+    response: `${PAPER_LIST_MARKER} ${JSON.stringify(PAPER_RECOMMENDATION_PAYLOAD)}`,
   },
   {
     keywords: ['文献', 'paper', '总结'],

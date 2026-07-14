@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { ChevronDown, Menu, Plus, Search, Upload, Users } from 'lucide-react';
 import { Select } from 'antd';
-import { BaseButton, BaseDocumentUpload, BaseEmpty, BaseModal } from '../components';
+import { BaseButton, BaseEmpty, BaseModal } from '../components';
 import { EXPERIMENTS_BY_PROJECT, PROJECT_MEMBERS, mockProjects } from '../mock/projects';
 import { type LayoutOutletContext } from '../components/Layout';
 
@@ -187,14 +187,6 @@ const formatChatDateTime = (rawDate: string, chatId: string) => {
   return formatDateToCnymdhm(now);
 };
 
-const createLocalDocId = () => `exp-local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-
-const getFileNameWithoutExt = (fileName: string) => {
-  const idx = fileName.lastIndexOf('.');
-  if (idx <= 0) return fileName;
-  return fileName.slice(0, idx);
-};
-
 export default function ProjectDetailPage() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
@@ -205,10 +197,7 @@ export default function ProjectDetailPage() {
   const [selectedTag, setSelectedTag] = useState('all');
   const [isTagExpanded, setIsTagExpanded] = useState(false);
   const [showTagToggle, setShowTagToggle] = useState(false);
-  const [showCreateDocModal, setShowCreateDocModal] = useState(false);
   const [showMemberModal, setShowMemberModal] = useState(false);
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [createDocError, setCreateDocError] = useState('');
   const [memberModalError, setMemberModalError] = useState('');
   const [selectedInviteMemberIds, setSelectedInviteMemberIds] = useState<string[]>([]);
   const [invitePermission, setInvitePermission] = useState<MemberPermission>('浏览');
@@ -276,16 +265,6 @@ export default function ProjectDetailPage() {
     setLocalDocs([...experimentList]);
   }, [experimentList]);
 
-  const resetCreateDocForm = () => {
-    setSelectedFiles([]);
-    setCreateDocError('');
-  };
-
-  const openCreateDocModal = () => {
-    resetCreateDocForm();
-    setShowCreateDocModal(true);
-  };
-
   const openMemberModal = () => {
     setMemberModalError('');
     setSelectedInviteMemberIds([]);
@@ -300,13 +279,8 @@ export default function ProjectDetailPage() {
     setInvitePermission('浏览');
   };
 
-  const handleImportDocClick = () => {
-    openCreateDocModal();
-  };
-
-  const closeCreateDocModal = () => {
-    setShowCreateDocModal(false);
-    resetCreateDocForm();
+  const handlePendingDocAction = () => {
+    // 文档新建/导入逻辑暂缓，先移除弹窗入口。
   };
 
   const handlePermissionChange = (memberId: string, permission: MemberPermission) => {
@@ -362,30 +336,6 @@ export default function ProjectDetailPage() {
     setSelectedInviteMemberIds([]);
     setInvitePermission('浏览');
     setMemberModalError('');
-  };
-
-  const handleCreateDocSubmit = () => {
-    if (selectedFiles.length === 0) {
-      setCreateDocError('请先选择至少一个文件');
-      return;
-    }
-
-    const uploadedDocs = selectedFiles.map((file) => {
-      const nameWithoutExt = getFileNameWithoutExt(file.name);
-      const extension = file.name.includes('.') ? file.name.split('.').pop()?.toLowerCase() : '';
-
-      return {
-        id: createLocalDocId(),
-        title: nameWithoutExt || file.name,
-        summary: `上传文件：${file.name}`,
-        ownerId: projectMembers[0]?.id ?? 'm-system',
-        status: '进行中' as const,
-        tags: extension ? ['外部导入', extension.toUpperCase()] : ['外部导入'],
-      };
-    });
-
-    setLocalDocs((prev) => [...uploadedDocs, ...prev]);
-    closeCreateDocModal();
   };
 
   const documentTagOptions = useMemo(() => {
@@ -645,7 +595,7 @@ export default function ProjectDetailPage() {
                     rounded="large"
                     icon={activeTab === 'experiment' ? <Plus size={16} /> : undefined}
                     className="!h-auto !gap-1 !border-transparent !bg-transparent !px-0 !py-0 !text-sm !font-semibold !text-[var(--color-primary)] hover:!bg-transparent hover:!text-[var(--color-primary-hover)]"
-                    onClick={activeTab === 'experiment' ? openCreateDocModal : undefined}
+                    onClick={activeTab === 'experiment' ? handlePendingDocAction : undefined}
                   >
                     {activeTab === 'experiment' ? '新建' : '发起对话'}
                   </BaseButton>
@@ -654,7 +604,7 @@ export default function ProjectDetailPage() {
                       <span className="h-4 border-l border-[var(--color-line-subtle)]" aria-hidden="true" />
                       <button
                         type="button"
-                        onClick={handleImportDocClick}
+                        onClick={handlePendingDocAction}
                         className="inline-flex items-center gap-1 text-sm font-medium text-[var(--color-primary)] transition-colors hover:text-[var(--color-primary-hover)] hover:underline"
                       >
                         <Upload size={14} />
@@ -768,32 +718,6 @@ export default function ProjectDetailPage() {
           )}
         </div>
       </div>
-
-      <BaseModal
-        visible={showCreateDocModal}
-        title="导入文档"
-        width={500}
-        maskClosable={false}
-        cancelText="取消"
-        okText="导入"
-        onCancel={closeCreateDocModal}
-        onConfirm={handleCreateDocSubmit}
-        bodyClassName="!px-6 !py-5"
-      >
-        <div className="space-y-4">
-          <div className="space-y-3">
-            <BaseDocumentUpload
-              value={selectedFiles}
-              maxCount={5}
-              maxSize={20 * 1024 * 1024}
-              onChange={setSelectedFiles}
-              onError={(error) => setCreateDocError(error.message)}
-            />
-          </div>
-
-          {createDocError && <div className="text-sm text-[var(--color-danger)]">{createDocError}</div>}
-        </div>
-      </BaseModal>
 
       <BaseModal
         visible={showMemberModal}
