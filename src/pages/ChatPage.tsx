@@ -1,20 +1,13 @@
 import React, { useState, useRef, useEffect, useLayoutEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useParams, useOutletContext, useLocation } from 'react-router-dom';
-import { Menu, Folder, ChevronDown, ChevronRight, Plus, Send, FileText, FlaskConical, Search, X, Clock3, Copy, Check } from 'lucide-react';
+import { Menu, Folder, ChevronDown, ChevronRight, Plus, FileText, FlaskConical, Search, X, Copy, Check } from 'lucide-react';
 import MessageItem from '../components/chat/MessageItem';
-import InputArea, {
-CHAT_FILE_OPTIONS,
-CHAT_INPUT_GUIDE_TEXT,
-CHAT_SKILL_OPTIONS,
-insertFileReference,
-insertSkillCommand,
-resolveAtQuery,
-resolveSlashQuery,
-} from '../components/chat/InputArea';
+import InputArea from '../components/chat/InputArea';
+import type { InputAttachment, InputSendPayload } from '../components/chat/InputArea';
 import QuickPrompts from '../components/chat/QuickPrompts';
 import ThinkingIndicator, { type StatusPhase, type SearchStep } from '../components/chat/ThinkingIndicator';
 import { ChatStreamError, streamChatResponse } from '../mock/mockApi';
-import { mockProjects } from '../mock/projects';
+import { EXPERIMENTS_BY_PROJECT, KNOWLEDGE_BY_PROJECT, mockProjects } from '../mock/projects';
 import { type MockChat } from '../mock/chats';
 import { BaseActionMenu, BaseButton, BaseInput, BaseModal } from '../components';
 import type { BaseActionMenuItem, BaseActionMenuProps } from '../components';
@@ -23,6 +16,8 @@ import { type LayoutOutletContext } from '../components/Layout';
 interface Message {
   role: 'user' | 'assistant';
   content: string;
+  attachments?: InputAttachment[];
+  references?: InputSendPayload['references'];
 }
 
 type AssistantFeedback = 'like' | 'dislike';
@@ -49,9 +44,16 @@ function loadChatMessagesFromStorage(): Record<string, Message[]> {
         .map((item) => {
           const role = (item as { role?: string }).role;
           const content = (item as { content?: string }).content;
+          const attachments = (item as { attachments?: InputAttachment[] }).attachments;
+          const references = (item as { references?: InputSendPayload['references'] }).references;
 
           if ((role === 'user' || role === 'assistant') && typeof content === 'string') {
-            return { role, content } as Message;
+            return {
+              role,
+              content,
+              attachments: Array.isArray(attachments) ? attachments : [],
+              references: Array.isArray(references) ? references : [],
+            } as Message;
           }
 
           return null;
@@ -106,6 +108,26 @@ interface ProjectExperiment {
 interface ProjectAttachmentContent {
   knowledgeDocs: ProjectKnowledgeDoc[];
   experiments: ProjectExperiment[];
+}
+
+interface ProjectKnowledgeListItem {
+  id: string;
+  title: string;
+  summary: string;
+  tags: string[];
+}
+
+interface ProjectExperimentListItem {
+  id: string;
+  title: string;
+  summary: string;
+  status: string;
+  tags: string[];
+}
+
+interface ProjectPanelContent {
+  knowledgeDocs: ProjectKnowledgeListItem[];
+  experiments: ProjectExperimentListItem[];
 }
 
 type PreviewItemType = 'knowledge' | 'experiment-log';
@@ -260,23 +282,12 @@ export default function ChatPage({ isNew }: { isNew?: boolean }) {
   const [workspaceWidth, setWorkspaceWidth] = useState(0);
   const prevSidebarOpenRef = useRef(isSidebarOpen);
   const suppressAutoCollapseRef = useRef(false);
-const [inputVal, setInputVal] = useState('');
-const [isInputFocused, setIsInputFocused] = useState(false);
-const [showSkillMenu, setShowSkillMenu] = useState(false);
-const [skillQuery, setSkillQuery] = useState('');
-const [activeSkillIndex, setActiveSkillIndex] = useState(-1);
-const [showFileMenu, setShowFileMenu] = useState(false);
-const [fileQuery, setFileQuery] = useState('');
-const [activeFileIndex, setActiveFileIndex] = useState(-1);
 const [projects, setProjects] = useState<Project[]>(() => mockProjects.map((project) => ({ ...project })));
 const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 const [showCreateProjectPopover, setShowCreateProjectPopover] = useState(false);
 const [newProjectName, setNewProjectName] = useState('');
 
   const [showProjectDropdown, setShowProjectDropdown] = useState(false);
-  const [isKnowledgeExpanded, setIsKnowledgeExpanded] = useState(true);
-  const [isExperimentsExpanded, setIsExperimentsExpanded] = useState(true);
-  const [expandedExperiments, setExpandedExperiments] = useState<Record<string, boolean>>({});
   const [previewTabs, setPreviewTabs] = useState<PreviewItem[]>([]);
   const [activePreviewKey, setActivePreviewKey] = useState<string | null>(null);
   const [fileSearchQuery, setFileSearchQuery] = useState('');
@@ -284,7 +295,6 @@ const [newProjectName, setNewProjectName] = useState('');
   const chatScrollContainerRef = useRef<HTMLDivElement | null>(null);
   const shouldStickToBottomRef = useRef(true);
   const hasInitializedChatChangeRef = useRef(false);
-  const newChatTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const projectSelectorRef = useRef<HTMLDivElement | null>(null);
   const createProjectPopoverRef = useRef<HTMLDivElement | null>(null);
 
@@ -399,6 +409,8 @@ const [newProjectName, setNewProjectName] = useState('');
         const loadedMessages: Message[] = messages.map((msg: any) => ({
           role: msg.role as 'user' | 'assistant',
           content: msg.content,
+          attachments: Array.isArray(msg.attachments) ? msg.attachments : [],
+          references: Array.isArray(msg.references) ? msg.references : [],
         }));
         
         if (loadedMessages.length > 0) {
@@ -598,15 +610,8 @@ const [newProjectName, setNewProjectName] = useState('');
   useEffect(() => {
     if (!isNewChat) return;
 
-    // 每次进入新建页都重置输入态，确保不会展示历史对话内容。
+    // 每次进入新建页都重置状态，确保不会展示历史对话内容。
     setMessages([]);
-    setInputVal('');
-    setShowSkillMenu(false);
-    setSkillQuery('');
-    setActiveSkillIndex(-1);
-    setShowFileMenu(false);
-    setFileQuery('');
-    setActiveFileIndex(-1);
     setIsTyping(false);
     setShowProjectDropdown(false);
     setShowCreateProjectPopover(false);
@@ -745,60 +750,42 @@ const [newProjectName, setNewProjectName] = useState('');
     };
   }, [showCreateProjectPopover]);
 
-  const attachmentContent = useMemo<ProjectAttachmentContent>(() => {
-    if (!currentProject) return attachmentContentFallback;
-    return mockAttachmentByProjectId[currentProject.id] ?? attachmentContentFallback;
+  const panelContent = useMemo<ProjectPanelContent>(() => {
+    if (!currentProject) {
+      return {
+        knowledgeDocs: [],
+        experiments: [],
+      };
+    }
+
+    return {
+      knowledgeDocs: KNOWLEDGE_BY_PROJECT[currentProject.id] ?? [],
+      experiments: EXPERIMENTS_BY_PROJECT[currentProject.id] ?? [],
+    };
   }, [currentProject]);
 
   const normalizedFileSearchQuery = fileSearchQuery.trim().toLowerCase();
 
-  const displayedAttachmentContent = useMemo<ProjectAttachmentContent>(() => {
-    if (!normalizedFileSearchQuery) return attachmentContent;
+  const displayedPanelContent = useMemo<ProjectPanelContent>(() => {
+    if (!normalizedFileSearchQuery) return panelContent;
 
     const matchesQuery = (value: string) => value.toLowerCase().includes(normalizedFileSearchQuery);
 
-    const knowledgeDocs = attachmentContent.knowledgeDocs.filter((doc) => {
-      return matchesQuery(doc.title) || matchesQuery(doc.category);
-    });
-
-    const experiments: ProjectExperiment[] = [];
-
-    attachmentContent.experiments.forEach((experiment) => {
-      const matchesTitle = matchesQuery(experiment.title);
-      const filteredLogs = matchesTitle
-        ? experiment.logs
-        : experiment.logs.filter((log) => {
-            return matchesQuery(log.summary) || matchesQuery(log.status) || matchesQuery(log.date);
-          });
-
-      if (matchesTitle || filteredLogs.length > 0) {
-        experiments.push({
-          ...experiment,
-          logs: filteredLogs,
-        });
-      }
-    });
-
     return {
-      knowledgeDocs,
-      experiments,
+      knowledgeDocs: panelContent.knowledgeDocs.filter((doc) => {
+        return matchesQuery(doc.title) || matchesQuery(doc.summary) || doc.tags.some((tag) => matchesQuery(tag));
+      }),
+      experiments: panelContent.experiments.filter((experiment) => {
+        return (
+          matchesQuery(experiment.title) ||
+          matchesQuery(experiment.summary) ||
+          matchesQuery(experiment.status) ||
+          experiment.tags.some((tag) => matchesQuery(tag))
+        );
+      }),
     };
-  }, [attachmentContent, normalizedFileSearchQuery]);
+  }, [panelContent, normalizedFileSearchQuery]);
 
-  useEffect(() => {
-    setIsKnowledgeExpanded(true);
-    setIsExperimentsExpanded(true);
-
-    const firstExperimentId = attachmentContent.experiments[0]?.id;
-    setExpandedExperiments(firstExperimentId ? { [firstExperimentId]: true } : {});
-  }, [attachmentContent.experiments, chatId]);
-
-  const toggleExperiment = (experimentId: string) => {
-    setExpandedExperiments((prev) => ({
-      ...prev,
-      [experimentId]: !prev[experimentId],
-    }));
-  };
 
   const openPreviewItem = (item: PreviewItem) => {
     setPreviewTabs((prevTabs) => {
@@ -840,26 +827,25 @@ const [newProjectName, setNewProjectName] = useState('');
     });
   };
 
-  const handleKnowledgeDocClick = (doc: ProjectKnowledgeDoc) => {
+  const handleKnowledgeDocClick = (doc: ProjectKnowledgeListItem) => {
     const projectName = currentProject?.name ?? '未归属项目';
     openPreviewItem({
       key: `knowledge:${doc.id}`,
       type: 'knowledge',
       title: doc.title,
-      subtitle: `${doc.category} · ${doc.source} · 引用 ${doc.referenceCount} 次`,
-      content: `【${doc.category}】${doc.title}\n来源：${doc.source}\n引用次数：${doc.referenceCount} 次\n\n本预览用于展示文档摘要与关键信息。\n你可以在这里继续补充背景、方法步骤、结论要点与后续行动。`,
+      subtitle: `${projectName} · ${doc.tags.join(' · ') || '未分类'}`,
+      content: `文档标题：${doc.title}\n标签：${doc.tags.join(' / ') || '未分类'}\n\n摘要：${doc.summary}\n\n本预览用于展示文档摘要与关键信息。`,
     });
   };
 
-  const handleExperimentLogClick = (experiment: ProjectExperiment, log: ProjectExperimentLog) => {
+  const handleExperimentClick = (experiment: ProjectExperimentListItem) => {
     const projectName = currentProject?.name ?? '未归属项目';
     openPreviewItem({
-      key: `experiment-log:${log.id}`,
+      key: `experiment:${experiment.id}`,
       type: 'experiment-log',
-      title: `${experiment.title} · ${log.date}`,
-      subtitle: `${projectName} · ${log.status}`,
-      status: log.status,
-      content: `记录摘要：${log.summary}\n\n实验名称：${experiment.title}\n记录日期：${log.date}\n状态：${log.status}\n\n本预览用于快速查看该条实验记录，后续可接入完整详情内容。`,
+      title: experiment.title,
+      subtitle: `${projectName} · ${experiment.tags.join(' · ') || experiment.status}`,
+      content: `实验标题：${experiment.title}\n标签：${experiment.tags.join(' / ') || experiment.status}\n\n摘要：${experiment.summary}\n\n本预览用于快速查看该条实验内容，后续可接入完整详情。`,
     });
   };
 
@@ -909,102 +895,13 @@ const [newProjectName, setNewProjectName] = useState('');
   }, [chatId, hasReceivedAssistantChunk, isNewChat, isTyping, messages, statusPhase]);
 
   // 发送首条消息时立即创建会话并绑定所选项目，确保近期对话分组正确。
-  const syncNewChatCommandMenuState = useCallback((nextValue: string, cursor: number | null | undefined) => {
-    const selection = cursor ?? nextValue.length;
-    const slashQuery = resolveSlashQuery(nextValue, selection);
+  const handleSend = useCallback(async (payload: string | InputSendPayload) => {
+    const normalizedPayload: InputSendPayload =
+      typeof payload === 'string'
+        ? { content: payload, attachments: [], references: [] }
+        : payload;
 
-    if (slashQuery !== null) {
-      setShowSkillMenu(true);
-      setSkillQuery(slashQuery);
-      setActiveSkillIndex(-1);
-
-      setShowFileMenu(false);
-      setFileQuery('');
-      setActiveFileIndex(-1);
-      return;
-    }
-
-    const atQuery = resolveAtQuery(nextValue, selection);
-    if (atQuery !== null) {
-      setShowFileMenu(true);
-      setFileQuery(atQuery);
-      setActiveFileIndex(-1);
-
-      setShowSkillMenu(false);
-      setSkillQuery('');
-      setActiveSkillIndex(-1);
-      return;
-    }
-
-    setShowSkillMenu(false);
-    setSkillQuery('');
-    setActiveSkillIndex(-1);
-
-    setShowFileMenu(false);
-    setFileQuery('');
-    setActiveFileIndex(-1);
-  }, []);
-
-  const filteredSkills = useMemo(() => {
-    const keyword = skillQuery.trim().toLowerCase();
-    if (!keyword) return CHAT_SKILL_OPTIONS;
-
-    return CHAT_SKILL_OPTIONS.filter((skill) => {
-      const searchText = `${skill.id} ${skill.description} ${skill.source}`.toLowerCase();
-      return searchText.includes(keyword);
-    });
-  }, [skillQuery]);
-
-  const filteredFiles = useMemo(() => {
-    const keyword = fileQuery.trim().toLowerCase();
-    if (!keyword) {
-      return CHAT_FILE_OPTIONS.filter((file) => file.isRecent).slice(0, 10);
-    }
-
-    return CHAT_FILE_OPTIONS.filter((file) => {
-      const searchText = `${file.name} ${file.projectName} ${file.sourceType} ${file.operatorName ?? ''} ${file.operatedAt ?? ''}`.toLowerCase();
-      return searchText.includes(keyword);
-    });
-  }, [fileQuery]);
-
-  const applyNewChatSkillSelection = useCallback((skillId: string) => {
-    const textarea = newChatTextareaRef.current;
-    const selectionStart = textarea?.selectionStart ?? inputVal.length;
-    const selectionEnd = textarea?.selectionEnd ?? selectionStart;
-    const next = insertSkillCommand(inputVal, selectionStart, selectionEnd, skillId);
-
-    setInputVal(next.value);
-    setShowSkillMenu(false);
-    setSkillQuery('');
-    setActiveSkillIndex(-1);
-
-    requestAnimationFrame(() => {
-      if (!textarea) return;
-      textarea.focus();
-      textarea.setSelectionRange(next.cursor, next.cursor);
-    });
-  }, [inputVal]);
-
-  const applyNewChatFileSelection = useCallback((fileName: string) => {
-    const textarea = newChatTextareaRef.current;
-    const selectionStart = textarea?.selectionStart ?? inputVal.length;
-    const selectionEnd = textarea?.selectionEnd ?? selectionStart;
-    const next = insertFileReference(inputVal, selectionStart, selectionEnd, fileName);
-
-    setInputVal(next.value);
-    setShowFileMenu(false);
-    setFileQuery('');
-    setActiveFileIndex(-1);
-
-    requestAnimationFrame(() => {
-      if (!textarea) return;
-      textarea.focus();
-      textarea.setSelectionRange(next.cursor, next.cursor);
-    });
-  }, [inputVal]);
-
-  const handleSend = useCallback(async (text: string) => {
-    const trimmedText = text.trim();
+    const trimmedText = normalizedPayload.content.trim();
     if (!trimmedText || isTyping) return;
 
     let targetChatId = chatId;
@@ -1029,20 +926,18 @@ const [newProjectName, setNewProjectName] = useState('');
     localStorage.setItem(storageKey, conversationId);
     localStorage.setItem('conv_id', conversationId);
 
-    const userMessage: Message = { role: 'user', content: trimmedText };
+    const userMessage: Message = {
+      role: 'user',
+      content: trimmedText,
+      attachments: normalizedPayload.attachments,
+      references: normalizedPayload.references,
+    };
     const baseMessages = targetChatId
       ? (chatMessages[targetChatId] ?? (targetChatId === chatId ? messages : []))
       : messages;
     const requestMessages = [...baseMessages, userMessage];
     const nextMessages = [...requestMessages, { role: 'assistant', content: '' } as Message];
 
-    setInputVal('');
-    setShowSkillMenu(false);
-    setSkillQuery('');
-    setActiveSkillIndex(-1);
-    setShowFileMenu(false);
-    setFileQuery('');
-    setActiveFileIndex(-1);
     setHasReceivedAssistantChunk(false);
     setIsTyping(true);
     setStatusPhase('thinking');
@@ -1169,7 +1064,7 @@ const [newProjectName, setNewProjectName] = useState('');
 
     if (!previousUserMessage) return;
 
-    void handleSend(previousUserMessage.content);
+    void handleSend({ content: previousUserMessage.content, attachments: [], references: [] });
   }, [handleSend, isTyping, messages]);
 
   const activePreviewItem = useMemo(() => {
@@ -1231,252 +1126,9 @@ const [newProjectName, setNewProjectName] = useState('');
             <h1 className="text-5xl text-primaryText mb-10 tracking-wider" style={{ fontFamily: '"Songti SC", "STSong", "Noto Serif CJK SC", serif' }}>
               研究，由此开始
             </h1>
-            
+
             <div className="w-full max-w-[840px] mx-auto mb-6">
-              <div className="relative bg-white rounded-3xl shadow-sm border border-borderGray flex flex-col transition-all focus-within:shadow-lg focus-within:border-borderGray">
-                <textarea
-                  ref={newChatTextareaRef}
-                  value={inputVal}
-                  onChange={(event) => {
-                    const nextValue = event.target.value;
-                    setInputVal(nextValue);
-                    syncNewChatCommandMenuState(nextValue, event.target.selectionStart);
-                  }}
-                  onClick={(event) => {
-                    syncNewChatCommandMenuState(event.currentTarget.value, event.currentTarget.selectionStart);
-                  }}
-                  onKeyUp={(event) => {
-                    if (['ArrowDown', 'ArrowUp', 'Enter', 'Escape'].includes(event.key)) return;
-                    syncNewChatCommandMenuState(event.currentTarget.value, event.currentTarget.selectionStart);
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' && (event.shiftKey || event.metaKey || event.ctrlKey)) {
-                      event.preventDefault();
-                      const textarea = event.currentTarget;
-                      const selectionStart = textarea.selectionStart ?? inputVal.length;
-                      const selectionEnd = textarea.selectionEnd ?? selectionStart;
-                      const nextValue = `${inputVal.slice(0, selectionStart)}\n${inputVal.slice(selectionEnd)}`;
-                      const nextCursor = selectionStart + 1;
-
-                      setInputVal(nextValue);
-                      syncNewChatCommandMenuState(nextValue, nextCursor);
-
-                      requestAnimationFrame(() => {
-                        textarea.setSelectionRange(nextCursor, nextCursor);
-                      });
-                      return;
-                    }
-
-                    if (showSkillMenu) {
-                      if (event.key === 'ArrowDown') {
-                        event.preventDefault();
-                        setActiveSkillIndex((prev) => {
-                          if (filteredSkills.length === 0) return -1;
-                          if (prev < 0) return 0;
-                          return (prev + 1) % filteredSkills.length;
-                        });
-                        return;
-                      }
-
-                      if (event.key === 'ArrowUp') {
-                        event.preventDefault();
-                        setActiveSkillIndex((prev) => {
-                          if (filteredSkills.length === 0) return -1;
-                          if (prev < 0) return filteredSkills.length - 1;
-                          return (prev - 1 + filteredSkills.length) % filteredSkills.length;
-                        });
-                        return;
-                      }
-
-                      if (event.key === 'Escape') {
-                        event.preventDefault();
-                        setShowSkillMenu(false);
-                        setSkillQuery('');
-                        setActiveSkillIndex(-1);
-                        return;
-                      }
-
-                      if (event.key === 'Enter' && !event.shiftKey) {
-                        event.preventDefault();
-                        const targetSkill = activeSkillIndex >= 0 ? filteredSkills[activeSkillIndex] : undefined;
-                        if (targetSkill) {
-                          applyNewChatSkillSelection(targetSkill.id);
-                        }
-                        return;
-                      }
-                    }
-
-                    if (showFileMenu) {
-                      if (event.key === 'ArrowDown') {
-                        event.preventDefault();
-                        setActiveFileIndex((prev) => {
-                          if (filteredFiles.length === 0) return -1;
-                          if (prev < 0) return 0;
-                          return (prev + 1) % filteredFiles.length;
-                        });
-                        return;
-                      }
-
-                      if (event.key === 'ArrowUp') {
-                        event.preventDefault();
-                        setActiveFileIndex((prev) => {
-                          if (filteredFiles.length === 0) return -1;
-                          if (prev < 0) return filteredFiles.length - 1;
-                          return (prev - 1 + filteredFiles.length) % filteredFiles.length;
-                        });
-                        return;
-                      }
-
-                      if (event.key === 'Escape') {
-                        event.preventDefault();
-                        setShowFileMenu(false);
-                        setFileQuery('');
-                        setActiveFileIndex(-1);
-                        return;
-                      }
-
-                      if (event.key === 'Enter' && !event.shiftKey) {
-                        event.preventDefault();
-                        const targetFile = activeFileIndex >= 0 ? filteredFiles[activeFileIndex] : undefined;
-                        if (targetFile) {
-                          applyNewChatFileSelection(targetFile.name);
-                        }
-                        return;
-                      }
-                    }
-
-                    if (event.key === 'Enter' && !event.shiftKey) {
-                      event.preventDefault();
-                      handleSend(inputVal);
-                    }
-                  }}
-                  onFocus={() => setIsInputFocused(true)}
-                  onBlur={() => {
-                    setIsInputFocused(false);
-                    setShowSkillMenu(false);
-                    setActiveSkillIndex(-1);
-                    setShowFileMenu(false);
-                    setActiveFileIndex(-1);
-                  }}
-                  placeholder={isInputFocused ? CHAT_INPUT_GUIDE_TEXT : '输入你的科研问题...'}
-                  className="w-full min-h-[90px] max-h-[200px] p-5 outline-none resize-none text-[14px] bg-transparent text-primaryText placeholder:text-tertiaryText leading-relaxed"
-                />
-
-                {showSkillMenu && (
-                  <div className="absolute inset-x-4 bottom-full mb-2 z-40" onMouseDown={(event) => event.preventDefault()}>
-                    <div className="overflow-hidden rounded-xl border border-[#e6ecf2] bg-white shadow-[0_8px_24px_rgba(15,23,42,0.12)]">
-                      <div className="flex items-center gap-2 border-b border-[#eef2f6] px-3 py-2 text-[13px] text-tertiaryText">
-                        <Search size={14} className="text-tertiaryText" />
-                        <span className="truncate">{skillQuery ? `搜索 skill：${skillQuery}` : '搜索 skill'}</span>
-                      </div>
-
-                      <div className="max-h-64 overflow-y-auto py-1">
-                        {filteredSkills.length === 0 ? (
-                          <div className="px-3 py-6 text-center text-sm text-tertiaryText">未找到匹配的 Skill</div>
-                        ) : (
-                          filteredSkills.map((skill, index) => (
-                            <button
-                              key={skill.id}
-                              type="button"
-                              className={`mx-2 flex w-[calc(100%-1rem)] items-center gap-2 rounded-lg px-3 py-2 text-left transition-colors ${
-                                index === activeSkillIndex ? 'bg-[#f4f7fb]' : 'hover:bg-[#f8fafc]'
-                              }`}
-                              onClick={() => applyNewChatSkillSelection(skill.id)}
-                            >
-                              <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded bg-[#eef3f8] text-[10px] font-semibold leading-none text-[#5f6b7a]">
-                                {skill.badge}
-                              </span>
-                              <span className="min-w-0 flex flex-1 items-center gap-1">
-                                <span className="text-[13px] font-semibold text-primaryText">{skill.id}</span>
-                                <span className="truncate text-[12px] text-tertiaryText">{skill.description}</span>
-                              </span>
-                              <span className="shrink-0 text-[11px] text-tertiaryText">{skill.source}</span>
-                            </button>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {showFileMenu && (
-                  <div className="absolute inset-x-4 bottom-full mb-2 z-40" onMouseDown={(event) => event.preventDefault()}>
-                    <div className="overflow-hidden rounded-xl border border-[#e6ecf2] bg-white shadow-[0_8px_24px_rgba(15,23,42,0.12)]">
-                      <div className="flex items-center gap-2 border-b border-[#eef2f6] px-3 py-2 text-[13px] text-tertiaryText">
-                        <Search size={14} className="text-tertiaryText" />
-                        <span className="truncate">{fileQuery ? `搜索文件：${fileQuery}` : '搜索文件'}</span>
-                      </div>
-
-                      <div className="max-h-64 overflow-y-auto py-1">
-                        {!fileQuery && (
-                          <div className="px-3 py-2">
-                            <div className="flex items-center gap-1 text-[12px] text-tertiaryText">
-                              <Clock3 size={12} />
-                              <span>最近使用的文档</span>
-                            </div>
-                          </div>
-                        )}
-                        {filteredFiles.length === 0 ? (
-                          <div className="px-3 py-6 text-center text-sm text-tertiaryText">未找到匹配的文件</div>
-                        ) : (
-                          filteredFiles.map((file, index) => (
-                            <button
-                              key={file.id}
-                              type="button"
-                              className={`mx-2 flex w-[calc(100%-1rem)] items-center gap-2 rounded-lg px-3 py-2 text-left transition-colors ${
-                                index === activeFileIndex ? 'bg-[#f4f7fb]' : 'hover:bg-[#f8fafc]'
-                              }`}
-                              onClick={() => applyNewChatFileSelection(file.name)}
-                            >
-                              <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded bg-[#eef3f8] text-[#5f6b7a]">
-                                <FileText size={11} />
-                              </span>
-                              <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-primaryText">{file.name}</span>
-                              {!fileQuery && file.operatorName && file.operatedAt && (
-                                <span className="shrink-0 max-w-[55%] truncate text-right text-[12px] text-tertiaryText">
-                                  {`- by ${file.operatorName} ${file.operatedAt}`}
-                                </span>
-                              )}
-                            </button>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-            <div className="flex justify-between items-center p-3 pt-0">
-              <div ref={projectSelectorRef} className="flex items-center gap-2 pl-1 relative">
-                <BaseActionMenu
-                  open={showProjectDropdown}
-                  onOpenChange={(open) => {
-                    if (!open && showCreateProjectPopover) {
-                      return;
-                    }
-                    setShowProjectDropdown(open);
-                    if (!open) {
-                      setShowCreateProjectPopover(false);
-                      return;
-                    }
-                    setShowCreateProjectPopover(false);
-                  }}
-                  placement="top-start"
-                  width={260}
-                  trigger={
-                    <span className="flex items-center gap-1.5 rounded-full border border-borderGray bg-white px-4 py-1.5 text-[14px] text-tertiaryText transition-colors hover:bg-bgLight">
-                      <span className="truncate max-w-[120px]">
-                        {selectedProject ? selectedProject.name : '工作项目'}
-                      </span>
-                      <ChevronDown size={14} />
-                    </span>
-                  }
-                  items={projectMenuItems}
-                  footerItems={projectMenuFooterItems}
-                  onItemClick={handleProjectMenuItemClick}
-                  className="!inline-flex"
-                  listClassName="max-h-[220px] overflow-y-auto"
-                />
-
+              <div ref={projectSelectorRef} className="relative">
                 {showCreateProjectPopover && (
                   <div
                     ref={createProjectPopoverRef}
@@ -1509,27 +1161,43 @@ const [newProjectName, setNewProjectName] = useState('');
                     </div>
                   </div>
                 )}
-
-                <div className="relative group">
-                      <button className="w-8 h-8 rounded-full border border-borderGray flex items-center justify-center text-tertiaryText hover:bg-bgLight transition-colors bg-white">
-                        <Plus size={16} />
-                      </button>
-                      <div className="pointer-events-none absolute bottom-full left-0 z-50 mb-2 hidden w-max whitespace-nowrap rounded-lg bg-[#2b313d] px-3 py-2 text-[13px] leading-6 text-white shadow-[0_8px_20px_rgba(15,23,42,0.25)] group-hover:block">
-                        <div>上传文件，支持各类文档和图片</div>
-                        <div>最多 50 个，每个 100 MB</div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button 
-                      onClick={() => handleSend(inputVal)}
-                      className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${inputVal.trim() && !isTyping ? 'bg-primary text-white shadow-md hover:bg-primary-hover' : 'bg-tertiaryText text-white'}`}
-                    >
-                      <Send size={16} />
-                    </button>
-                  </div>
-                </div>
               </div>
+
+              <InputArea
+                onSend={handleSend}
+                disabled={isTyping}
+                leadingControls={(
+                  <BaseActionMenu
+                    open={showProjectDropdown}
+                    onOpenChange={(open) => {
+                      if (!open && showCreateProjectPopover) {
+                        return;
+                      }
+                      setShowProjectDropdown(open);
+                      if (!open) {
+                        setShowCreateProjectPopover(false);
+                        return;
+                      }
+                      setShowCreateProjectPopover(false);
+                    }}
+                    placement="top-start"
+                    width={260}
+                    trigger={
+                      <span className="flex items-center gap-1.5 rounded-full border border-borderGray bg-white px-4 py-1.5 text-[14px] text-tertiaryText transition-colors hover:bg-bgLight">
+                        <span className="truncate max-w-[120px]">
+                          {selectedProject ? selectedProject.name : '工作项目'}
+                        </span>
+                        <ChevronDown size={14} />
+                      </span>
+                    }
+                    items={projectMenuItems}
+                    footerItems={projectMenuFooterItems}
+                    onItemClick={handleProjectMenuItemClick}
+                    className="!inline-flex"
+                    listClassName="max-h-[220px] overflow-y-auto"
+                  />
+                )}
+              />
             </div>
 
             <QuickPrompts onSelect={handleSend} />
@@ -1786,145 +1454,73 @@ className={`w-full inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 pr-6 
                   </section>
 
                   <section>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <button
-                        onClick={() => setIsKnowledgeExpanded((prev) => !prev)}
-                        className="flex items-center gap-1 text-sm font-medium text-primaryText hover:text-black"
-                      >
-                        {isKnowledgeExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                        <span>知识 {displayedAttachmentContent.knowledgeDocs.length}</span>
-                      </button>
-                      <button className="text-xs text-secondaryText hover:text-primaryText transition-colors">添加</button>
-                    </div>
+                    <div className="space-y-1">
+                      {(() => {
+                        const totalItems =
+                          displayedPanelContent.knowledgeDocs.length + displayedPanelContent.experiments.length;
 
-                    {isKnowledgeExpanded && (
-                      displayedAttachmentContent.knowledgeDocs.length > 0 ? (
-                        <div className="space-y-1">
-                          {displayedAttachmentContent.knowledgeDocs.map((doc) => {
-                            const previewKey = `knowledge:${doc.id}`;
-                            const isActive = activePreviewKey === previewKey;
+                        if (totalItems === 0) {
+                          return (
+                            <div className="rounded-lg bg-bgLight px-3 py-2 text-xs text-secondaryText">
+                              {normalizedFileSearchQuery ? '未找到匹配的文件' : '暂无项目文件'}
+                            </div>
+                          );
+                        }
 
-                            return (
-                              <button
-                                key={doc.id}
-                                onClick={() => handleKnowledgeDocClick(doc)}
-                                className={`w-full flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-sm text-primaryText transition-colors ${
-                                  isActive ? 'bg-[#fafafa] font-semibold' : 'font-normal hover:bg-[#fafafa]'
-                                }`}
-                              >
-                                <FileText size={13} className="text-tertiaryText shrink-0" />
-                                <span className="text-secondaryText shrink-0">【{doc.category}】</span>
-                                <span className="truncate">{doc.title}</span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <div className="rounded-lg bg-bgLight px-3 py-2 text-xs text-secondaryText">
-                          {normalizedFileSearchQuery ? '未找到匹配的知识文档' : '暂无知识文档，点击“添加”补充'}
-                        </div>
-                      )
-                    )}
-                  </section>
+                        return (
+                          <>
+                            {displayedPanelContent.knowledgeDocs.map((doc) => {
+                              const previewKey = `knowledge:${doc.id}`;
+                              const isActive = activePreviewKey === previewKey;
+                              const tagText = doc.tags[0] ?? '未分类';
 
-                  <section>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <button
-                        onClick={() => setIsExperimentsExpanded((prev) => !prev)}
-                        className="flex items-center gap-1 text-sm font-medium text-primaryText hover:text-black"
-                      >
-                        {isExperimentsExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                        <span>实验 {displayedAttachmentContent.experiments.length}</span>
-                      </button>
-                      <button className="text-xs text-secondaryText hover:text-primaryText transition-colors">添加</button>
-                    </div>
-
-                    {isExperimentsExpanded && (
-                      displayedAttachmentContent.experiments.length > 0 ? (
-                        <div className="space-y-1.5">
-                          {displayedAttachmentContent.experiments.map((experiment) => {
-                            const isExpanded = expandedExperiments[experiment.id] === true;
-
-                            return (
-                              <div key={experiment.id} className="rounded-lg">
+                              return (
                                 <button
-                                  onClick={() => toggleExperiment(experiment.id)}
-                                  className="w-full flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-sm text-primaryText hover:bg-[#fafafa] transition-colors"
+                                  key={doc.id}
+                                  onClick={() => handleKnowledgeDocClick(doc)}
+                                  className={`w-full rounded-lg px-2 py-1.5 text-left transition-colors ${
+                                    isActive ? 'bg-[#fafafa]' : 'hover:bg-[#fafafa]'
+                                  }`}
                                 >
-                                  {isExpanded ? (
-                                    <ChevronDown size={13} className="text-tertiaryText shrink-0" />
-                                  ) : (
-                                    <ChevronRight size={13} className="text-tertiaryText shrink-0" />
-                                  )}
-                                  <FlaskConical size={13} className="text-tertiaryText shrink-0" />
-                                  <span className="truncate">{experiment.title}</span>
-                                </button>
-
-                                {isExpanded && (
-                                  <div className="ml-7 mt-0.5 space-y-0.5">
-                                    {experiment.logs.length > 0 ? (
-                                      experiment.logs.map((log, logIndex) => {
-                                        const showConnector = logIndex < experiment.logs.length - 1;
-                                        const previewKey = `experiment-log:${log.id}`;
-                                        const isActive = activePreviewKey === previewKey;
-
-                                        return (
-                                          <button
-                                            key={log.id}
-                                            type="button"
-                                            onClick={() => handleExperimentLogClick(experiment, log)}
-                                            className="group block w-full text-left"
-                                          >
-                                            <div className="relative flex gap-2">
-                                              <div className="relative flex w-3.5 shrink-0 justify-center">
-                                                {showConnector && (
-                                                  <span className="absolute left-1/2 top-[14px] bottom-[-6px] w-px -translate-x-1/2 bg-borderGray/80" />
-                                                )}
-                                                <span className="mt-[9px] h-1.5 w-1.5 rounded-full bg-[#D1D5DB]" />
-                                              </div>
-                                              <div className="min-w-0 flex-1 pb-1.5">
-                                                <div
-                                                  className={`rounded-lg px-2.5 py-1.5 transition-colors ${
-                                                    isActive ? 'bg-[#fafafa]' : 'group-hover:bg-[#fafafa]'
-                                                  }`}
-                                                >
-                                                  <div
-                                                    className={`line-clamp-2 text-sm leading-5 ${
-                                                      isActive
-                                                        ? 'font-semibold text-primaryText'
-                                                        : 'font-normal text-secondaryText'
-                                                    }`}
-                                                  >
-                                                    {log.summary}
-                                                  </div>
-                                                  <div
-                                                    className={`mt-0.5 text-xs ${
-                                                      isActive ? 'text-secondaryText' : 'text-tertiaryText'
-                                                    }`}
-                                                  >
-                                                    {log.date}
-                                                  </div>
-                                                </div>
-                                              </div>
-                                            </div>
-                                          </button>
-                                        );
-                                      })
-                                    ) : (
-                                      <div className="text-xs text-secondaryText px-2 py-1">暂无实验记录</div>
-                                    )}
+                                  <div className="min-w-0">
+                                    <div className={`truncate text-sm ${isActive ? 'font-semibold text-primaryText' : 'font-normal text-primaryText'}`}>
+                                      {doc.title}
+                                    </div>
+                                    <div className="mt-0.5 truncate text-xs text-tertiaryText">{tagText}</div>
                                   </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <div className="rounded-lg bg-bgLight px-3 py-2 text-xs text-secondaryText">
-                          {normalizedFileSearchQuery ? '未找到匹配的实验内容' : '暂无实验，点击“添加”创建实验'}
-                        </div>
-                      )
-                    )}
+                                </button>
+                              );
+                            })}
+                            {displayedPanelContent.experiments.map((experiment) => {
+                              const previewKey = `experiment:${experiment.id}`;
+                              const isActive = activePreviewKey === previewKey;
+                              const tagText = experiment.tags[0] ?? experiment.status;
+
+                              return (
+                                <button
+                                  key={experiment.id}
+                                  onClick={() => handleExperimentClick(experiment)}
+                                  className={`w-full rounded-lg px-2 py-1.5 text-left transition-colors ${
+                                    isActive ? 'bg-[#fafafa]' : 'hover:bg-[#fafafa]'
+                                  }`}
+                                >
+                                  <div className="min-w-0">
+                                    <div
+                                      className={`truncate text-sm ${
+                                        isActive ? 'font-semibold text-primaryText' : 'font-normal text-primaryText'
+                                      }`}
+                                    >
+                                      {experiment.title}
+                                    </div>
+                                    <div className="mt-0.5 truncate text-xs text-tertiaryText">{tagText}</div>
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </>
+                        );
+                      })()}
+                    </div>
                   </section>
                 </div>
               </div>

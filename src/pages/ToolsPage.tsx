@@ -784,6 +784,7 @@ export default function ToolsPage() {
               onOpenChange={(open) => setActionMenuTaskId(open ? task.id : null)}
               placement="bottom-end"
               width={132}
+              portal
               menuClassName="!min-w-[132px]"
               trigger={
                 <span className="inline-flex rounded-md p-1 text-secondaryText transition-colors hover:bg-bgLight hover:text-primaryText">

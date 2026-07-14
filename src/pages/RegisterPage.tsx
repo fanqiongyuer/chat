@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { CheckCircle2 } from 'lucide-react';
 
 const AUTH_STORAGE_KEY = 'deeptrace-authenticated';
@@ -44,6 +44,9 @@ export default function RegisterPage() {
   const [email, setEmail] = useState('');
   const [verifyCode, setVerifyCode] = useState('');
   const [inviteCode, setInviteCode] = useState('');
+  const [labName, setLabName] = useState('');
+  const [searchParams] = useSearchParams();
+  const isCreateLabMode = searchParams.get('mode') === 'create-lab';
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -202,13 +205,16 @@ export default function RegisterPage() {
     if (isSubmitting) return false;
     switch (step) {
       case 'email':
+        if (isCreateLabMode) {
+          return email.trim().length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && verifyCode.trim().length >= 6 && labName.trim().length > 0;
+        }
         return email.trim().length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && verifyCode.trim().length >= 6 && inviteCode.trim().length > 0;
       case 'password':
         return password.trim().length >= 6 && password === confirmPassword;
       default:
         return false;
     }
-  }, [step, email, verifyCode, inviteCode, password, confirmPassword, isSubmitting]);
+  }, [step, email, verifyCode, inviteCode, labName, isCreateLabMode, password, confirmPassword, isSubmitting]);
 
   // ---- 提交当前步骤 ----
   const handleSubmitStep = async (e: FormEvent) => {
@@ -231,7 +237,7 @@ export default function RegisterPage() {
 
     // ---- 步骤描述 ----
     const stepTitle: Record<RegisterStep, string> = {
-     email: '验证您的邮箱',
+     email: isCreateLabMode ? '创建实验室' : '验证您的邮箱',
       password: '设置登录密码',
      success: '',
     };
@@ -318,18 +324,33 @@ export default function RegisterPage() {
                       {countdown > 0 ? `${countdown}s后获取` : '获取验证码'}
                     </button>
                   </div>
-                  <label className="relative block">
-                    <input
-                      type="text"
-                      value={inviteCode}
-                      onChange={(e) => setInviteCode(e.target.value)}
-                      required
-                      placeholder=" "
-                      autoComplete="off"
-                      className={inputClass}
-                    />
-                    <span className={labelClass}>邀请码</span>
-                  </label>
+                  {isCreateLabMode ? (
+                    <label className="relative block">
+                      <input
+                        type="text"
+                        value={labName}
+                        onChange={(e) => setLabName(e.target.value)}
+                        required
+                        placeholder=" "
+                        autoComplete="off"
+                        className={inputClass}
+                      />
+                      <span className={labelClass}>实验室名称</span>
+                    </label>
+                  ) : (
+                    <label className="relative block">
+                      <input
+                        type="text"
+                        value={inviteCode}
+                        onChange={(e) => setInviteCode(e.target.value)}
+                        required
+                        placeholder=" "
+                        autoComplete="off"
+                        className={inputClass}
+                      />
+                      <span className={labelClass}>邀请码</span>
+                    </label>
+                  )}
                 </>
               )}
 

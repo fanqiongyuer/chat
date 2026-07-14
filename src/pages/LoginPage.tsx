@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle2 } from 'lucide-react';
+import { Building2, CheckCircle2, UserPlus } from 'lucide-react';
 
 const AUTH_STORAGE_KEY = 'deeptrace-authenticated';
 const AUTH_SESSION_KEY = 'deeptrace-authenticated-session';
@@ -378,12 +378,32 @@ export default function LoginPage() {
           </form>
 
           {!showForgotPassword && (
-            <p className="mt-6 text-center text-sm text-gray-500">
-              首次使用平台？
-              <button type="button" onClick={() => navigate('/register')} className="ml-1 font-medium text-[#14B886] transition-colors hover:text-[#0d9e6d]">
-                去注册
-              </button>
-            </p>
+            <div className="mt-7">
+              <div className="flex items-center justify-center text-sm text-gray-400">
+                <span className="h-px w-12 bg-gray-200" />
+                <span className="mx-3">首次使用？</span>
+                <span className="h-px w-12 bg-gray-200" />
+              </div>
+              <div className="mt-4 flex items-center justify-center gap-6">
+                <button
+                  type="button"
+                  onClick={() => navigate('/register')}
+                  className="inline-flex items-center gap-1.5 text-sm font-normal text-[#6B7280] transition-colors hover:text-[#4B5563]"
+                >
+                  <UserPlus size={16} className="text-[#9CA3AF]" />
+                  加入实验室
+                </button>
+                <span className="h-4 w-px bg-[var(--color-line-subtle)]" aria-hidden="true" />
+                <button
+                  type="button"
+                  onClick={() => navigate('/register?mode=create-lab')}
+                  className="inline-flex items-center gap-1.5 text-sm font-normal text-[#6B7280] transition-colors hover:text-[#4B5563]"
+                >
+                  <Building2 size={16} className="text-[#9CA3AF]" />
+                  创建实验室
+                </button>
+              </div>
+            </div>
           )}
 
           {/* 忘记密码流程 */}

@@ -19,6 +19,8 @@ export interface BaseActionMenuProps {
   onItemClick?: (item: BaseActionMenuItem, event: React.MouseEvent<HTMLButtonElement>) => void;
   placement?: 'bottom-start' | 'bottom-end' | 'top-start' | 'top-end';
   width?: number | string;
+  /** When true, the menu panel is rendered via Portal into document.body to escape overflow clipping */
+  portal?: boolean;
   className?: string;
   triggerClassName?: string;
   menuClassName?: string;

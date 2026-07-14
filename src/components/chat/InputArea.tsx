@@ -1,10 +1,30 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { Plus, Send, Search, Clock3, FileText } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, useId } from 'react';
+import { Plus, Send, Search, Clock3, FileText, Paperclip, Puzzle, AtSign, X } from 'lucide-react';
 import { EXPERIMENT_DETAILS_BY_PROJECT, mockProjects } from '../../mock/projects';
 
+export interface InputAttachment {
+  id: string;
+  name: string;
+  mimeType: string;
+  previewUrl?: string;
+}
+
+export interface InputReference {
+  id: string;
+  type: 'skill' | 'doc';
+  label: string;
+}
+
+export interface InputSendPayload {
+  content: string;
+  attachments: InputAttachment[];
+  references: InputReference[];
+}
+
 interface InputAreaProps {
-  onSend: (val: string) => void;
+  onSend: (payload: InputSendPayload) => void;
   disabled: boolean;
+  leadingControls?: React.ReactNode;
 }
 
 export interface ChatSkillOption {
@@ -24,6 +44,11 @@ export interface ChatFileOption {
   operatorName?: string;
   operatedAt?: string;
 }
+
+interface UploadedInputFile extends InputAttachment {}
+
+const MAX_UPLOAD_COUNT = 50;
+const MAX_UPLOAD_FILE_SIZE = 100 * 1024 * 1024;
 
 export const CHAT_INPUT_GUIDE_TEXT = '⏎发送 | ⇧+⏎换行 | @引用 | /快捷操作';
 
@@ -167,7 +192,7 @@ const buildProjectFileOptions = (): ChatFileOption[] => {
 export const CHAT_FILE_OPTIONS: ChatFileOption[] = buildProjectFileOptions();
 export const CHAT_RECENT_FILE_OPTIONS: ChatFileOption[] = CHAT_FILE_OPTIONS.filter((option) => option.isRecent).slice(0, 10);
 
-const InputArea = ({ onSend, disabled }: InputAreaProps) => {
+const InputArea = ({ onSend, disabled, leadingControls }: InputAreaProps) => {
   const [val, setVal] = useState('');
   const [isFocused, setIsFocused] = useState(false);
 
@@ -178,8 +203,29 @@ const InputArea = ({ onSend, disabled }: InputAreaProps) => {
   const [showFileMenu, setShowFileMenu] = useState(false);
   const [fileQuery, setFileQuery] = useState('');
   const [activeFileIndex, setActiveFileIndex] = useState(-1);
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedInputFile[]>([]);
+  const [referencedSkills, setReferencedSkills] = useState<InputReference[]>([]);
+  const [referencedDocs, setReferencedDocs] = useState<InputReference[]>([]);
+  const [showUploadHint, setShowUploadHint] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const filePickerRef = useRef<HTMLInputElement | null>(null);
+  const filePickerId = useId();
+  const uploadedFilesRef = useRef<UploadedInputFile[]>([]);
+
+  useEffect(() => {
+    uploadedFilesRef.current = uploadedFiles;
+  }, [uploadedFiles]);
+
+  useEffect(() => {
+    return () => {
+      uploadedFilesRef.current.forEach((file) => {
+        if (file.previewUrl) {
+          URL.revokeObjectURL(file.previewUrl);
+        }
+      });
+    };
+  }, []);
 
   const filteredSkills = useMemo(() => {
     const keyword = skillQuery.trim().toLowerCase();
@@ -243,7 +289,30 @@ const InputArea = ({ onSend, disabled }: InputAreaProps) => {
     const textarea = textareaRef.current;
     const selectionStart = textarea?.selectionStart ?? val.length;
     const selectionEnd = textarea?.selectionEnd ?? selectionStart;
-    const next = insertSkillCommand(val, selectionStart, selectionEnd, skillId);
+
+    const before = val.slice(0, selectionStart);
+    const after = val.slice(selectionEnd);
+
+    const next = (() => {
+      const strictMatched = before.match(/(?:^|\s)\/[^\s/]*$/);
+      if (!strictMatched) {
+        return { value: val, cursor: selectionStart };
+      }
+
+      const tokenStart = before.length - strictMatched[0].length;
+      const replacement = strictMatched[0].startsWith(' ') ? ' ' : '';
+      const nextBefore = `${before.slice(0, tokenStart)}${replacement}`;
+      return {
+        value: `${nextBefore}${after}`,
+        cursor: nextBefore.length,
+      };
+    })();
+
+    setReferencedSkills((prev) => {
+      const key = `skill-${skillId}`;
+      if (prev.some((item) => item.id === key)) return prev;
+      return [...prev, { id: key, type: 'skill', label: skillId }];
+    });
 
     setVal(next.value);
     setShowSkillMenu(false);
@@ -261,7 +330,30 @@ const InputArea = ({ onSend, disabled }: InputAreaProps) => {
     const textarea = textareaRef.current;
     const selectionStart = textarea?.selectionStart ?? val.length;
     const selectionEnd = textarea?.selectionEnd ?? selectionStart;
-    const next = insertFileReference(val, selectionStart, selectionEnd, fileName);
+
+    const before = val.slice(0, selectionStart);
+    const after = val.slice(selectionEnd);
+
+    const next = (() => {
+      const strictMatched = before.match(/(?:^|\s)@[^\s@]*$/);
+      if (!strictMatched) {
+        return { value: val, cursor: selectionStart };
+      }
+
+      const tokenStart = before.length - strictMatched[0].length;
+      const replacement = strictMatched[0].startsWith(' ') ? ' ' : '';
+      const nextBefore = `${before.slice(0, tokenStart)}${replacement}`;
+      return {
+        value: `${nextBefore}${after}`,
+        cursor: nextBefore.length,
+      };
+    })();
+
+    setReferencedDocs((prev) => {
+      const key = `doc-${fileName}`;
+      if (prev.some((item) => item.id === key)) return prev;
+      return [...prev, { id: key, type: 'doc', label: fileName }];
+    });
 
     setVal(next.value);
     setShowFileMenu(false);
@@ -275,10 +367,92 @@ const InputArea = ({ onSend, disabled }: InputAreaProps) => {
     });
   }, [val]);
 
+  const handleTriggerUpload = useCallback(() => {
+    setShowUploadHint(false);
+
+    const fileInput = filePickerRef.current;
+    if (!fileInput) return;
+
+    try {
+      if ('showPicker' in fileInput && typeof fileInput.showPicker === 'function') {
+        fileInput.showPicker();
+        return;
+      }
+    } catch {
+      // ignore and fallback to click
+    }
+
+    fileInput.click();
+  }, []);
+
+  const handleFileUploadChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFiles = Array.from(event.target.files ?? []);
+    if (selectedFiles.length === 0) return;
+
+    setUploadedFiles((prev) => {
+      const seen = new Set(prev.map((file) => file.id));
+      const merged = [...prev];
+
+      selectedFiles.forEach((file) => {
+        if (file.size > MAX_UPLOAD_FILE_SIZE) return;
+        if (merged.length >= MAX_UPLOAD_COUNT) return;
+
+        const signature = `${file.name}-${file.size}-${file.lastModified}`;
+        if (seen.has(signature)) return;
+
+        const isImage = file.type.startsWith('image/');
+
+        seen.add(signature);
+        merged.push({
+          id: signature,
+          name: file.name,
+          mimeType: file.type || 'application/octet-stream',
+          previewUrl: isImage ? URL.createObjectURL(file) : undefined,
+        });
+      });
+
+      return merged;
+    });
+
+    event.target.value = '';
+  }, []);
+
+  const handleRemoveUploadedFile = useCallback((fileId: string) => {
+    setUploadedFiles((prev) => {
+      const target = prev.find((file) => file.id === fileId);
+      if (target?.previewUrl) {
+        URL.revokeObjectURL(target.previewUrl);
+      }
+      return prev.filter((file) => file.id !== fileId);
+    });
+  }, []);
+
+  const handleRemoveSkillReference = useCallback((referenceId: string) => {
+    setReferencedSkills((prev) => prev.filter((item) => item.id !== referenceId));
+  }, []);
+
+  const handleRemoveDocReference = useCallback((referenceId: string) => {
+    setReferencedDocs((prev) => prev.filter((item) => item.id !== referenceId));
+  }, []);
+
   const handleSend = useCallback(() => {
     if (!val.trim() || disabled) return;
-    onSend(val);
+
+    onSend({
+      content: val,
+      attachments: uploadedFiles.map((file) => ({
+        id: file.id,
+        name: file.name,
+        mimeType: file.mimeType,
+        previewUrl: file.previewUrl,
+      })),
+      references: [...referencedSkills, ...referencedDocs],
+    });
+
     setVal('');
+    setUploadedFiles([]);
+    setReferencedSkills([]);
+    setReferencedDocs([]);
 
     setShowSkillMenu(false);
     setSkillQuery('');
@@ -287,11 +461,91 @@ const InputArea = ({ onSend, disabled }: InputAreaProps) => {
     setShowFileMenu(false);
     setFileQuery('');
     setActiveFileIndex(-1);
-  }, [val, disabled, onSend]);
+  }, [val, disabled, onSend, uploadedFiles, referencedDocs, referencedSkills]);
 
   return (
     <div className="w-full max-w-[840px] mx-auto">
       <div className="relative bg-white rounded-3xl shadow-sm border border-borderGray flex flex-col transition-all focus-within:shadow-lg focus-within:border-borderGray">
+        <input
+          id={filePickerId}
+          ref={filePickerRef}
+          type="file"
+          multiple
+          className="pointer-events-none absolute h-0 w-0 opacity-0"
+          onChange={handleFileUploadChange}
+        />
+
+        {(uploadedFiles.length > 0 || referencedSkills.length > 0 || referencedDocs.length > 0) && (
+          <div className="px-5 pt-4 pb-1">
+            <div className="flex flex-wrap gap-2">
+              {referencedSkills.map((reference) => (
+                <div
+                  key={reference.id}
+                  className="group relative inline-flex max-w-full items-center gap-1.5 rounded-full border border-[#cfe0ff] bg-[#edf4ff] pl-3 pr-3 py-1.5 text-sm text-[#2f7bff] shadow-sm transition-[padding] duration-150 hover:pr-7"
+                >
+                  <Puzzle size={12} className="shrink-0 text-[#2f7bff]" />
+                  <span className="max-w-[190px] truncate font-medium">{reference.label}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveSkillReference(reference.id)}
+                    className="pointer-events-none absolute right-2 top-1/2 inline-flex h-4 w-4 -translate-y-1/2 translate-x-1 items-center justify-center rounded text-[#6a8cc5] opacity-0 transition-all hover:bg-[#dce9ff] hover:text-[#2f7bff] group-hover:pointer-events-auto group-hover:translate-x-0 group-hover:opacity-100"
+                    aria-label={`移除 skill ${reference.label}`}
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              ))}
+
+              {referencedDocs.map((reference) => (
+                <div
+                  key={reference.id}
+                  className="group relative inline-flex max-w-full items-center gap-1.5 rounded-full border border-[#c5f0d8] bg-[#effff6] pl-3 pr-3 py-1.5 text-sm text-[#16935a] shadow-sm transition-[padding] duration-150 hover:pr-7"
+                >
+                  <AtSign size={12} className="shrink-0 text-[#16935a]" />
+                  <span className="max-w-[190px] truncate font-medium">{reference.label}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveDocReference(reference.id)}
+                    className="pointer-events-none absolute right-2 top-1/2 inline-flex h-4 w-4 -translate-y-1/2 translate-x-1 items-center justify-center rounded text-[#5f8f73] opacity-0 transition-all hover:bg-[#dff7ea] hover:text-[#137f49] group-hover:pointer-events-auto group-hover:translate-x-0 group-hover:opacity-100"
+                    aria-label={`移除文档引用 ${reference.label}`}
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              ))}
+
+              {uploadedFiles.map((file) => (
+                <div
+                  key={file.id}
+                  className="group relative inline-flex max-w-full items-center gap-1.5 rounded-full border border-[#dfe4ea] bg-white pl-3 pr-3 py-1.5 text-sm text-primaryText shadow-sm transition-[padding] duration-150 hover:pr-7"
+                >
+                  {file.previewUrl ? (
+                    <span className="inline-flex h-[14px] w-[14px] shrink-0 overflow-hidden rounded-[3px] bg-[#eef3f8]">
+                      <img src={file.previewUrl} alt={file.name} className="h-full w-full object-cover" />
+                    </span>
+                  ) : (
+                    <Paperclip size={13} className="shrink-0 text-tertiaryText" />
+                  )}
+                  <span className="relative min-w-0">
+                    <span className="peer block max-w-[190px] truncate">{file.name}</span>
+                    <span className="pointer-events-none absolute left-0 top-[calc(100%+6px)] z-50 hidden max-w-[280px] rounded-md bg-[#2b313d] px-2.5 py-1.5 text-xs text-white shadow-[0_6px_18px_rgba(15,23,42,0.3)] peer-hover:block">
+                      {file.name}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveUploadedFile(file.id)}
+                    className="pointer-events-none absolute right-2 top-1/2 inline-flex h-4 w-4 -translate-y-1/2 translate-x-1 items-center justify-center rounded text-[#9aa0a6] opacity-0 transition-all hover:bg-[#eef2f6] hover:text-secondaryText group-hover:pointer-events-auto group-hover:translate-x-0 group-hover:opacity-100"
+                    aria-label={`删除文件 ${file.name}`}
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <textarea
           ref={textareaRef}
           value={val}
@@ -416,7 +670,7 @@ const InputArea = ({ onSend, disabled }: InputAreaProps) => {
             setShowFileMenu(false);
           }}
           placeholder={isFocused ? CHAT_INPUT_GUIDE_TEXT : '输入你的科研问题...'}
-          className="w-full min-h-[72px] max-h-[180px] px-5 pt-4 pb-3 outline-none resize-none text-[14px] bg-transparent text-primaryText placeholder:text-tertiaryText leading-relaxed"
+          className={`w-full min-h-[72px] max-h-[180px] px-5 ${(uploadedFiles.length > 0 || referencedSkills.length > 0 || referencedDocs.length > 0) ? 'pt-2' : 'pt-4'} pb-3 outline-none resize-none text-[14px] bg-transparent text-primaryText placeholder:text-tertiaryText leading-relaxed`}
         />
 
         {showSkillMenu && (
@@ -503,13 +757,27 @@ const InputArea = ({ onSend, disabled }: InputAreaProps) => {
         )}
 
         <div className="flex justify-between items-center p-3 pt-0">
-          <div className="relative group">
-            <button className="w-8 h-8 rounded-full border border-borderGray flex items-center justify-center text-tertiaryText hover:bg-bgLight transition-colors bg-white">
-              <Plus size={16} />
-            </button>
-            <div className="pointer-events-none absolute bottom-full left-0 z-50 mb-2 hidden w-max whitespace-nowrap rounded-lg bg-[#2b313d] px-3 py-2 text-[13px] leading-6 text-white shadow-[0_8px_20px_rgba(15,23,42,0.25)] group-hover:block">
-              <div>上传文件，支持各类文档和图片</div>
-              <div>最多 50 个，每个 100 MB</div>
+          <div className="flex items-center gap-2 min-w-0">
+            {leadingControls}
+            <div
+              className="relative"
+              onMouseEnter={() => setShowUploadHint(true)}
+              onMouseLeave={() => setShowUploadHint(false)}
+            >
+              <button
+                type="button"
+                onClick={handleTriggerUpload}
+                aria-controls={filePickerId}
+                className="w-8 h-8 rounded-full border border-borderGray flex items-center justify-center text-tertiaryText hover:bg-bgLight transition-colors bg-white"
+              >
+                <Plus size={16} />
+              </button>
+              <div
+                className={`pointer-events-none absolute bottom-full left-0 z-50 mb-2 w-max whitespace-nowrap rounded-lg bg-[#2b313d] px-3 py-2 text-[13px] leading-6 text-white shadow-[0_8px_20px_rgba(15,23,42,0.25)] ${showUploadHint ? 'block' : 'hidden'}`}
+              >
+                <div>上传文件，支持各类文档和图片</div>
+                <div>最多 50 个，每个 100 MB</div>
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-2">

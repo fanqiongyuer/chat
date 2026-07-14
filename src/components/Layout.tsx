@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { Folder, Clock3, Settings, Search, ChevronDown, ChevronRight, PanelLeftClose, Menu, SquarePen, MoreHorizontal, Pencil, Share2, Trash2, Pin } from 'lucide-react';
-import { BaseActionMenu } from './common';
+import { Folder, Clock3, Settings, Search, ChevronDown, ChevronRight, PanelLeftClose, Menu, SquarePen, MoreHorizontal, Pencil, Share2, Trash2, Pin, AlertTriangle } from 'lucide-react';
+import { BaseActionMenu, BaseEmpty, BaseModal } from './common';
 import type { BaseActionMenuItem, BaseActionMenuProps } from './common';
 import { mockProjects } from '../mock/projects';
 import { mockChats, type MockChat } from '../mock/chats';
@@ -12,22 +12,84 @@ export interface LayoutOutletContext {
   setIsSidebarOpen: React.Dispatch<React.SetStateAction<boolean>>;
   chats: MockChat[];
   setChats: React.Dispatch<React.SetStateAction<MockChat[]>>;
+  setAiUsageWarningActive: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 const AUTH_STORAGE_KEY = 'deeptrace-authenticated';
 const AUTH_SESSION_KEY = 'deeptrace-authenticated-session';
 const CHATS_STORAGE_KEY = 'deeptrace-chats';
 const CHAT_MESSAGES_STORAGE_KEY = 'deeptrace-chat-messages';
-const MAX_RECENT_CHATS = 15;
+const MAX_RECENT_CHATS = 10;
+const TASK_DEMO_CHAT_ID = 'task-demo-1';
+const AI_USAGE_ACCOUNT_BALANCE_BASE = 40_000_000;
+
+const generateMockMonthTrendPoints = (monthValue: string, memberFactor = 1): number[] => {
+  const [yearText, monthText] = monthValue.split('-');
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const daysInMonth = new Date(year, month, 0).getDate();
+
+  return Array.from({ length: daysInMonth }, (_, index) => {
+    const day = index + 1;
+    const weekDay = new Date(year, month - 1, day).getDay();
+    const isWeekend = weekDay === 0 || weekDay === 6;
+    const base = 84_000 + ((month * 19 + day * 11) % 7) * 4_300;
+    const wave = 1 + Math.sin((day / daysInMonth) * Math.PI * 2) * 0.16;
+    const weekendFactor = isWeekend ? 0.72 : 1;
+    return Math.round(base * wave * weekendFactor * memberFactor);
+  });
+};
+
+const calculateIsAiUsageBudgetLow = () => {
+  const now = new Date();
+  const monthValue = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const summaryTrendPoints = generateMockMonthTrendPoints(monthValue, 1);
+  const summaryMonthlyTotal = summaryTrendPoints.reduce((sum, point) => sum + point, 0);
+  const summarySevenDayTotal = summaryTrendPoints.slice(-7).reduce((sum, point) => sum + point, 0);
+  const accountBalance = Math.max(0, AI_USAGE_ACCOUNT_BALANCE_BASE - summaryMonthlyTotal);
+  const summaryDailyAvg = summarySevenDayTotal / 7;
+
+  if (summaryDailyAvg <= 0) return false;
+
+  // Keep mock behavior aligned with AiUsagePage for warning display.
+  const remainingDays = Math.min(7, Math.max(0, Math.floor(accountBalance / summaryDailyAvg)));
+  return remainingDays <= 7;
+};
+
+const TASK_DEMO_CHAT: MockChat =
+  mockChats.find((chat) => chat.id === TASK_DEMO_CHAT_ID) ?? {
+    id: TASK_DEMO_CHAT_ID,
+    title: '肿瘤免疫文献订阅（Mock）',
+    date: '刚刚',
+    count: 12,
+    isTaskConversation: true,
+    taskId: 'task-5',
+    source: 'task',
+  };
+
+const isTaskConversationChat = (chat: MockChat) =>
+  chat.isTaskConversation === true ||
+  chat.source === 'task' ||
+  chat.id.startsWith('task-') ||
+  (typeof chat.taskId === 'string' && chat.taskId.trim().length > 0);
+
+const ensureTaskDemoChat = (chats: MockChat[]) => {
+  if (chats.some(isTaskConversationChat)) {
+    return chats;
+  }
+
+  return [TASK_DEMO_CHAT, ...chats.filter((chat) => chat.id !== TASK_DEMO_CHAT_ID)];
+};
+
 function loadChatsFromStorage(): MockChat[] {
   if (typeof window === 'undefined') return [];
 
   try {
     const raw = window.localStorage.getItem(CHATS_STORAGE_KEY);
-    if (!raw) return [];
+    if (!raw) return ensureTaskDemoChat([]);
 
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
+    if (!Array.isArray(parsed)) return ensureTaskDemoChat([]);
 
     const normalizedChats = parsed
       .filter((chat) => chat && typeof chat === 'object')
@@ -38,14 +100,31 @@ function loadChatsFromStorage(): MockChat[] {
         const count = typeof chat.count === 'number' ? chat.count : 0;
         const projectId = typeof chat.projectId === 'string' ? chat.projectId : undefined;
         const isPinned = chat.isPinned === true;
+        const taskId = typeof chat.taskId === 'string' ? chat.taskId : undefined;
+        const source = typeof chat.source === 'string' ? chat.source : undefined;
+        const isTaskConversation =
+          chat.isTaskConversation === true ||
+          source === 'task' ||
+          id.startsWith('task-') ||
+          (typeof taskId === 'string' && taskId.trim().length > 0);
 
-        return { id, title, date, count, projectId, isPinned } as MockChat;
+        return {
+          id,
+          title,
+          date,
+          count,
+          projectId,
+          isPinned,
+          taskId,
+          source,
+          isTaskConversation,
+        } as MockChat;
       })
       .filter((chat) => chat.id && chat.title);
 
-    return normalizedChats;
+    return ensureTaskDemoChat(normalizedChats);
   } catch {
-    return [];
+    return ensureTaskDemoChat([]);
   }
 }
 
@@ -86,8 +165,14 @@ export default function Layout() {
   const [isSidebarScrolling, setIsSidebarScrolling] = useState(false);
   const [editingChatId, setEditingChatId] = useState<string | null>(null);
   const [editingChatTitle, setEditingChatTitle] = useState('');
+  const [showAllChatsModal, setShowAllChatsModal] = useState(false);
+  const [allChatsKeyword, setAllChatsKeyword] = useState('');
+  const [isAllChatsModalScrolling, setIsAllChatsModalScrolling] = useState(false);
+  const [aiUsageWarningActive, setAiUsageWarningActive] = useState(() => calculateIsAiUsageBudgetLow());
+  const [aiUsageWarningDismissed, setAiUsageWarningDismissed] = useState(false);
   const chatRenameInputRef = useRef<HTMLInputElement | null>(null);
   const sidebarScrollTimerRef = useRef<number | null>(null);
+  const allChatsScrollTimerRef = useRef<number | null>(null);
 
   const handleLogout = () => {
     localStorage.removeItem(AUTH_STORAGE_KEY);
@@ -278,6 +363,9 @@ export default function Layout() {
       if (sidebarScrollTimerRef.current !== null) {
         window.clearTimeout(sidebarScrollTimerRef.current);
       }
+      if (allChatsScrollTimerRef.current !== null) {
+        window.clearTimeout(allChatsScrollTimerRef.current);
+      }
     };
   }, []);
 
@@ -289,6 +377,27 @@ export default function Layout() {
     sidebarScrollTimerRef.current = window.setTimeout(() => {
       setIsSidebarScrolling(false);
     }, 600);
+  };
+
+  const handleAllChatsModalScroll = () => {
+    setIsAllChatsModalScrolling(true);
+    if (allChatsScrollTimerRef.current !== null) {
+      window.clearTimeout(allChatsScrollTimerRef.current);
+    }
+    allChatsScrollTimerRef.current = window.setTimeout(() => {
+      setIsAllChatsModalScrolling(false);
+    }, 600);
+  };
+
+  useEffect(() => {
+    if (!aiUsageWarningActive) {
+      setAiUsageWarningDismissed(false);
+    }
+  }, [aiUsageWarningActive]);
+
+  const handleAiUsageWarningClick = () => {
+    setAiUsageWarningDismissed(true);
+    navigate('/ai-usage');
   };
 
   const settingsMenuItems = useMemo<BaseActionMenuItem[]>(() => [
@@ -370,46 +479,55 @@ export default function Layout() {
     },
   ];
 
-  const renderChatActionControl = (chat: MockChat, isMenuOpen: boolean) => (
-    <div className="ml-2 shrink-0 flex h-[14px] w-5 items-center justify-center">
-      <BaseActionMenu
-        open={isMenuOpen}
-        onOpenChange={(open) => setChatMenuOpenId(open ? chat.id : null)}
-        placement="bottom-end"
-        width={Math.max(140, Math.min(176, sidebarWidth - 56))}
-        trigger={<MoreHorizontal size={14} />}
-        onTriggerClick={(event) => {
-          event.stopPropagation();
-        }}
-        items={buildChatMenuItems(chat)}
-        footerItems={chatMenuFooterItems}
-        onItemClick={(item, event) => {
-          event.stopPropagation();
-          if (item.key === 'rename') {
-            startChatRename(chat);
-            return;
-          }
-          if (item.key === 'share') {
-            navigate(`/chat/${chat.id}?share=1`);
+  const renderChatActionControl = (chat: MockChat, isMenuOpen: boolean) => {
+    const isTaskChat = isTaskConversationChat(chat);
+
+    return (
+      <div className={`relative shrink-0 flex h-5 w-5 items-center justify-center ${isTaskChat ? 'ml-6' : 'ml-2'}`}>
+        {isTaskChat && !isMenuOpen && (
+          <span className="pointer-events-none absolute right-0 shrink-0 whitespace-nowrap rounded-full bg-[#E4E7EC] px-1.5 py-0.5 text-[11px] leading-[14px] text-[#667085] transition-opacity group-hover:opacity-0">
+            任务
+          </span>
+        )}
+        <BaseActionMenu
+          open={isMenuOpen}
+          onOpenChange={(open) => setChatMenuOpenId(open ? chat.id : null)}
+          placement="bottom-end"
+          width={Math.max(140, Math.min(176, sidebarWidth - 56))}
+          trigger={<MoreHorizontal size={14} />}
+          onTriggerClick={(event) => {
+            event.stopPropagation();
+          }}
+          items={buildChatMenuItems(chat)}
+          footerItems={chatMenuFooterItems}
+          onItemClick={(item, event) => {
+            event.stopPropagation();
+            if (item.key === 'rename') {
+              startChatRename(chat);
+              return;
+            }
+            if (item.key === 'share') {
+              navigate(`/chat/${chat.id}?share=1`);
+              setChatMenuOpenId(null);
+              return;
+            }
+            if (item.key === 'pin') {
+              handleTogglePinChat(chat.id);
+              return;
+            }
+            if (item.key === 'delete') {
+              handleDeleteChat(chat.id);
+              return;
+            }
             setChatMenuOpenId(null);
-            return;
-          }
-          if (item.key === 'pin') {
-            handleTogglePinChat(chat.id);
-            return;
-          }
-          if (item.key === 'delete') {
-            handleDeleteChat(chat.id);
-            return;
-          }
-          setChatMenuOpenId(null);
-        }}
-        triggerClassName={`-mx-1 items-center justify-center ${isMenuOpen ? 'inline-flex' : 'hidden group-hover:inline-flex'}`}
-        className="relative z-40"
-        menuClassName="!min-w-0 !right-[-6px]"
-      />
-    </div>
-  );
+          }}
+          triggerClassName={`h-5 w-5 items-center justify-center ${isMenuOpen ? 'inline-flex' : 'hidden group-hover:inline-flex'}`}
+          className="relative z-40"
+          menuClassName="!min-w-0 !right-[-6px]"
+        />
+      </div>
+    );
+  };
 
   const navItems = [
     {
@@ -456,6 +574,33 @@ export default function Layout() {
     return timeSortedUnpinnedChats.slice(0, availableSlots);
   }, [sortMode, timeSortedUnpinnedChats, visiblePinnedChats.length]);
 
+  const totalVisibleRecentChats = useMemo(
+    () => visiblePinnedChats.length + visibleTimeChats.length,
+    [visiblePinnedChats.length, visibleTimeChats.length],
+  );
+
+  const shouldShowViewAllChatsEntry = sortMode === 'time' && chats.length > totalVisibleRecentChats;
+
+  const projectNameById = useMemo(() => {
+    return new Map(mockProjects.map((project) => [project.id, project.name]));
+  }, []);
+
+  const allChatsSorted = useMemo(() => {
+    return chats.slice().sort((a, b) => b.id.localeCompare(a.id));
+  }, [chats]);
+
+  const normalizedAllChatsKeyword = allChatsKeyword.trim().toLowerCase();
+
+  const filteredAllChats = useMemo(() => {
+    if (!normalizedAllChatsKeyword) return allChatsSorted;
+
+    return allChatsSorted.filter((chat) => {
+      const projectName = chat.projectId ? (projectNameById.get(chat.projectId) ?? '未分组') : '未分组';
+      const searchableText = `${chat.title} ${projectName} ${chat.date}`.toLowerCase();
+      return searchableText.includes(normalizedAllChatsKeyword);
+    });
+  }, [allChatsSorted, normalizedAllChatsKeyword, projectNameById]);
+
   useEffect(() => {
     if (!activeChat) return;
 
@@ -465,6 +610,25 @@ export default function Layout() {
       return { ...prev, [targetKey]: true };
     });
   }, [activeChat]);
+
+  const handleOpenAllChatsModal = () => {
+    setAllChatsKeyword('');
+    setShowAllChatsModal(true);
+  };
+
+  const handleCloseAllChatsModal = () => {
+    setShowAllChatsModal(false);
+    setIsAllChatsModalScrolling(false);
+    if (allChatsScrollTimerRef.current !== null) {
+      window.clearTimeout(allChatsScrollTimerRef.current);
+      allChatsScrollTimerRef.current = null;
+    }
+  };
+
+  const handleOpenChatFromModal = (chatId: string) => {
+    setShowAllChatsModal(false);
+    navigate(`/chat/${chatId}`);
+  };
 
   return (
     <div className="flex h-screen w-full bg-bgLight font-sans antialiased text-primaryText overflow-hidden relative">
@@ -478,14 +642,11 @@ export default function Layout() {
         <div className="w-full flex flex-col h-full">
           {/* Logo 区域 */}
 <div className="mt-2 md:mt-3 flex h-16 items-center justify-between pl-5 pr-[10px]">
-<div className="flex items-center gap-3 cursor-pointer min-w-0 flex-1" onClick={() => navigate('/chat/new')}>
-<img src={logoIcon} alt="Helia Logo" className="h-[16px] w-[16px] shrink-0 flex-shrink-0" style={{ display: 'flex', alignItems: 'center' }} />
+<div className="-ml-[3px] flex items-center gap-2 cursor-pointer min-w-0 flex-1" onClick={() => navigate('/chat/new')}>
+<img src={logoIcon} alt="Helia Logo" className="h-[20px] w-[20px] shrink-0 flex-shrink-0" style={{ display: 'flex', alignItems: 'center' }} />
 <span className="text-[18px] font-bold text-primaryText tracking-tight truncate leading-none">Helia</span>
 </div>
             <div className="flex items-center gap-0 shrink-0">
-              <button className="p-2 text-secondaryText hover:bg-bgLight rounded-full transition-colors" title="搜索">
-                <Search size={16} />
-              </button>
               <button onClick={() => setIsSidebarOpen(false)} className="p-2 text-secondaryText hover:bg-bgLight rounded-full transition-colors">
                 <PanelLeftClose size={16} />
               </button>
@@ -705,9 +866,38 @@ export default function Layout() {
                     </div>
                   );
                 })}
+
+                {shouldShowViewAllChatsEntry && (
+                  <button
+                    type="button"
+                    onClick={handleOpenAllChatsModal}
+                    className="mx-[10px] mt-1 inline-flex items-center gap-1 rounded-md px-[10px] py-1.5 text-left text-sm text-secondaryText transition-colors hover:bg-[#E4EAF0] hover:text-primaryText"
+                  >
+                    <span>查看全部对话</span>
+                    <ChevronRight size={14} />
+                  </button>
+                )}
               </div>
             )}
           </div>
+
+          {aiUsageWarningActive && !aiUsageWarningDismissed && (
+            <div className="mx-3 mb-2 rounded-[12px] bg-white p-2 shadow-[0_6px_20px_rgba(15,23,42,0.08)]">
+              <div className="flex items-center gap-2">
+                <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-warning-soft text-warning">
+                  <AlertTriangle size={15} style={{ fill: 'var(--color-warning)', stroke: '#ffffff' }} />
+                </span>
+                <span className="min-w-0 flex-1 truncate text-sm font-medium text-primaryText">用量即将耗尽</span>
+                <button
+                  type="button"
+                  onClick={handleAiUsageWarningClick}
+                  className="ml-auto shrink-0 whitespace-nowrap rounded-[8px] bg-[var(--color-warning)] px-3 py-1 text-xs font-medium text-white transition-colors hover:opacity-90"
+                >
+                  去查看
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* 用户区域 */}
           <div className="p-3 mt-auto">
@@ -762,11 +952,77 @@ export default function Layout() {
                 <Menu size={20} />
               </button>
             )}
-            <Outlet context={{ isSidebarOpen, setIsSidebarOpen, chats, setChats }} />
+            <Outlet context={{ isSidebarOpen, setIsSidebarOpen, chats, setChats, setAiUsageWarningActive }} />
           </div>
         </div>
       </main>
 
+      <BaseModal
+        visible={showAllChatsModal}
+        title="全部历史对话"
+        width={640}
+        footer={null}
+        onCancel={handleCloseAllChatsModal}
+        className="!overflow-y-hidden"
+        bodyClassName="!overflow-hidden !px-6 !py-5"
+      >
+        <div className="space-y-4">
+          <div className="relative">
+            <Search
+              size={14}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-tertiaryText"
+            />
+            <input
+              type="text"
+              value={allChatsKeyword}
+              onChange={(event) => setAllChatsKeyword(event.target.value)}
+              placeholder="搜索对话或项目"
+              className="h-9 w-full rounded-lg border border-[var(--color-line-subtle)] bg-white pl-9 pr-3 text-sm text-primaryText transition-colors placeholder:text-tertiaryText hover:border-[var(--color-gray-3)] focus:border-[var(--color-primary)] focus:outline-none"
+            />
+          </div>
+
+          {filteredAllChats.length > 0 ? (
+            <div
+              onScroll={handleAllChatsModalScroll}
+              className={`max-h-[440px] overflow-y-auto auto-hide-scrollbar ${
+                isAllChatsModalScrolling ? 'is-scrolling is-scrolling-thin' : ''
+              }`}
+            >
+              {filteredAllChats.map((chat) => {
+                const projectName = chat.projectId ? (projectNameById.get(chat.projectId) ?? '未分组') : '未分组';
+                const isTaskChat = isTaskConversationChat(chat);
+
+                return (
+                  <button
+                    key={chat.id}
+                    type="button"
+                    onClick={() => handleOpenChatFromModal(chat.id)}
+                    className="w-full rounded-lg px-4 py-3 text-left transition-colors hover:bg-[#F8FAFC]"
+                  >
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="truncate text-sm font-medium text-primaryText">{chat.title}</span>
+                      {isTaskChat && (
+                        <span className="shrink-0 rounded-full bg-[#F1F5F9] px-1.5 py-0.5 text-[11px] leading-[14px] text-[#7A869A]">
+                          任务
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-1 flex items-center gap-1 text-xs text-tertiaryText">
+                      <span className="truncate">{projectName}</span>
+                      <span>·</span>
+                      <span>{chat.date}</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="rounded-lg border border-dashed border-[var(--color-border-soft)]">
+              <BaseEmpty description="暂无匹配的历史对话" />
+            </div>
+          )}
+        </div>
+      </BaseModal>
     </div>
   );
 }

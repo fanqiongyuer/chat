@@ -212,6 +212,10 @@ export default function ProjectDetailPage() {
   const [memberModalError, setMemberModalError] = useState('');
   const [selectedInviteMemberIds, setSelectedInviteMemberIds] = useState<string[]>([]);
   const [invitePermission, setInvitePermission] = useState<MemberPermission>('浏览');
+  const [projectNameDraft, setProjectNameDraft] = useState('');
+  const [projectDescDraft, setProjectDescDraft] = useState('');
+  const [isEditingProjectName, setIsEditingProjectName] = useState(false);
+  const [isEditingProjectDesc, setIsEditingProjectDesc] = useState(false);
   const tagFilterRef = useRef<HTMLDivElement | null>(null);
 
   const project = useMemo(() => mockProjects.find((item) => item.id === id), [id]);
@@ -224,13 +228,28 @@ export default function ProjectDetailPage() {
   const [managedMembers, setManagedMembers] = useState<ProjectMemberEntry[]>([]);
 
   useEffect(() => {
-    const nextMembers = projectMembers.map((member, index) => ({
+    const nextMembers: ProjectMemberEntry[] = projectMembers.map((member, index) => ({
       id: member.id,
       name: member.name,
       permission: index === 0 ? '编辑' : '浏览',
     }));
     setManagedMembers(nextMembers);
   }, [projectMembers]);
+
+  useEffect(() => {
+    if (!project) {
+      setProjectNameDraft('');
+      setProjectDescDraft('');
+      setIsEditingProjectName(false);
+      setIsEditingProjectDesc(false);
+      return;
+    }
+
+    setProjectNameDraft(project.name);
+    setProjectDescDraft(project.desc);
+    setIsEditingProjectName(false);
+    setIsEditingProjectDesc(false);
+  }, [project]);
 
   const inviteDirectoryMap = useMemo(
     () => new Map(LAB_MEMBER_DIRECTORY.map((member) => [member.id, member])),
@@ -436,6 +455,26 @@ export default function ProjectDetailPage() {
 
   const memberCount = managedMembers.length;
 
+  const handleProjectNameSubmit = () => {
+    const normalizedName = projectNameDraft.trim();
+    if (!normalizedName) {
+      setProjectNameDraft(project?.name ?? '');
+    } else {
+      setProjectNameDraft(normalizedName);
+    }
+    setIsEditingProjectName(false);
+  };
+
+  const handleProjectDescSubmit = () => {
+    const normalizedDesc = projectDescDraft.trim();
+    if (!normalizedDesc) {
+      setProjectDescDraft(project?.desc ?? '');
+    } else {
+      setProjectDescDraft(normalizedDesc);
+    }
+    setIsEditingProjectDesc(false);
+  };
+
   return (
     <div className="flex h-full w-full flex-col bg-white">
       <header className="z-10 flex h-16 shrink-0 items-center justify-between bg-white/80 px-4 backdrop-blur-sm">
@@ -458,20 +497,20 @@ export default function ProjectDetailPage() {
               项目
             </button>
             <span className="text-tertiaryText">/</span>
-            <span className="font-medium text-primaryText">{project?.name ?? '详情'}</span>
+            <span className="font-medium text-primaryText">{projectNameDraft || project?.name || '详情'}</span>
           </div>
         </div>
 
         {project && (
           <div className="flex items-center gap-2">
-            <BaseButton
-              type="secondary"
-              size="small"
-              rounded="large"
+            <button
+              type="button"
               onClick={openMemberModal}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-transparent px-1 py-1 text-[14px] leading-5 font-medium text-secondaryText transition-colors hover:text-primaryText"
             >
-              管理成员
-            </BaseButton>
+              <Users size={15} className="text-current" />
+              <span>管理成员</span>
+            </button>
           </div>
         )}
       </header>
@@ -484,10 +523,71 @@ export default function ProjectDetailPage() {
             </div>
           ) : (
             <section>
-              <h2 className="text-2xl font-semibold text-primaryText">{project.name}</h2>
-              <p className="mt-1 text-sm text-tertiaryText">
-                项目的描述，您可查看私有项目的对话，并编辑里面的知识内容
-              </p>
+              {isEditingProjectName ? (
+                <input
+                  type="text"
+                  value={projectNameDraft}
+                  onChange={(event) => setProjectNameDraft(event.target.value)}
+                  onBlur={handleProjectNameSubmit}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      handleProjectNameSubmit();
+                    }
+                    if (event.key === 'Escape') {
+                      setProjectNameDraft(project.name);
+                      setIsEditingProjectName(false);
+                    }
+                  }}
+                  autoFocus
+                  className="w-full max-w-[560px] rounded-md border border-[var(--color-primary)] bg-white px-2 py-1 text-2xl font-semibold text-primaryText outline-none"
+                />
+              ) : (
+                <div className="group relative block w-fit max-w-full">
+                  <h2
+                    className="cursor-text text-2xl font-semibold text-primaryText"
+                    onClick={() => setIsEditingProjectName(true)}
+                  >
+                    {projectNameDraft || project.name}
+                  </h2>
+                  <div className="pointer-events-none absolute left-1/2 top-full z-20 mt-1.5 w-max -translate-x-1/2 rounded-md bg-gray-7 px-2 py-1 text-xs text-white opacity-0 shadow-md transition-opacity group-hover:opacity-100">
+                    点击编辑项目名称
+                  </div>
+                </div>
+              )}
+
+              {isEditingProjectDesc ? (
+                <input
+                  type="text"
+                  value={projectDescDraft}
+                  onChange={(event) => setProjectDescDraft(event.target.value)}
+                  onBlur={handleProjectDescSubmit}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      handleProjectDescSubmit();
+                    }
+                    if (event.key === 'Escape') {
+                      setProjectDescDraft(project.desc);
+                      setIsEditingProjectDesc(false);
+                    }
+                  }}
+                  autoFocus
+                  className="mt-1 w-full max-w-[760px] rounded-md border border-[var(--color-line-subtle)] bg-white px-2 py-1 text-sm text-tertiaryText outline-none focus:border-[var(--color-primary)]"
+                />
+              ) : (
+                <div className="group relative mt-1 block max-w-[760px]">
+                  <p
+                    className="cursor-text text-sm text-tertiaryText"
+                    onClick={() => setIsEditingProjectDesc(true)}
+                  >
+                    {projectDescDraft || project.desc}
+                  </p>
+                  <div className="pointer-events-none absolute left-1/2 top-full z-20 mt-1.5 w-max -translate-x-1/2 rounded-md bg-gray-7 px-2 py-1 text-xs text-white opacity-0 shadow-md transition-opacity group-hover:opacity-100">
+                    点击编辑项目描述
+                  </div>
+                </div>
+              )}
 
               <div className="mt-4 flex flex-wrap items-center gap-2">
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-[#f1f4f7] px-2.5 py-0.5 text-[13px] font-medium text-secondaryText">
@@ -550,14 +650,17 @@ export default function ProjectDetailPage() {
                     {activeTab === 'experiment' ? '新建' : '发起对话'}
                   </BaseButton>
                   {activeTab === 'experiment' && (
-                    <button
-                      type="button"
-                      onClick={handleImportDocClick}
-                      className="inline-flex items-center gap-1 text-sm font-medium text-[var(--color-primary)] transition-colors hover:text-[var(--color-primary-hover)] hover:underline"
-                    >
-                      <Upload size={14} />
-                      导入
-                    </button>
+                    <>
+                      <span className="h-4 border-l border-[var(--color-line-subtle)]" aria-hidden="true" />
+                      <button
+                        type="button"
+                        onClick={handleImportDocClick}
+                        className="inline-flex items-center gap-1 text-sm font-medium text-[var(--color-primary)] transition-colors hover:text-[var(--color-primary-hover)] hover:underline"
+                      >
+                        <Upload size={14} />
+                        导入
+                      </button>
+                    </>
                   )}
                 </div>
               </div>
@@ -647,7 +750,7 @@ export default function ProjectDetailPage() {
                       key={chat.id}
                       type="button"
                       onClick={() => navigate(`/chat/${chat.id}`)}
-                      className="w-full rounded-lg border border-[var(--color-line-subtle)] bg-[var(--color-surface)] px-4 py-3 text-left transition-all hover:border-[var(--color-gray-3)] hover:shadow-sm"
+                      className="-ml-2 w-[calc(100%+0.5rem)] rounded-lg px-2 py-3 text-left transition-colors hover:bg-[#f8fafc]"
                     >
                       <div className="truncate text-sm font-medium text-primaryText">{chat.title}</div>
                       <div className="mt-1 text-xs text-tertiaryText">

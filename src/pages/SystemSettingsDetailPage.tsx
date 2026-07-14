@@ -2,54 +2,14 @@ import React, { useRef, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { Menu } from 'lucide-react';
 import { type LayoutOutletContext } from '../components/Layout';
-import { BaseButton, BaseInput, BaseModal, BaseSelect, BaseToggle } from '../components';
-
-type SettingsTab = 'general' | 'ai-model';
+import { BaseButton, BaseInput, BaseModal } from '../components';
 
 interface SettingsState {
-  // 通用设置
   avatarFileName: string;
-
-  // AI 模型配置
-  defaultModel: string;
-  temperature: string;
-  maxContextLength: string;
-  streamOutput: boolean;
-  topP: string;
-  frequencyPenalty: string;
 }
-
-const tabOptions: Array<{ label: string; value: SettingsTab }> = [
-  { label: '通用设置', value: 'general' },
-  { label: 'AI 模型配置', value: 'ai-model' },
-];
-
-const modelOptions = [
-  { label: 'GPT-4o', value: 'gpt-4o' },
-  { label: 'GPT-4o Mini', value: 'gpt-4o-mini' },
-  { label: 'GPT-4 Turbo', value: 'gpt-4-turbo' },
-  { label: 'Claude 3.5 Sonnet', value: 'claude-3.5-sonnet' },
-  { label: 'Claude 3 Opus', value: 'claude-3-opus' },
-  { label: 'DeepSeek V3', value: 'deepseek-v3' },
-];
-
-const contextLengthOptions = [
-  { label: '4,096 tokens', value: '4096' },
-  { label: '8,192 tokens', value: '8192' },
-  { label: '16,384 tokens', value: '16384' },
-  { label: '32,768 tokens', value: '32768' },
-  { label: '128,000 tokens', value: '128000' },
-];
 
 const initialSettings: SettingsState = {
   avatarFileName: '未上传新头像',
-
-  defaultModel: 'gpt-4o',
-  temperature: '0.7',
-  maxContextLength: '8192',
-  streamOutput: true,
-  topP: '1.0',
-  frequencyPenalty: '0',
 };
 
 interface SettingRowProps {
@@ -78,7 +38,6 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 
 export default function SystemSettingsDetailPage() {
   const { isSidebarOpen, setIsSidebarOpen } = useOutletContext<LayoutOutletContext>();
-  const [activeTab, setActiveTab] = useState<SettingsTab>('general');
   const [settings, setSettings] = useState<SettingsState>(initialSettings);
 
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -160,101 +119,6 @@ export default function SystemSettingsDetailPage() {
     </div>
   );
 
-  const renderAiModel = () => (
-    <div className="space-y-6">
-      <div>
-        <SectionTitle>模型选择</SectionTitle>
-        <div className="rounded-lg bg-[var(--color-surface)]">
-          <div className="px-0">
-            <SettingRow label="默认模型" description="新建对话时使用的默认 AI 模型">
-              <BaseSelect
-                options={modelOptions}
-                value={settings.defaultModel}
-                onChange={(v) => updateSetting('defaultModel', String(v))}
-                size="small"
-              />
-            </SettingRow>
-            <SettingRow label="最大上下文长度" description="对话中保留的最大 token 数量">
-              <BaseSelect
-                options={contextLengthOptions}
-                value={settings.maxContextLength}
-                onChange={(v) => updateSetting('maxContextLength', String(v))}
-                size="small"
-              />
-            </SettingRow>
-            <SettingRow label="流式输出" description="逐字展示模型回复内容">
-              <BaseToggle
-                checked={settings.streamOutput}
-                onChange={(v) => updateSetting('streamOutput', v)}
-                size="small"
-              />
-            </SettingRow>
-          </div>
-        </div>
-      </div>
-
-      <div>
-        <SectionTitle>模型参数</SectionTitle>
-        <div className="rounded-lg bg-[var(--color-surface)]">
-          <div className="px-0">
-            <SettingRow label="温度 (Temperature)" description="值越高，回复越有发散性">
-              <div className="flex items-center gap-2">
-                <input
-                  type="range"
-                  min="0"
-                  max="2"
-                  step="0.1"
-                  value={settings.temperature}
-                  onChange={(e) => updateSetting('temperature', e.target.value)}
-                  className="h-1.5 w-24 appearance-none rounded-full bg-[var(--color-gray-2)] accent-[var(--color-primary)]"
-                />
-                <span className="w-8 text-right text-sm text-[var(--color-text-secondary)]">
-                  {Number(settings.temperature).toFixed(1)}
-                </span>
-              </div>
-            </SettingRow>
-            <SettingRow label="Top P" description="控制候选 token 的概率范围">
-              <div className="flex items-center gap-2">
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  value={settings.topP}
-                  onChange={(e) => updateSetting('topP', e.target.value)}
-                  className="h-1.5 w-24 appearance-none rounded-full bg-[var(--color-gray-2)] accent-[var(--color-primary)]"
-                />
-                <span className="w-8 text-right text-sm text-[var(--color-text-secondary)]">
-                  {Number(settings.topP).toFixed(2)}
-                </span>
-              </div>
-            </SettingRow>
-            <SettingRow label="频率惩罚" description="减轻重复词汇与句式的出现">
-              <div className="flex items-center gap-2">
-                <input
-                  type="range"
-                  min="0"
-                  max="2"
-                  step="0.1"
-                  value={settings.frequencyPenalty}
-                  onChange={(e) => updateSetting('frequencyPenalty', e.target.value)}
-                  className="h-1.5 w-24 appearance-none rounded-full bg-[var(--color-gray-2)] accent-[var(--color-primary)]"
-                />
-                <span className="w-8 text-right text-sm text-[var(--color-text-secondary)]">
-                  {Number(settings.frequencyPenalty).toFixed(1)}
-                </span>
-              </div>
-            </SettingRow>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  const tabContentMap: Record<SettingsTab, () => React.ReactNode> = {
-    general: renderGeneral,
-    'ai-model': renderAiModel,
-  };
 
   return (
     <div className="flex h-full w-full flex-col bg-white">
@@ -279,28 +143,7 @@ export default function SystemSettingsDetailPage() {
 
       <div className="flex-1 overflow-y-auto px-4 pb-12 pt-4 md:px-8 lg:px-10 md:pb-12 md:pt-6">
         <div className="mx-auto max-w-[720px] py-0">
-          <div className="mb-6 border-b border-[var(--color-line-subtle)]">
-            <div className="flex items-center gap-6">
-              {tabOptions.map((tab) => {
-                const isActive = activeTab === tab.value;
-                return (
-                  <button
-                    key={tab.value}
-                    type="button"
-                    onClick={() => setActiveTab(tab.value)}
-                    className={`-mb-px border-b-2 pb-2.5 text-sm font-medium transition-colors ${
-                      isActive
-                        ? 'border-[var(--color-primary)] text-[var(--color-primary)]'
-                        : 'border-transparent text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)]'
-                    }`}
-                  >
-                    {tab.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-          {tabContentMap[activeTab]?.()}
+          {renderGeneral()}
         </div>
       </div>
 

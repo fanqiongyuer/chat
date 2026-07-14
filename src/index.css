@@ -95,8 +95,8 @@ body {
 }
 
 .auto-hide-scrollbar.is-scrolling::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 .auto-hide-scrollbar.is-scrolling-thin {
@@ -113,12 +113,12 @@ body {
 }
 
 .auto-hide-scrollbar.is-scrolling::-webkit-scrollbar-thumb {
-  background: #d7dee7;
+  background: #edf2f7;
   border-radius: 999px;
 }
 
 .auto-hide-scrollbar.is-scrolling::-webkit-scrollbar-thumb:hover {
-  background: #c5ced9;
+  background: #e3e9f1;
 }
 
 .task-table-scroll {

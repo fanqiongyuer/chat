@@ -3,7 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import type { Components, Options } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
-import { Copy, Check, ArrowRight } from 'lucide-react';
+import { Copy, Check, ArrowRight, Paperclip, Puzzle, AtSign } from 'lucide-react';
 import 'highlight.js/styles/atom-one-light.css';
 import 'katex/dist/katex.min.css';
 import AssistantActions from './AssistantActions';
@@ -13,9 +13,24 @@ type MarkdownRemarkPlugin = NonNullable<Options['remarkPlugins']>[number];
 type MarkdownRehypePlugin = NonNullable<Options['rehypePlugins']>[number];
 type MermaidApi = (typeof import('mermaid'))['default'];
 
+interface MessageAttachment {
+  id: string;
+  name: string;
+  mimeType: string;
+  previewUrl?: string;
+}
+
+interface MessageReference {
+  id: string;
+  type: 'skill' | 'doc';
+  label: string;
+}
+
 interface Message {
   role: 'user' | 'assistant';
   content: string;
+  attachments?: MessageAttachment[];
+  references?: MessageReference[];
 }
 
 interface MessageItemProps {
@@ -479,6 +494,43 @@ const MessageItem: React.FC<MessageItemProps> = ({
       <div className={`flex w-full max-w-[860px] px-1 md:px-2 ${isUser ? 'justify-end' : 'justify-start'}`}>
         {isUser ? (
           <div className="message-bubble-user">
+            {((msg.references && msg.references.length > 0) || (msg.attachments && msg.attachments.length > 0)) && (
+              <div className="mb-2 flex flex-wrap gap-2">
+                {msg.references?.map((reference) => (
+                  <div
+                    key={reference.id}
+                    className={`inline-flex max-w-full items-center gap-1.5 rounded-full px-3 py-1.5 text-sm shadow-sm ${
+                      reference.type === 'skill'
+                        ? 'border border-[#cfe0ff] bg-[#edf4ff] text-[#2f7bff]'
+                        : 'border border-[#c5f0d8] bg-[#effff6] text-[#16935a]'
+                    }`}
+                  >
+                    {reference.type === 'skill' ? (
+                      <Puzzle size={12} className="shrink-0 text-[#2f7bff]" />
+                    ) : (
+                      <AtSign size={12} className="shrink-0 text-[#16935a]" />
+                    )}
+                    <span className="max-w-[190px] truncate" title={reference.label}>{reference.label}</span>
+                  </div>
+                ))}
+
+                {msg.attachments?.map((attachment) => (
+                  <div
+                    key={attachment.id}
+                    className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-[#dfe4ea] bg-white px-3 py-1.5 text-sm text-primaryText shadow-sm"
+                  >
+                    {attachment.previewUrl ? (
+                      <span className="inline-flex h-[14px] w-[14px] shrink-0 overflow-hidden rounded-[3px] bg-[#eef3f8]">
+                        <img src={attachment.previewUrl} alt={attachment.name} className="h-full w-full object-cover" />
+                      </span>
+                    ) : (
+                      <Paperclip size={13} className="shrink-0 text-tertiaryText" />
+                    )}
+                    <span className="max-w-[190px] truncate" title={attachment.name}>{attachment.name}</span>
+                  </div>
+                ))}
+              </div>
+            )}
             <p className="whitespace-pre-wrap">{msg.content}</p>
           </div>
         ) : (

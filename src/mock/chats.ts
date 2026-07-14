@@ -5,6 +5,9 @@ export interface MockChat {
   count: number;
   projectId?: string;
   isPinned?: boolean;
+  isTaskConversation?: boolean;
+  taskId?: string;
+  source?: string;
 }
 
 export const mockChats: MockChat[] = [
@@ -48,5 +51,14 @@ export const mockChats: MockChat[] = [
     date: '上周五 18:06',
     count: 2,
     projectId: 'p-organoid',
+  },
+  {
+    id: 'task-demo-1',
+    title: '肿瘤免疫文献订阅（Mock）',
+    date: '刚刚',
+    count: 12,
+    isTaskConversation: true,
+    taskId: 'task-5',
+    source: 'task',
   },
 ];

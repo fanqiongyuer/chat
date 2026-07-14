@@ -1,8 +1,8 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { Menu } from 'lucide-react';
+import { ChevronDown, CircleHelp, Menu } from 'lucide-react';
 import { type LayoutOutletContext } from '../components/Layout';
-import { BaseModal, BaseSelect, BaseSegmented, BaseTable, type BaseTableColumn } from '../components';
+import { BaseActionMenu, BaseTable, type BaseActionMenuItem, type BaseTableColumn } from '../components';
 import { mockProjects } from '../mock/projects';
 
 type ViewTab = 'analysis' | 'users';
@@ -30,6 +30,12 @@ type MemberUsageRow = MemberProfile & {
   ratio: string;
 };
 
+type RechargeRecordRow = {
+  id: string;
+  amount: string;
+  rechargeTime: string;
+};
+
 const memberProfiles: MemberProfile[] = [
   { id: 'mira', name: 'Mira', role: '管理员', weight: 1.25 },
   { id: 'maodan', name: '毛单', role: '成员', weight: 1.0 },
@@ -42,11 +48,19 @@ const memberSelectOptions = [
   ...memberProfiles.map((member) => ({ label: member.name, value: member.id })),
 ];
 
-const slotSelectOptions = [
-  { label: '全部角色', value: 'all' },
-  { label: '工作时段', value: 'work' },
-  { label: '非工作时段', value: 'off' },
-];
+const monthSelectOptions = Array.from({ length: 12 }, (_, offset) => {
+  const date = new Date();
+  date.setDate(1);
+  date.setMonth(date.getMonth() - offset);
+
+  const year = date.getFullYear();
+  const month = date.getMonth();
+
+  return {
+    label: `${year}年${month + 1}月`,
+    value: `${year}-${String(month + 1).padStart(2, '0')}`,
+  };
+});
 
 const rangeLabelMap: Record<TimeRange, string> = {
   yesterday: '昨日',
@@ -59,7 +73,6 @@ const rangeOptions: Array<{ label: string; value: TimeRange }> = [
   { label: '昨日', value: 'yesterday' },
   { label: '近一周', value: 'week' },
   { label: '近一个月', value: 'month' },
-  { label: '自定义', value: 'custom' },
 ];
 
 const ratioOptions: Array<{ label: string; value: RatioView }> = [
@@ -103,6 +116,23 @@ function formatDate(value: Date): string {
   const month = String(value.getMonth() + 1).padStart(2, '0');
   const day = String(value.getDate()).padStart(2, '0');
   return `${year}.${month}.${day}`;
+}
+
+function generateMonthTrendPoints(monthValue: string, memberFactor: number): number[] {
+  const [yearText, monthText] = monthValue.split('-');
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const daysInMonth = new Date(year, month, 0).getDate();
+
+  return Array.from({ length: daysInMonth }, (_, index) => {
+    const day = index + 1;
+    const weekDay = new Date(year, month - 1, day).getDay();
+    const isWeekend = weekDay === 0 || weekDay === 6;
+    const base = 84_000 + ((month * 19 + day * 11) % 7) * 4_300;
+    const wave = 1 + Math.sin((day / daysInMonth) * Math.PI * 2) * 0.16;
+    const weekendFactor = isWeekend ? 0.72 : 1;
+    return Math.round(base * wave * weekendFactor * memberFactor);
+  });
 }
 
 function getRangeDates(range: TimeRange): string {
@@ -159,172 +189,181 @@ function buildSvgPath(points: number[], width: number, height: number, padding =
   return path;
 }
 
-function UsageTrendChart({
+function UsageAmountBarChart({
   points,
-  leftLabel,
-  rightLabel,
+  labels,
+  totalAmount,
 }: {
   points: number[];
-  leftLabel: string;
-  rightLabel: string;
+  labels: string[];
+  totalAmount: number;
 }) {
-  const viewWidth = 1000;
-  const viewHeight = 150;
-  const viewPadding = 16;
-  const chartRef = useRef<HTMLDivElement>(null);
-  const [hoverData, setHoverData] = useState<{
-    x: number;
-    y: number;
-    offsetX: number;
-    offsetY: number;
-    chartWidth: number;
-    chartHeight: number;
-    value: number;
-  } | null>(null);
+  const chartLeft = 52;
+  const chartRight = 980;
+  const chartTop = 18;
+  const chartBottom = 156;
+  const chartHeight = chartBottom - chartTop;
+  const chartWidth = chartRight - chartLeft;
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
-  const trendPath = useMemo(() => buildSvgPath(points, viewWidth, viewHeight, viewPadding), [points]);
+  const maxAmount = useMemo(() => Math.max(...points, 1), [points]);
 
-  const metrics = useMemo(() => {
-    const maxVal = Math.max(...points);
-    const minVal = Math.min(...points);
-    const range = Math.max(1, maxVal - minVal);
-    const average = points.reduce((sum, value) => sum + value, 0) / Math.max(points.length, 1);
-    return { maxVal, minVal, range, average };
-  }, [points]);
+  const axisTicks = useMemo(() => [maxAmount, 0], [maxAmount]);
 
-  const getYByValue = (value: number) => {
-    const drawableHeight = viewHeight - viewPadding * 2;
-    return viewPadding + ((metrics.maxVal - value) / metrics.range) * drawableHeight;
+  const labelStep = useMemo(() => {
+    if (points.length <= 10) return 1;
+    return Math.ceil(points.length / 6);
+  }, [points.length]);
+
+  const barGap = useMemo(() => {
+    if (points.length <= 1) return 0;
+    return Math.min(6, chartWidth / points.length / 2.5);
+  }, [chartWidth, points.length]);
+
+  const barWidth = useMemo(() => {
+    if (points.length === 0) return 0;
+    return Math.max(3, (chartWidth - (points.length - 1) * barGap) / points.length);
+  }, [barGap, chartWidth, points.length]);
+
+  const formatAxisAmount = (value: number) => {
+    if (value >= 10_000) return `￥${(value / 10_000).toFixed(1)}万`;
+    return `￥${formatNumber(value)}`;
   };
-
-  const guideLineY = getYByValue(metrics.average);
-
-  const handleMouseMove = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (!chartRef.current || points.length === 0) return;
-
-    const rect = chartRef.current.getBoundingClientRect();
-    const ratio = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
-
-    const x = ratio * viewWidth;
-    const position = ratio * (points.length - 1);
-    const leftIndex = Math.floor(position);
-    const rightIndex = Math.min(points.length - 1, leftIndex + 1);
-    const progress = position - leftIndex;
-
-    const leftValue = points[leftIndex];
-    const rightValue = points[rightIndex];
-    const interpolatedValue = leftValue + (rightValue - leftValue) * progress;
-    const y = getYByValue(interpolatedValue);
-
-    setHoverData({
-      x,
-      y,
-      offsetX: event.clientX - rect.left,
-      offsetY: (y / viewHeight) * rect.height,
-      chartWidth: rect.width,
-      chartHeight: rect.height,
-      value: Math.max(0, Math.round(interpolatedValue)),
-    });
-  };
-
-  const handleMouseLeave = () => {
-    setHoverData(null);
-  };
-
-  const tooltipStyle = useMemo(() => {
-    if (!hoverData) return undefined;
-
-    const tooltipWidth = 136;
-    const tooltipHeight = 56;
-    const edgePadding = 8;
-    const offset = 12;
-
-    let left = hoverData.offsetX + offset;
-    const maxLeft = Math.max(edgePadding, hoverData.chartWidth - tooltipWidth - edgePadding);
-
-    if (left > maxLeft) {
-      left = hoverData.offsetX - tooltipWidth - offset;
-    }
-
-    left = Math.max(edgePadding, Math.min(left, maxLeft));
-
-    let top = hoverData.offsetY - tooltipHeight - offset;
-    if (top < edgePadding) {
-      top = hoverData.offsetY + offset;
-    }
-
-    const maxTop = Math.max(edgePadding, hoverData.chartHeight - tooltipHeight - edgePadding);
-    top = Math.max(edgePadding, Math.min(top, maxTop));
-
-    return { left: `${left}px`, top: `${top}px` };
-  }, [hoverData]);
 
   return (
-    <>
-      <div
-        ref={chartRef}
-        className="relative mt-3 h-[150px] w-full cursor-crosshair"
-        onMouseMove={handleMouseMove}
-        onMouseLeave={handleMouseLeave}
-      >
-        <svg viewBox="0 0 1000 150" preserveAspectRatio="none" className="h-full w-full">
-          <line
-            x1="0"
-            x2="1000"
-            y1={guideLineY.toFixed(2)}
-            y2={guideLineY.toFixed(2)}
-            stroke="var(--color-line-subtle)"
-            strokeDasharray="4 4"
-            strokeWidth="1"
-          />
-          <path d={trendPath} fill="none" stroke="var(--color-primary)" strokeWidth="3" strokeLinecap="round" />
-          {hoverData && (
-            <>
-              <line
-                x1={hoverData.x.toFixed(2)}
-                y1="0"
-                x2={hoverData.x.toFixed(2)}
-                y2={viewHeight - viewPadding}
-                stroke="var(--color-primary)"
-                strokeDasharray="4 4"
-                strokeWidth="1"
-              />
-              <circle cx={hoverData.x.toFixed(2)} cy={hoverData.y.toFixed(2)} r="6" fill="var(--color-primary)" fillOpacity="0.24" />
-              <circle cx={hoverData.x.toFixed(2)} cy={hoverData.y.toFixed(2)} r="3" fill="var(--color-primary)" />
-            </>
-          )}
+    <div>
+      <div className="mb-3">
+        <div className="text-sm font-semibold text-primaryText">月度用量</div>
+        <div className="mt-1 text-xs text-tertiaryText">
+          消耗金额
+          <span className="ml-1 text-primaryText">￥{formatNumber(totalAmount)}</span>
+        </div>
+      </div>
+
+      <div className="relative h-[190px] w-full">
+        <svg viewBox="0 0 1000 190" preserveAspectRatio="none" className="h-full w-full">
+          {axisTicks.map((tick) => {
+            const y = chartBottom - (tick / maxAmount) * chartHeight;
+            return (
+              <g key={tick}>
+                <line
+                  x1={chartLeft}
+                  x2={chartRight}
+                  y1={y.toFixed(2)}
+                  y2={y.toFixed(2)}
+                  stroke="var(--color-line-subtle)"
+                  strokeWidth="1"
+                />
+                <text x={chartLeft - 8} y={y + 4} textAnchor="end" fill="var(--color-tertiaryText)" fontSize="11">
+                  {formatAxisAmount(tick)}
+                </text>
+              </g>
+            );
+          })}
+
+          {points.map((point, index) => {
+            const barHeight = (point / maxAmount) * chartHeight;
+            const x = chartLeft + index * (barWidth + barGap);
+            const y = chartBottom - barHeight;
+            const label = labels[index] ?? '';
+            const showLabel = index % labelStep === 0 || index === points.length - 1;
+
+            return (
+              <g key={`${label}-${index}`} onMouseEnter={() => setHoveredIndex(index)} onMouseLeave={() => setHoveredIndex(null)}>
+                <rect
+                  x={x.toFixed(2)}
+                  y={y.toFixed(2)}
+                  width={barWidth.toFixed(2)}
+                  height={Math.max(1, barHeight).toFixed(2)}
+                  rx="1.5"
+                  fill={hoveredIndex === index ? '#059669' : '#10b981'}
+                />
+                {showLabel && (
+                  <text
+                    x={(x + barWidth / 2).toFixed(2)}
+                    y={chartBottom + 14}
+                    textAnchor="middle"
+                    fill="var(--color-tertiaryText)"
+                    fontSize="11"
+                  >
+                    {label}
+                  </text>
+                )}
+              </g>
+            );
+          })}
         </svg>
 
-        {hoverData && (
+        {hoveredIndex !== null && (
           <div
-            className="pointer-events-none absolute z-30 rounded-lg bg-gray-7 px-2.5 py-2 text-sm text-white shadow-md"
-            style={tooltipStyle}
+            className="pointer-events-none absolute top-0 z-20 -translate-x-1/2 rounded-lg bg-gray-7 px-2.5 py-2 text-xs text-white shadow-md"
+            style={{
+              left: `${((chartLeft + hoveredIndex * (barWidth + barGap) + barWidth / 2) / 1000) * 100}%`,
+            }}
           >
-            <div className="text-sm text-tertiaryText">当前时刻消耗</div>
-              <div className="font-semibold text-[var(--color-primary)]">
-              {formatNumber(hoverData.value)}
-              <span className="ml-1 text-sm font-normal text-white">Tokens</span>
-            </div>
+            <div className="text-tertiaryText">{labels[hoveredIndex]}</div>
+            <div className="mt-0.5 font-semibold text-[#10b981]">￥{formatNumber(points[hoveredIndex])}</div>
           </div>
         )}
       </div>
-
-      <div className="-mt-1 flex items-center justify-between text-sm text-tertiaryText">
-        <span>{leftLabel}</span>
-        <span>{rightLabel}</span>
-      </div>
-    </>
+    </div>
   );
 }
 
 export default function AiUsagePage() {
-  const { isSidebarOpen, setIsSidebarOpen } = useOutletContext<LayoutOutletContext>();
+  const { isSidebarOpen, setIsSidebarOpen, setAiUsageWarningActive } = useOutletContext<LayoutOutletContext>();
   const [activeTab, setActiveTab] = useState<ViewTab>('analysis');
   const [selectedMember, setSelectedMember] = useState<string>('all');
-  const [selectedSlot, setSelectedSlot] = useState<TimeSlot>('all');
+  const [selectedMonth, setSelectedMonth] = useState<string>(
+    monthSelectOptions[0]?.value ?? `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`,
+  );
+  const selectedSlot: TimeSlot = 'all';
   const [selectedRange, setSelectedRange] = useState<TimeRange>('yesterday');
   const [ratioView, setRatioView] = useState<RatioView>('project');
-  const [showRechargeModal, setShowRechargeModal] = useState(false);
+  const [memberMenuOpen, setMemberMenuOpen] = useState(false);
+  const [monthMenuOpen, setMonthMenuOpen] = useState(false);
+
+  const selectedMemberLabel = useMemo(
+    () => memberSelectOptions.find((option) => String(option.value) === selectedMember)?.label ?? '全部成员',
+    [selectedMember],
+  );
+
+  const selectedMonthLabel = useMemo(
+    () => monthSelectOptions.find((option) => String(option.value) === selectedMonth)?.label ?? selectedMonth,
+    [selectedMonth],
+  );
+
+  const memberMenuItems = useMemo<BaseActionMenuItem[]>(
+    () =>
+      memberSelectOptions.map((option) => ({
+        key: `member-${option.value}`,
+        label: option.label,
+        active: String(option.value) === selectedMember,
+      })),
+    [selectedMember],
+  );
+
+  const monthMenuItems = useMemo<BaseActionMenuItem[]>(
+    () =>
+      monthSelectOptions.map((option) => ({
+        key: `month-${option.value}`,
+        label: option.label,
+        active: String(option.value) === selectedMonth,
+      })),
+    [selectedMonth],
+  );
+
+  const handleMemberMenuItemClick = useCallback((item: BaseActionMenuItem) => {
+    const nextValue = item.key.replace('member-', '');
+    setSelectedMember(nextValue);
+    setMemberMenuOpen(false);
+  }, []);
+
+  const handleMonthMenuItemClick = useCallback((item: BaseActionMenuItem) => {
+    const nextValue = item.key.replace('month-', '');
+    setSelectedMonth(nextValue);
+    setMonthMenuOpen(false);
+  }, []);
 
   const currentMembers = useMemo(() => {
     if (selectedMember === 'all') return memberProfiles;
@@ -348,18 +387,9 @@ export default function AiUsagePage() {
   }, [memberWeightSum, selectedRange, selectedSlot, totalWeight]);
 
   const trendPoints = useMemo(() => {
-    const sourcePattern =
-      selectedRange === 'yesterday'
-        ? hourlyPattern
-        : selectedRange === 'week'
-          ? weekPattern
-          : selectedRange === 'month'
-            ? monthPattern
-            : customPattern;
-
     const memberFactor = memberWeightSum / totalWeight;
-    return sourcePattern.map((point) => point * memberFactor * slotFactor[selectedSlot]);
-  }, [memberWeightSum, selectedRange, selectedSlot, totalWeight]);
+    return generateMonthTrendPoints(selectedMonth, memberFactor);
+  }, [memberWeightSum, selectedMonth, totalWeight]);
 
   const projectRows = useMemo<ProjectUsageRow[]>(() => {
     const totalProjectChats = mockProjects.reduce((sum, project) => sum + project.count, 0) || 1;
@@ -377,8 +407,9 @@ export default function AiUsagePage() {
   }, [currentTotal]);
 
   const memberRows = useMemo<MemberUsageRow[]>(() => {
+    const monthTotal = trendPoints.reduce((sum, point) => sum + point, 0);
     const rows = currentMembers.map((member) => {
-      const usage = rangeBaseTotal[selectedRange] * (member.weight / totalWeight) * slotFactor[selectedSlot];
+      const usage = monthTotal * (member.weight / totalWeight);
       return { ...member, usage };
     });
 
@@ -387,34 +418,61 @@ export default function AiUsagePage() {
       ...row,
       ratio: `${((row.usage / sum) * 100).toFixed(1)}%`,
     }));
-  }, [currentMembers, selectedRange, selectedSlot, totalWeight]);
+  }, [currentMembers, totalWeight, trendPoints]);
+
+  const filteredMonthlyTotal = useMemo(() => trendPoints.reduce((sum, point) => sum + point, 0), [trendPoints]);
 
   // Top summary cards are global totals, not affected by detail filters.
-  const monthlyTotal = useMemo(() => rangeBaseTotal.month, []);
+  const summaryTrendPoints = useMemo(
+    () => generateMonthTrendPoints(monthSelectOptions[0]?.value ?? selectedMonth, 1),
+    [selectedMonth],
+  );
 
-  const sevenDayTotal = useMemo(() => rangeBaseTotal.week, []);
+  const summaryMonthlyTotal = useMemo(
+    () => summaryTrendPoints.reduce((sum, point) => sum + point, 0),
+    [summaryTrendPoints],
+  );
 
-  const tokenTotal = useMemo(() => monthlyTotal * 11.7, [monthlyTotal]);
+  const summarySevenDayTotal = useMemo(
+    () => summaryTrendPoints.slice(-7).reduce((sum, point) => sum + point, 0),
+    [summaryTrendPoints],
+  );
+
+  const accountBalance = useMemo(() => Math.max(0, 40_000_000 - summaryMonthlyTotal), [summaryMonthlyTotal]);
 
   const remainingDays = useMemo(() => {
-    const summaryDailyAvg = sevenDayTotal / 7;
+    const summaryDailyAvg = summarySevenDayTotal / 7;
     if (summaryDailyAvg <= 0) return 0;
-    return Math.max(0, Math.floor((40_000_000 - monthlyTotal) / summaryDailyAvg));
-  }, [monthlyTotal, sevenDayTotal]);
+    // Mock: keep remaining days within 7 to verify warning UI.
+    return Math.min(7, Math.max(0, Math.floor(accountBalance / summaryDailyAvg)));
+  }, [accountBalance, summarySevenDayTotal]);
+
+  const isBudgetLow = remainingDays <= 7;
+
+  useEffect(() => {
+    setAiUsageWarningActive(isBudgetLow);
+  }, [isBudgetLow, setAiUsageWarningActive]);
 
   const overviewCards = useMemo(
     () => [
-      { title: 'Token 用量', value: formatNumber(tokenTotal), helper: '' },
-      { title: '本月消耗', value: formatNumber(monthlyTotal), helper: '环比上月↑18%' },
-      { title: '近7日消耗', value: formatNumber(sevenDayTotal), helper: `日均 ${formatNumber(sevenDayTotal / 7)} /天` },
-      { title: '剩余续航天数(天)', value: formatNumber(remainingDays), helper: '基于近7日，日均消耗量' },
+      { title: '帐户余额', value: formatNumber(accountBalance), helper: '' },
+      { title: '本月消耗金额', value: formatNumber(summaryMonthlyTotal), helper: '' },
+      {
+        title: '剩余天数预估',
+        value: formatNumber(remainingDays),
+        helper: '',
+        tooltip: '基于近7日日均消耗量预估',
+        warningLabel: isBudgetLow ? '即将耗尽' : '',
+      },
     ],
-    [monthlyTotal, remainingDays, sevenDayTotal, tokenTotal],
+    [accountBalance, isBudgetLow, remainingDays, summaryMonthlyTotal],
   );
 
-  const rangeDateText = useMemo(() => getRangeDates(selectedRange), [selectedRange]);
-
-  const trendRangeLabel = selectedRange === 'yesterday' ? '00:00' : selectedRange === 'week' ? '7天前' : '30天前';
+  const trendLabels = useMemo(() => {
+    const [, monthText] = selectedMonth.split('-');
+    const month = Number(monthText);
+    return trendPoints.map((_, index) => `${month}-${index + 1}`);
+  }, [selectedMonth, trendPoints]);
 
   const projectTableColumns = useMemo<BaseTableColumn<ProjectUsageRow>[]>(
     () => [
@@ -474,31 +532,29 @@ export default function AiUsagePage() {
     [],
   );
 
-  const detailTableColumns = useMemo<BaseTableColumn<MemberUsageRow>[]>(
+  const rechargeRows = useMemo<RechargeRecordRow[]>(
+    () => [
+      { id: 'r-20240115', amount: '￥100', rechargeTime: '2024.01.15' },
+      { id: 'r-20240110', amount: '￥50', rechargeTime: '2024.01.10' },
+      { id: 'r-20240105', amount: '￥200', rechargeTime: '2024.01.05' },
+      { id: 'r-20231228', amount: '￥150', rechargeTime: '2023.12.28' },
+    ],
+    [],
+  );
+
+  const rechargeTableColumns = useMemo<BaseTableColumn<RechargeRecordRow>[]>(
     () => [
       {
-        title: '成员',
-        dataIndex: 'name',
-        width: '25%',
+        title: '充值金额',
+        dataIndex: 'amount',
+        width: '50%',
+        render: (value: string) => <span className="text-primaryText font-medium">{value}</span>,
       },
       {
-        title: '角色',
-        dataIndex: 'role',
-        width: '20%',
-        render: (value: MemberProfile['role']) => <span className="text-secondaryText">{value}</span>,
-      },
-      {
-        title: '当前周期消耗',
-        dataIndex: 'usage',
-        width: '30%',
-        render: (value: number) => formatNumber(value),
-      },
-      {
-        title: '建议日上限',
-        dataIndex: 'usage',
-        key: 'dailyLimit',
-        width: '25%',
-        render: (value: number) => <span className="text-secondaryText">{formatNumber(value / 7)}</span>,
+        title: '充值时间',
+        dataIndex: 'rechargeTime',
+        width: '50%',
+        render: (value: string) => <span className="text-secondaryText">{value}</span>,
       },
     ],
     [],
@@ -527,12 +583,31 @@ export default function AiUsagePage() {
 
       <div className="flex-1 overflow-y-auto px-4 pb-10 pt-2 md:px-8 lg:px-10 md:pb-12 md:pt-3">
         <div className="max-w-[1240px] mx-auto space-y-5">
-          <section className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <section className="grid grid-cols-1 gap-3 md:grid-cols-3">
             {overviewCards.map((card) => (
-              <div key={card.title} className="rounded-xl px-4 py-4" style={{ backgroundColor: 'rgba(242, 243, 245, 0.4)' }}>
-                <div className="text-sm text-tertiaryText">{card.title}</div>
-                <div className="mt-3 text-2xl leading-none font-semibold text-primaryText">{card.value}</div>
-                <div className="mt-2 min-h-5 text-sm text-tertiaryText">{card.helper}</div>
+              <div key={card.title} className="h-[118px] rounded-xl px-4" style={{ backgroundColor: 'rgba(242, 243, 245, 0.4)' }}>
+                <div className="flex h-full flex-col justify-center">
+                  <div className="flex items-center gap-1 text-sm text-tertiaryText">
+                    <span>{card.title}</span>
+                    {card.tooltip && (
+                      <div className="group relative inline-flex">
+                        <CircleHelp size={14} className="cursor-help text-tertiaryText opacity-80" />
+                        <div className="pointer-events-none absolute left-1/2 top-full z-20 mt-1.5 w-max -translate-x-1/2 rounded-md bg-gray-7 px-2 py-1 text-xs text-white opacity-0 shadow-md transition-opacity group-hover:opacity-100">
+                          {card.tooltip}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="mt-2 flex items-center gap-2">
+                    <div className="text-[30px] leading-none font-semibold text-primaryText whitespace-nowrap overflow-hidden text-ellipsis">{card.value}</div>
+                    {card.warningLabel ? (
+                      <span className="inline-flex shrink-0 items-center rounded-full bg-danger-soft px-2 py-0.5 text-xs font-medium text-danger">
+                        {card.warningLabel}
+                      </span>
+                    ) : null}
+                  </div>
+                  {card.helper ? <div className="mt-2 text-sm text-tertiaryText">{card.helper}</div> : null}
+                </div>
               </div>
             ))}
           </section>
@@ -558,100 +633,67 @@ export default function AiUsagePage() {
                     activeTab === 'users' ? 'border-[var(--color-primary)] text-primaryText' : 'border-transparent text-tertiaryText'
                   }`}
                 >
-                  帐户明细
+                  充值记录
                 </button>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowRechargeModal(true)}
-                className="pb-2 text-sm text-[var(--color-primary)] hover:text-[var(--color-primary-hover)] transition-colors font-medium"
-              >
-                充值记录
-              </button>
             </div>
 
-            <div className="pl-0 pr-0 py-5">
-              <div className="flex flex-wrap items-center gap-2 text-sm text-secondaryText">
-                <BaseSelect
-                  options={memberSelectOptions}
-                  value={selectedMember}
-                  onChange={(value) => setSelectedMember(String(value))}
-                  size="medium"
-                />
+            {activeTab === 'analysis' && (
+              <div className="pl-0 pr-0 py-5">
+                <div className="flex flex-wrap items-center gap-2 text-sm text-secondaryText">
+                  <BaseActionMenu
+                    open={memberMenuOpen}
+                    onOpenChange={setMemberMenuOpen}
+                    items={memberMenuItems}
+                    onItemClick={handleMemberMenuItemClick}
+                    placement="bottom-start"
+                    width={172}
+                    portal
+                    menuClassName="!min-w-[172px] !rounded-lg !border !border-border !p-1.5 !shadow-[0_4px_20px_rgba(0,0,0,0.05)]"
+                    listClassName="max-h-[240px] overflow-y-auto"
+                    trigger={
+                      <span className="inline-flex h-10 min-w-[172px] items-center justify-between rounded-xl border border-border bg-white px-4 text-sm text-primaryText transition-colors hover:border-[var(--color-primary)]">
+                        <span className="truncate">{selectedMemberLabel}</span>
+                        <ChevronDown size={16} className={`ml-2 shrink-0 text-secondaryText transition-transform ${memberMenuOpen ? 'rotate-180' : ''}`} />
+                      </span>
+                    }
+                  />
 
-                <BaseSelect
-                  options={slotSelectOptions}
-                  value={selectedSlot}
-                  onChange={(value) => setSelectedSlot(value as TimeSlot)}
-                  size="medium"
-                />
-
-                <BaseSegmented
-                  options={rangeOptions}
-                  value={selectedRange}
-                  onChange={(value) => setSelectedRange(value as TimeRange)}
-                  size="middle"
-                />
-
-                <span className="ml-1 text-tertiaryText">{rangeDateText}</span>
+                  <BaseActionMenu
+                    open={monthMenuOpen}
+                    onOpenChange={setMonthMenuOpen}
+                    items={monthMenuItems}
+                    onItemClick={handleMonthMenuItemClick}
+                    placement="bottom-start"
+                    width={172}
+                    portal
+                    menuClassName="!min-w-[172px] !rounded-lg !border !border-border !p-1.5 !shadow-[0_4px_20px_rgba(0,0,0,0.05)]"
+                    listClassName="max-h-[240px] overflow-y-auto"
+                    trigger={
+                      <span className="inline-flex h-10 min-w-[172px] items-center justify-between rounded-xl border border-border bg-white px-4 text-sm text-primaryText transition-colors hover:border-[var(--color-primary)]">
+                        <span className="truncate">{selectedMonthLabel}</span>
+                        <ChevronDown size={16} className={`ml-2 shrink-0 text-secondaryText transition-transform ${monthMenuOpen ? 'rotate-180' : ''}`} />
+                      </span>
+                    }
+                  />
+                </div>
               </div>
-            </div>
+            )}
 
             {activeTab === 'analysis' ? (
               <>
                 <div className="pl-0 pr-0 py-4">
-                  <div className="text-base font-medium text-primaryText">消耗趋势</div>
-                  <div
-                    className="mt-2 rounded-xl px-4 py-4"
-                    style={{ backgroundColor: 'rgba(242, 243, 245, 0.4)' }}
-                  >
-                    <div className="text-sm text-tertiaryText">总消耗</div>
-                    <div className="mt-3 text-2xl leading-none font-semibold text-primaryText">{formatNumber(currentTotal)}</div>
-
-                    <UsageTrendChart
-                      points={trendPoints}
-                      leftLabel={trendRangeLabel}
-                      rightLabel={selectedRange === 'yesterday' ? '23:59' : '今天'}
-                    />
-                  </div>
+                  <UsageAmountBarChart points={trendPoints} labels={trendLabels} totalAmount={filteredMonthlyTotal} />
                 </div>
 
-                <div className="pl-0 pr-0 py-3.5">
-                  <div className="mb-3 flex items-center gap-6">
-                    <h3 className="text-base font-medium text-primaryText">消耗占比</h3>
-                    <BaseSegmented
-                      options={ratioOptions}
-                      value={ratioView}
-                      onChange={(value) => setRatioView(value as RatioView)}
-                    />
-                  </div>
-
-                  <div className="border-b border-borderGray bg-white">
-                    {ratioView === 'project' ? (
-                      <BaseTable
-                        className="task-table-scroll min-w-[760px]"
-                        columns={projectTableColumns}
-                        dataSource={projectRows}
-                        rowKey="id"
-                      />
-                    ) : (
-                      <BaseTable
-                        className="task-table-scroll min-w-[760px]"
-                        columns={memberTableColumns}
-                        dataSource={memberRows}
-                        rowKey="id"
-                      />
-                    )}
-                  </div>
-                </div>
               </>
             ) : (
-              <div className="pl-0 pr-0 -mt-2 pb-5">
+              <div className="pl-0 pr-0 pt-4 pb-5">
                 <div className="border-b border-borderGray bg-white">
                   <BaseTable
                     className="task-table-scroll min-w-[760px]"
-                    columns={detailTableColumns}
-                    dataSource={memberRows}
+                    columns={rechargeTableColumns}
+                    dataSource={rechargeRows}
                     rowKey="id"
                   />
                 </div>
@@ -661,47 +703,6 @@ export default function AiUsagePage() {
         </div>
       </div>
 
-      {/* 充值记录弹窗 */}
-      {showRechargeModal && (
-        <>
-          <div className="fixed inset-0 z-40 bg-black/20" onClick={() => setShowRechargeModal(false)} />
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <BaseModal
-              visible={showRechargeModal}
-              title="充值记录"
-              okText="充值"
-              cancelText="关闭"
-              onConfirm={() => setShowRechargeModal(false)}
-              onCancel={() => setShowRechargeModal(false)}
-              width={600}
-              maskClosable
-            >
-              <div className="max-h-[calc(100vh-200px)] overflow-y-auto space-y-3">
-                {[
-                  { date: '2024.01.15', amount: '￥100', tokens: '+10,000 Tokens', status: '已到账' },
-                  { date: '2024.01.10', amount: '￥50', tokens: '+5,000 Tokens', status: '已到账' },
-                  { date: '2024.01.05', amount: '￥200', tokens: '+20,000 Tokens', status: '已到账' },
-                  { date: '2024.12.28', amount: '￥150', tokens: '+15,000 Tokens', status: '已到账' },
-                ].map((record, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between p-3 rounded-lg border border-line-soft hover:border-borderGray transition-colors"
-                  >
-                    <div className="flex-1">
-                      <div className="text-sm font-medium text-primaryText">{record.amount}</div>
-                      <div className="text-sm text-tertiaryText mt-1">{record.date}</div>
-                    </div>
-                    <div className="flex-1 text-right">
-                      <div className="text-sm text-primaryText">{record.tokens}</div>
-                      <div className="text-sm text-success mt-1">{record.status}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </BaseModal>
-          </div>
-        </>
-      )}
     </div>
   );
 }

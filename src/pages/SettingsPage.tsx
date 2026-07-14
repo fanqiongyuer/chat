@@ -17,7 +17,6 @@ export default function SettingsPage() {
     <div className="p-8 max-w-2xl mx-auto">
       <h1 className="text-3xl font-bold mb-8">⚙️ 系统设置</h1>
       <div className="bg-white border border-borderGray rounded-2xl overflow-hidden shadow-sm">
-        <div className="p-4 border-b border-borderGray hover:bg-bgLight cursor-pointer transition-colors">配置 Skill 模型</div>
         <button
           onClick={() => navigate('/ai-usage')}
           className="w-full text-left p-4 border-b border-borderGray hover:bg-bgLight cursor-pointer transition-colors"
