@@ -1379,7 +1379,7 @@ const chatScrollContainerRef = useRef<HTMLDivElement | null>(null);
 
   const chatContentMaxWidth: number | string = showPreviewPanel ? '100%' : 800;
   const chatInputMaxWidth: number | string = showPreviewPanel ? '100%' : 840;
-  const showChatTimeline = !isShareMode && chatTimelineItems.length > 0;
+  const showChatTimeline = !isShareMode && chatTimelineItems.length > 3;
 
   return (
     <div className="flex h-full w-full flex-col bg-white">
@@ -1655,14 +1655,14 @@ const chatScrollContainerRef = useRef<HTMLDivElement | null>(null);
                               <span
                                 className={`min-w-0 overflow-hidden whitespace-nowrap text-right text-[14px] leading-4 transition-[max-width,opacity,color] duration-200 ${
                                   isTimelineHovered ? 'max-w-[190px] opacity-100' : 'max-w-0 opacity-0'
-                                } ${isActive ? 'text-[#2b63ff]' : isHovered ? 'text-[#1f2937]' : 'text-[#8f95a3]'}`}
+                                } ${isActive ? 'text-primary' : isHovered ? 'text-[#1f2937]' : 'text-[#8f95a3]'}`}
                               >
                                 {item.preview}
                               </span>
                               <span
                                 className={`shrink-0 rounded-full transition-colors duration-200 ${
                                   isActive
-                                    ? 'h-[4px] w-[12px] bg-[#2b63ff]'
+                                    ? 'h-[4px] w-[12px] bg-primary'
                                     : isHovered
                                       ? 'h-[2px] w-[8px] bg-[#1f2937]'
                                       : 'h-[2px] w-[8px] bg-[#d9dce3]'
