@@ -141,6 +141,11 @@ interface PreviewItem {
   status?: string;
 }
 
+interface ChatTimelineItem {
+  messageIndex: number;
+  preview: string;
+}
+
 const mockAttachmentByProjectId: Record<string, ProjectAttachmentContent> = {
   'p-crispr': {
     knowledgeDocs: [
@@ -246,6 +251,12 @@ const attachmentContentFallback: ProjectAttachmentContent = {
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
+const normalizeTimelinePreview = (content: string) => {
+  const normalized = content.replace(/\s+/g, ' ').trim();
+  if (!normalized) return '空白消息';
+  return normalized.length > 56 ? `${normalized.slice(0, 56)}...` : normalized;
+};
+
 const PANEL_MIN_WIDTH = 200;
 const PANEL_MAX_WIDTH = 440;
 const MIN_CHAT_WIDTH = 320;
@@ -292,11 +303,25 @@ const [newProjectName, setNewProjectName] = useState('');
   const [activePreviewKey, setActivePreviewKey] = useState<string | null>(null);
   const [fileSearchQuery, setFileSearchQuery] = useState('');
   const [assistantFeedbackMap, setAssistantFeedbackMap] = useState<Record<string, AssistantFeedback>>({});
-  const chatScrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const [activeTimelineMessageIndex, setActiveTimelineMessageIndex] = useState(0);
+  const [hoveredTimelineMessageIndex, setHoveredTimelineMessageIndex] = useState<number | null>(null);
+  const [isTimelineHovered, setIsTimelineHovered] = useState(false);
+const [timelineScrollThumbHeight, setTimelineScrollThumbHeight] = useState(0);
+const [timelineScrollThumbTop, setTimelineScrollThumbTop] = useState(0);
+const [isTimelineScrolling, setIsTimelineScrolling] = useState(false);
+const [chatScrollThumbHeight, setChatScrollThumbHeight] = useState(0);
+const [chatScrollThumbTop, setChatScrollThumbTop] = useState(0);
+const [isChatScrolling, setIsChatScrolling] = useState(false);
+const timelineListRef = useRef<HTMLDivElement | null>(null);
+const timelineScrollHideTimerRef = useRef<number | null>(null);
+const chatScrollHideTimerRef = useRef<number | null>(null);
+const chatScrollContainerRef = useRef<HTMLDivElement | null>(null);
+
   const shouldStickToBottomRef = useRef(true);
   const hasInitializedChatChangeRef = useRef(false);
   const projectSelectorRef = useRef<HTMLDivElement | null>(null);
   const createProjectPopoverRef = useRef<HTMLDivElement | null>(null);
+  const messageElementRefs = useRef<Array<HTMLDivElement | null>>([]);
 
   const isShareMode = useMemo(
     () => !isNewChat && new URLSearchParams(location.search).get('share') === '1',
@@ -306,6 +331,9 @@ const [newProjectName, setNewProjectName] = useState('');
   const [createdShareLink, setCreatedShareLink] = useState('');
   const [shareLinkCopied, setShareLinkCopied] = useState(false);
   const [isShareLinkModalOpen, setIsShareLinkModalOpen] = useState(false);
+  const [isEditingChatTitle, setIsEditingChatTitle] = useState(false);
+  const [editingChatTitle, setEditingChatTitle] = useState('');
+  const chatTitleInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (!isShareMode) {
@@ -364,11 +392,92 @@ const [newProjectName, setNewProjectName] = useState('');
     }
   }, [createdShareLink]);
 
+  const startEditChatTitle = useCallback(() => {
+    if (isNewChat || !chatId || !currentChat) return;
+    setEditingChatTitle(currentChat.title);
+    setIsEditingChatTitle(true);
+  }, [chatId, currentChat, isNewChat]);
+
+  const cancelEditChatTitle = useCallback(() => {
+    setEditingChatTitle(currentChat?.title ?? '');
+    setIsEditingChatTitle(false);
+  }, [currentChat?.title]);
+
+  const commitEditChatTitle = useCallback(() => {
+    if (!chatId || !currentChat) {
+      setIsEditingChatTitle(false);
+      return;
+    }
+
+    const nextTitle = editingChatTitle.trim();
+    if (!nextTitle) {
+      setEditingChatTitle(currentChat.title);
+      setIsEditingChatTitle(false);
+      return;
+    }
+
+    if (nextTitle !== currentChat.title) {
+      setChats((prevChats) =>
+        prevChats.map((chat) => (chat.id === chatId ? { ...chat, title: nextTitle } : chat)),
+      );
+    }
+
+    setEditingChatTitle(nextTitle);
+    setIsEditingChatTitle(false);
+  }, [chatId, currentChat, editingChatTitle, setChats]);
+
+  const handleChatTitleKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLInputElement>) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        commitEditChatTitle();
+        return;
+      }
+
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        cancelEditChatTitle();
+      }
+    },
+    [cancelEditChatTitle, commitEditChatTitle],
+  );
+
+  useEffect(() => {
+    setIsEditingChatTitle(false);
+    setEditingChatTitle(currentChat?.title ?? '');
+  }, [chatId, currentChat?.title]);
+
+  useEffect(() => {
+    if (!isEditingChatTitle) return;
+
+    const frameId = window.requestAnimationFrame(() => {
+      const input = chatTitleInputRef.current;
+      if (!input) return;
+      input.focus();
+      const cursorPosition = input.value.length;
+      input.setSelectionRange(cursorPosition, cursorPosition);
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
+  }, [isEditingChatTitle]);
+
   useEffect(() => {
     // 首次进入历史对话时状态已是默认值，跳过一次重置可避免额外重渲染抖动。
     if (!hasInitializedChatChangeRef.current) {
       hasInitializedChatChangeRef.current = true;
       return;
+    }
+
+    if (timelineScrollHideTimerRef.current !== null) {
+      window.clearTimeout(timelineScrollHideTimerRef.current);
+      timelineScrollHideTimerRef.current = null;
+    }
+
+    if (chatScrollHideTimerRef.current !== null) {
+      window.clearTimeout(chatScrollHideTimerRef.current);
+      chatScrollHideTimerRef.current = null;
     }
 
     setShowRightPanel(false);
@@ -377,6 +486,15 @@ const [newProjectName, setNewProjectName] = useState('');
     setActivePreviewKey(null);
     setFileSearchQuery('');
     setHasReceivedAssistantChunk(false);
+    setIsTimelineHovered(false);
+    setHoveredTimelineMessageIndex(null);
+    setIsTimelineScrolling(false);
+    setTimelineScrollThumbHeight(0);
+    setTimelineScrollThumbTop(0);
+    setIsChatScrolling(false);
+    setChatScrollThumbHeight(0);
+    setChatScrollThumbTop(0);
+    setActiveTimelineMessageIndex(0);
     shouldStickToBottomRef.current = true;
   }, [chatId]);
 
@@ -861,6 +979,70 @@ const [newProjectName, setNewProjectName] = useState('');
     setIsRightPanelResizing(true);
   };
 
+  const chatTimelineItems = useMemo<ChatTimelineItem[]>(() => {
+    return messages.reduce<ChatTimelineItem[]>((acc, message, messageIndex) => {
+      if (message.role !== 'user') return acc;
+
+      const preview = normalizeTimelinePreview(message.content);
+      acc.push({ messageIndex, preview });
+      return acc;
+    }, []);
+  }, [messages]);
+
+  const syncActiveTimelineByScroll = useCallback(() => {
+    const container = chatScrollContainerRef.current;
+    if (!container || chatTimelineItems.length === 0) return;
+
+    const viewportAnchor = container.scrollTop + Math.min(container.clientHeight * 0.35, 220);
+    let nextActiveMessageIndex = chatTimelineItems[0].messageIndex;
+
+    chatTimelineItems.forEach((item) => {
+      const anchorElement = messageElementRefs.current[item.messageIndex];
+      if (!anchorElement) return;
+      if (anchorElement.offsetTop <= viewportAnchor) {
+        nextActiveMessageIndex = item.messageIndex;
+      }
+    });
+
+    setActiveTimelineMessageIndex((prev) => (prev === nextActiveMessageIndex ? prev : nextActiveMessageIndex));
+  }, [chatTimelineItems]);
+
+  const updateTimelineScrollThumb = useCallback(() => {
+    const container = timelineListRef.current;
+    if (!container) {
+      setTimelineScrollThumbHeight(0);
+      setTimelineScrollThumbTop(0);
+      return;
+    }
+
+    const { scrollTop, scrollHeight, clientHeight } = container;
+    if (scrollHeight <= clientHeight || clientHeight <= 0) {
+      setTimelineScrollThumbHeight(0);
+      setTimelineScrollThumbTop(0);
+      return;
+    }
+
+    const nextThumbHeight = Math.max((clientHeight / scrollHeight) * clientHeight, 24);
+    const maxTravel = clientHeight - nextThumbHeight;
+    const progress = scrollTop / Math.max(scrollHeight - clientHeight, 1);
+
+    setTimelineScrollThumbHeight(nextThumbHeight);
+    setTimelineScrollThumbTop(maxTravel * progress);
+  }, []);
+
+  const handleTimelineListScroll = useCallback(() => {
+    updateTimelineScrollThumb();
+    setIsTimelineScrolling(true);
+
+    if (timelineScrollHideTimerRef.current !== null) {
+      window.clearTimeout(timelineScrollHideTimerRef.current);
+    }
+
+    timelineScrollHideTimerRef.current = window.setTimeout(() => {
+      setIsTimelineScrolling(false);
+    }, 650);
+  }, [updateTimelineScrollThumb]);
+
   const setAssistantFeedback = useCallback((actionKey: string, feedback: AssistantFeedback) => {
     setAssistantFeedbackMap((prev) => {
       const current = prev[actionKey];
@@ -877,12 +1059,60 @@ const [newProjectName, setNewProjectName] = useState('');
     });
   }, []);
 
+  const updateChatScrollThumb = useCallback(() => {
+    const container = chatScrollContainerRef.current;
+    if (!container) {
+      setChatScrollThumbHeight(0);
+      setChatScrollThumbTop(0);
+      return;
+    }
+
+    const { scrollTop, scrollHeight, clientHeight } = container;
+    if (scrollHeight <= clientHeight || clientHeight <= 0) {
+      setChatScrollThumbHeight(0);
+      setChatScrollThumbTop(0);
+      return;
+    }
+
+    const nextThumbHeight = Math.max((clientHeight / scrollHeight) * clientHeight, 36);
+    const maxTravel = clientHeight - nextThumbHeight;
+    const progress = scrollTop / Math.max(scrollHeight - clientHeight, 1);
+
+    setChatScrollThumbHeight(nextThumbHeight);
+    setChatScrollThumbTop(maxTravel * progress);
+  }, []);
+
   const handleChatScroll = useCallback(() => {
     const container = chatScrollContainerRef.current;
     if (!container) return;
 
     const distanceToBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
     shouldStickToBottomRef.current = distanceToBottom <= 80;
+
+    syncActiveTimelineByScroll();
+    updateChatScrollThumb();
+    setIsChatScrolling(true);
+
+    if (chatScrollHideTimerRef.current !== null) {
+      window.clearTimeout(chatScrollHideTimerRef.current);
+    }
+
+    chatScrollHideTimerRef.current = window.setTimeout(() => {
+      setIsChatScrolling(false);
+    }, 650);
+  }, [syncActiveTimelineByScroll, updateChatScrollThumb]);
+
+  const scrollToTimelineMessage = useCallback((messageIndex: number) => {
+    const container = chatScrollContainerRef.current;
+    const anchorElement = messageElementRefs.current[messageIndex];
+    if (!container || !anchorElement) return;
+
+    shouldStickToBottomRef.current = false;
+    setActiveTimelineMessageIndex(messageIndex);
+    container.scrollTo({
+      top: Math.max(anchorElement.offsetTop - 88, 0),
+      behavior: 'smooth',
+    });
   }, []);
 
   useLayoutEffect(() => {
@@ -893,6 +1123,81 @@ const [newProjectName, setNewProjectName] = useState('');
 
     container.scrollTop = container.scrollHeight;
   }, [chatId, hasReceivedAssistantChunk, isNewChat, isTyping, messages, statusPhase]);
+
+  useEffect(() => {
+    messageElementRefs.current.length = messages.length;
+  }, [messages.length]);
+
+  useEffect(() => {
+    if (chatTimelineItems.length === 0) {
+      setActiveTimelineMessageIndex(0);
+      return;
+    }
+
+    const hasActiveMessage = chatTimelineItems.some((item) => item.messageIndex === activeTimelineMessageIndex);
+    if (!hasActiveMessage) {
+      setActiveTimelineMessageIndex(chatTimelineItems[chatTimelineItems.length - 1].messageIndex);
+    }
+  }, [activeTimelineMessageIndex, chatTimelineItems]);
+
+  useLayoutEffect(() => {
+    if (isNewChat || chatTimelineItems.length === 0) return;
+
+    const container = chatScrollContainerRef.current;
+    if (!container) return;
+
+    const distanceToBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+    if (distanceToBottom <= 80) {
+      setActiveTimelineMessageIndex(chatTimelineItems[chatTimelineItems.length - 1].messageIndex);
+      return;
+    }
+
+    syncActiveTimelineByScroll();
+  }, [chatTimelineItems, isNewChat, syncActiveTimelineByScroll]);
+
+  useEffect(() => {
+    if (!isTimelineHovered) return;
+
+    const rafId = window.requestAnimationFrame(() => {
+      updateTimelineScrollThumb();
+    });
+
+    return () => {
+      window.cancelAnimationFrame(rafId);
+    };
+  }, [chatTimelineItems.length, isTimelineHovered, updateTimelineScrollThumb]);
+
+  useEffect(() => {
+    const rafId = window.requestAnimationFrame(() => {
+      updateChatScrollThumb();
+    });
+
+    return () => {
+      window.cancelAnimationFrame(rafId);
+    };
+  }, [messages, statusPhase, hasReceivedAssistantChunk, isTyping, updateChatScrollThumb]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      updateChatScrollThumb();
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [updateChatScrollThumb]);
+
+  useEffect(() => {
+    return () => {
+      if (timelineScrollHideTimerRef.current !== null) {
+        window.clearTimeout(timelineScrollHideTimerRef.current);
+      }
+      if (chatScrollHideTimerRef.current !== null) {
+        window.clearTimeout(chatScrollHideTimerRef.current);
+      }
+    };
+  }, []);
 
   // 发送首条消息时立即创建会话并绑定所选项目，确保近期对话分组正确。
   const handleSend = useCallback(async (payload: string | InputSendPayload) => {
@@ -1074,6 +1379,7 @@ const [newProjectName, setNewProjectName] = useState('');
 
   const chatContentMaxWidth: number | string = showPreviewPanel ? '100%' : 800;
   const chatInputMaxWidth: number | string = showPreviewPanel ? '100%' : 840;
+  const showChatTimeline = !isShareMode && chatTimelineItems.length > 0;
 
   return (
     <div className="flex h-full w-full flex-col bg-white">
@@ -1086,9 +1392,28 @@ const [newProjectName, setNewProjectName] = useState('');
             </button>
           )}
           {!isNewChat && (
-            <h1 className="text-[15px] md:text-[16px] font-medium text-primaryText truncate">
-              {currentChat?.title ?? ''}
-            </h1>
+            <div className="min-w-0">
+              {isEditingChatTitle ? (
+                <input
+                  ref={chatTitleInputRef}
+                  value={editingChatTitle}
+                  onChange={(event) => setEditingChatTitle(event.target.value)}
+                  onBlur={commitEditChatTitle}
+                  onKeyDown={handleChatTitleKeyDown}
+                  className="w-full max-w-[560px] rounded-[8px] border border-[#22c55e] bg-white px-2.5 py-1 text-[15px] md:text-[16px] font-medium text-primaryText outline-none transition-colors focus:border-[#22c55e]"
+                  maxLength={80}
+                  aria-label="编辑对话名称"
+                />
+              ) : (
+                <h1
+                  className="text-[15px] md:text-[16px] font-medium text-primaryText truncate cursor-pointer"
+                  onClick={startEditChatTitle}
+                  title="点击编辑对话名称"
+                >
+                  {currentChat?.title ?? ''}
+                </h1>
+              )}
+            </div>
           )}
         </div>
         {!isNewChat && (
@@ -1204,18 +1529,26 @@ const [newProjectName, setNewProjectName] = useState('');
           </div>
         ) : (
           <>
-            <div
-              ref={chatScrollContainerRef}
-              onScroll={handleChatScroll}
-              className="flex-1 overflow-y-auto [scrollbar-gutter:stable_both-edges] px-4 sm:px-8 py-8 pt-20 flex flex-col items-center"
-            >
+            <div className="relative flex-1 min-h-0">
+            <div className="relative h-full">
+              <div
+                ref={chatScrollContainerRef}
+                onScroll={handleChatScroll}
+                className="flex h-full overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden px-4 sm:px-8 py-8 pt-20 flex-col items-center"
+              >
               <div className={`w-full flex flex-col ${isShareMode ? 'gap-3' : 'gap-8'}`} style={{ maxWidth: chatContentMaxWidth }}>
                 {messages.map((msg, idx) => {
                   const actionKey = `${chatId ?? 'new'}-${idx}`;
                   const isChecked = selectedShareMessageKeys.has(actionKey);
 
                   return (
-                    <div key={actionKey} className={isShareMode ? 'flex w-full items-start gap-2' : ''}>
+                    <div
+                      key={actionKey}
+                      ref={(element) => {
+                        messageElementRefs.current[idx] = element;
+                      }}
+                      className={isShareMode ? 'flex w-full items-start gap-2' : ''}
+                    >
                       {isShareMode && (
                         <button
                           type="button"
@@ -1261,6 +1594,101 @@ const [newProjectName, setNewProjectName] = useState('');
   </div>
 )}
               </div>
+              </div>
+
+              {chatScrollThumbHeight > 0 && (
+                <div
+                  className={`pointer-events-none absolute right-1 top-0 w-[6px] rounded-full bg-[#d3d8e0] transition-opacity duration-200 ${
+                    isChatScrolling ? 'opacity-100' : 'opacity-0'
+                  }`}
+                  style={{
+                    height: chatScrollThumbHeight,
+                    transform: `translateY(${chatScrollThumbTop}px)`,
+                  }}
+                />
+              )}
+            </div>
+
+            {showChatTimeline && (
+              <div className="pointer-events-none absolute right-6 top-1/2 z-[5] -translate-y-1/2">
+                <div
+                  className="pointer-events-auto relative"
+                  onMouseEnter={() => setIsTimelineHovered(true)}
+                  onMouseLeave={() => {
+                    if (timelineScrollHideTimerRef.current !== null) {
+                      window.clearTimeout(timelineScrollHideTimerRef.current);
+                      timelineScrollHideTimerRef.current = null;
+                    }
+                    setIsTimelineHovered(false);
+                    setHoveredTimelineMessageIndex(null);
+                    setIsTimelineScrolling(false);
+                  }}
+                >
+                  <div
+                    ref={timelineListRef}
+                    onScroll={handleTimelineListScroll}
+                    className={`ml-auto max-h-[332px] overflow-y-auto rounded-[12px] border [scrollbar-width:none] [&::-webkit-scrollbar]:hidden transition-[width,padding,background-color,border-color,box-shadow] duration-200 ${
+                      isTimelineHovered
+                        ? 'w-[244px] border-[#eef0f4] bg-white px-4 py-4 shadow-[0_18px_48px_rgba(15,23,42,0.12)]'
+                        : 'w-[12px] border-transparent bg-transparent px-0 py-0 shadow-none'
+                    }`}
+                  >
+                    <div className="relative">
+                      <div className="flex flex-col items-end gap-5">
+                        {chatTimelineItems.map((item) => {
+                          const isActive = item.messageIndex === activeTimelineMessageIndex;
+                          const isHovered = hoveredTimelineMessageIndex === item.messageIndex;
+                          return (
+                            <button
+                              key={`timeline-item-${item.messageIndex}`}
+                              type="button"
+                              onClick={() => scrollToTimelineMessage(item.messageIndex)}
+                              onMouseEnter={() => setHoveredTimelineMessageIndex(item.messageIndex)}
+                              onMouseLeave={() => setHoveredTimelineMessageIndex(null)}
+                              className={`flex h-4 items-center justify-end transition-[width,gap] duration-200 ${
+                                isTimelineHovered ? 'w-full gap-2' : 'w-[12px] gap-0'
+                              }`}
+                              style={{ fontFamily: '"Inter", "PingFang SC", "Microsoft YaHei", sans-serif' }}
+                              aria-label={`定位到第 ${item.messageIndex + 1} 条用户消息`}
+                              title={item.preview}
+                            >
+                              <span
+                                className={`min-w-0 overflow-hidden whitespace-nowrap text-right text-[14px] leading-4 transition-[max-width,opacity,color] duration-200 ${
+                                  isTimelineHovered ? 'max-w-[190px] opacity-100' : 'max-w-0 opacity-0'
+                                } ${isActive ? 'text-[#2b63ff]' : isHovered ? 'text-[#1f2937]' : 'text-[#8f95a3]'}`}
+                              >
+                                {item.preview}
+                              </span>
+                              <span
+                                className={`shrink-0 rounded-full transition-colors duration-200 ${
+                                  isActive
+                                    ? 'h-[4px] w-[12px] bg-[#2b63ff]'
+                                    : isHovered
+                                      ? 'h-[2px] w-[8px] bg-[#1f2937]'
+                                      : 'h-[2px] w-[8px] bg-[#d9dce3]'
+                                }`}
+                              />
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {isTimelineHovered && timelineScrollThumbHeight > 0 && (
+                        <div
+                          className={`pointer-events-none absolute right-[-2px] top-0 h-full w-[4px] rounded-full bg-[#d3d8e0] transition-opacity duration-200 ${
+                            isTimelineScrolling ? 'opacity-100' : 'opacity-0'
+                          }`}
+                          style={{
+                            height: timelineScrollThumbHeight,
+                            transform: `translateY(${timelineScrollThumbTop}px)`,
+                          }}
+                        />
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
             </div>
             
             {isShareMode ? (

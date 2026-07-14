@@ -1,39 +1,30 @@
-import { execSync } from 'node:child_process'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import path from 'path'
 
 const normalizeBase = (value: string) => {
-  const withLeadingSlash = value.startsWith('/') ? value : `/${value}`
-  return withLeadingSlash.endsWith('/') ? withLeadingSlash : `${withLeadingSlash}/`
+  const withLeadingSlash = value.charAt(0) === '/' ? value : `/${value}`
+  return withLeadingSlash.charAt(withLeadingSlash.length - 1) === '/' ? withLeadingSlash : `${withLeadingSlash}/`
 }
 
+const GITHUB_PAGES_DEFAULT_BASE = '/chat/'
+
 const resolvePagesBase = () => {
-  if (process.env.PAGES_BASE) {
-    return normalizeBase(process.env.PAGES_BASE)
-  }
+  const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {}
+  const configuredBase = env.PAGES_BASE || GITHUB_PAGES_DEFAULT_BASE
+  return normalizeBase(configuredBase)
+}
 
-  try {
-    const remoteUrl = execSync('git config --get remote.origin.url', {
-      stdio: ['ignore', 'pipe', 'ignore'],
-    })
-      .toString()
-      .trim()
-
-    const match = remoteUrl.match(/[:/]([^/]+)\/([^/]+?)(?:\.git)?$/)
-    const repoName = match?.[2]
-    return repoName ? `/${repoName}/` : '/chat/'
-  } catch {
-    return '/chat/'
-  }
+const resolveBuildTarget = () => {
+  const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {}
+  return env.BUILD_TARGET
 }
 
 export default defineConfig({
   plugins: [react()],
-  base: process.env.BUILD_TARGET === 'pages' ? resolvePagesBase() : '/',
+  base: resolveBuildTarget() === 'pages' ? resolvePagesBase() : '/',
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
+      '@': new URL('./src', import.meta.url).pathname,
     },
   },
   server: {
