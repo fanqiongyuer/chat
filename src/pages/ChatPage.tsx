@@ -313,6 +313,7 @@ const [chatScrollThumbHeight, setChatScrollThumbHeight] = useState(0);
 const [chatScrollThumbTop, setChatScrollThumbTop] = useState(0);
 const [isChatScrolling, setIsChatScrolling] = useState(false);
 const timelineListRef = useRef<HTMLDivElement | null>(null);
+const timelineMarkerRefs = useRef<Record<number, HTMLButtonElement | null>>({});
 const timelineScrollHideTimerRef = useRef<number | null>(null);
 const chatScrollHideTimerRef = useRef<number | null>(null);
 const chatScrollContainerRef = useRef<HTMLDivElement | null>(null);
@@ -993,8 +994,23 @@ const chatScrollContainerRef = useRef<HTMLDivElement | null>(null);
     const container = chatScrollContainerRef.current;
     if (!container || chatTimelineItems.length === 0) return;
 
+    const firstMessageIndex = chatTimelineItems[0].messageIndex;
+    const lastMessageIndex = chatTimelineItems[chatTimelineItems.length - 1].messageIndex;
+    const distanceToBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+
+    // 到达顶部/底部时，刻度条选中项与滚动位置保持严格同步。
+    if (container.scrollTop <= 2) {
+      setActiveTimelineMessageIndex((prev) => (prev === firstMessageIndex ? prev : firstMessageIndex));
+      return;
+    }
+
+    if (distanceToBottom <= 2) {
+      setActiveTimelineMessageIndex((prev) => (prev === lastMessageIndex ? prev : lastMessageIndex));
+      return;
+    }
+
     const viewportAnchor = container.scrollTop + Math.min(container.clientHeight * 0.35, 220);
-    let nextActiveMessageIndex = chatTimelineItems[0].messageIndex;
+    let nextActiveMessageIndex = firstMessageIndex;
 
     chatTimelineItems.forEach((item) => {
       const anchorElement = messageElementRefs.current[item.messageIndex];
@@ -1139,6 +1155,30 @@ const chatScrollContainerRef = useRef<HTMLDivElement | null>(null);
       setActiveTimelineMessageIndex(chatTimelineItems[chatTimelineItems.length - 1].messageIndex);
     }
   }, [activeTimelineMessageIndex, chatTimelineItems]);
+
+  useEffect(() => {
+    if (chatTimelineItems.length === 0) return;
+
+    const container = timelineListRef.current;
+    const activeMarker = timelineMarkerRefs.current[activeTimelineMessageIndex];
+    if (!container || !activeMarker) return;
+
+    const viewTop = container.scrollTop;
+    const viewBottom = viewTop + container.clientHeight;
+    const markerTop = activeMarker.offsetTop;
+    const markerBottom = markerTop + activeMarker.offsetHeight;
+    const padding = 16;
+
+    if (markerTop < viewTop + padding) {
+      container.scrollTo({ top: Math.max(markerTop - padding, 0), behavior: 'auto' });
+      return;
+    }
+
+    if (markerBottom > viewBottom - padding) {
+      const nextTop = markerBottom - container.clientHeight + padding;
+      container.scrollTo({ top: Math.max(nextTop, 0), behavior: 'auto' });
+    }
+  }, [activeTimelineMessageIndex, chatTimelineItems.length]);
 
   useLayoutEffect(() => {
     if (isNewChat || chatTimelineItems.length === 0) return;
@@ -1400,13 +1440,13 @@ const chatScrollContainerRef = useRef<HTMLDivElement | null>(null);
                   onChange={(event) => setEditingChatTitle(event.target.value)}
                   onBlur={commitEditChatTitle}
                   onKeyDown={handleChatTitleKeyDown}
-                  className="w-full max-w-[560px] rounded-[8px] border border-[#22c55e] bg-white px-2.5 py-1 text-[15px] md:text-[16px] font-medium text-primaryText outline-none transition-colors focus:border-[#22c55e]"
+                  className="w-full max-w-[560px] rounded-[8px] border border-[#22c55e] bg-white px-2.5 py-1 text-[14px] font-medium text-primaryText outline-none transition-colors focus:border-[#22c55e]"
                   maxLength={80}
                   aria-label="编辑对话名称"
                 />
               ) : (
                 <h1
-                  className="text-[15px] md:text-[16px] font-medium text-primaryText truncate cursor-pointer"
+                  className="text-[14px] font-medium text-primaryText truncate cursor-pointer"
                   onClick={startEditChatTitle}
                   title="点击编辑对话名称"
                 >
@@ -1641,6 +1681,9 @@ const chatScrollContainerRef = useRef<HTMLDivElement | null>(null);
                           return (
                             <button
                               key={`timeline-item-${item.messageIndex}`}
+                              ref={(element) => {
+                                timelineMarkerRefs.current[item.messageIndex] = element;
+                              }}
                               type="button"
                               onClick={() => scrollToTimelineMessage(item.messageIndex)}
                               onMouseEnter={() => setHoveredTimelineMessageIndex(item.messageIndex)}

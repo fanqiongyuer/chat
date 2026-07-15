@@ -151,22 +151,11 @@ export default function SystemSettingsDetailPage() {
         visible={showPasswordModal}
         title="修改密码"
         onClose={closePasswordModal}
-        footer={
-          <>
-            <BaseButton type="secondary" size="medium" rounded="large" onClick={closePasswordModal}>
-              取消
-            </BaseButton>
-            <BaseButton
-              type="primary"
-              size="medium"
-              rounded="large"
-              disabled={!canSubmitPassword}
-              onClick={closePasswordModal}
-            >
-              保存
-            </BaseButton>
-          </>
-        }
+        onCancel={closePasswordModal}
+        onConfirm={closePasswordModal}
+        cancelText="取消"
+        okText="保存"
+        okButtonProps={{ disabled: !canSubmitPassword }}
       >
         <div className="space-y-4">
           <BaseInput

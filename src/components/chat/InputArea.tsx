@@ -50,7 +50,7 @@ interface UploadedInputFile extends InputAttachment {}
 const MAX_UPLOAD_COUNT = 50;
 const MAX_UPLOAD_FILE_SIZE = 100 * 1024 * 1024;
 
-export const CHAT_INPUT_GUIDE_TEXT = '⏎发送 | ⇧+⏎换行 | @引用 | /快捷操作';
+export const CHAT_INPUT_GUIDE_TEXT = '⏎发送 | ⇧+⏎换行 | @引用 | /skill';
 
 export const CHAT_SKILL_OPTIONS: ChatSkillOption[] = [
   { id: 'docx', badge: 'D', description: '文档创建、编辑与分析，支持批注和修订。', source: '内置' },
