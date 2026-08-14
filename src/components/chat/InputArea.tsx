@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, useId } from 'react';
-import { Plus, Send, Search, Clock3, FileText, Paperclip, Puzzle, AtSign, X } from 'lucide-react';
+import { Plus, Send, Search, Clock3, FileText, Paperclip, Puzzle, AtSign, X, ChevronRight, ChevronUp, Cpu, Brain, Check } from 'lucide-react';
 import { EXPERIMENT_DETAILS_BY_PROJECT, mockProjects } from '../../mock/projects';
 
 export interface InputAttachment {
@@ -192,6 +192,36 @@ const buildProjectFileOptions = (): ChatFileOption[] => {
 export const CHAT_FILE_OPTIONS: ChatFileOption[] = buildProjectFileOptions();
 export const CHAT_RECENT_FILE_OPTIONS: ChatFileOption[] = CHAT_FILE_OPTIONS.filter((option) => option.isRecent).slice(0, 10);
 
+// ─── 思考深度 ───────────────────────────────────────────────────────────────
+export type ThinkingDepth = 'fast' | 'deep' | 'max';
+
+export interface ThinkingDepthOption {
+  id: ThinkingDepth;
+  label: string;
+  desc: string;
+}
+
+export const THINKING_DEPTH_OPTIONS: ThinkingDepthOption[] = [
+  { id: 'fast', label: 'Fast', desc: '快速响应，适合简单问题' },
+  { id: 'deep', label: 'Deep', desc: '深度分析，平衡速度与质量' },
+  { id: 'max',  label: 'Max',  desc: '最强推理，适合复杂任务' },
+];
+
+// ─── 可选模型 ────────────────────────────────────────────────────────────────
+export interface ModelOption {
+  id: string;
+  label: string;
+  tag?: string;
+}
+
+export const MODEL_OPTIONS: ModelOption[] = [
+  { id: 'gpt-4o',         label: 'GPT-4o',         tag: '推荐' },
+  { id: 'gpt-4o-mini',    label: 'GPT-4o mini' },
+  { id: 'claude-3-5',     label: 'Claude 3.5 Sonnet' },
+  { id: 'deepseek-v3',    label: 'DeepSeek V3' },
+  { id: 'qwen-max',       label: 'Qwen Max' },
+];
+
 const InputArea = ({ onSend, disabled, leadingControls }: InputAreaProps) => {
   const [val, setVal] = useState('');
   const [isFocused, setIsFocused] = useState(false);
@@ -207,6 +237,17 @@ const InputArea = ({ onSend, disabled, leadingControls }: InputAreaProps) => {
   const [referencedSkills, setReferencedSkills] = useState<InputReference[]>([]);
   const [referencedDocs, setReferencedDocs] = useState<InputReference[]>([]);
   const [showUploadHint, setShowUploadHint] = useState(false);
+
+  // 设置菜单状态
+  const [showSettingsMenu, setShowSettingsMenu] = useState(false);
+  const [showDepthSubmenu, setShowDepthSubmenu] = useState(false);
+  const [selectedDepth, setSelectedDepth] = useState<ThinkingDepth>('deep');
+  const [selectedModel, setSelectedModel] = useState<string>('gpt-4o');
+  const [depthSubmenuPos, setDepthSubmenuPos] = useState<{ bottom: number; left: number } | null>(null);
+  const settingsMenuRef = useRef<HTMLDivElement | null>(null);
+  const primaryMenuRef = useRef<HTMLDivElement | null>(null);
+  const depthRowRef = useRef<HTMLDivElement | null>(null);
+  const depthSubmenuTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const filePickerRef = useRef<HTMLInputElement | null>(null);
@@ -224,6 +265,26 @@ const InputArea = ({ onSend, disabled, leadingControls }: InputAreaProps) => {
           URL.revokeObjectURL(file.previewUrl);
         }
       });
+    };
+  }, []);
+
+  // 点击外部关闭设置菜单
+  useEffect(() => {
+    if (!showSettingsMenu) return;
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (settingsMenuRef.current && !settingsMenuRef.current.contains(event.target as Node)) {
+        setShowSettingsMenu(false);
+        setShowDepthSubmenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [showSettingsMenu]);
+
+  // 清理 depth submenu timer
+  useEffect(() => {
+    return () => {
+      if (depthSubmenuTimerRef.current) clearTimeout(depthSubmenuTimerRef.current);
     };
   }, []);
 
@@ -780,7 +841,165 @@ const InputArea = ({ onSend, disabled, leadingControls }: InputAreaProps) => {
               </div>
             </div>
           </div>
+
           <div className="flex items-center gap-2">
+            {/* ── 设置菜单 ─────────────────────────────────── */}
+            <div
+              ref={settingsMenuRef}
+              className="relative"
+            >
+              {/* 触发器按钮 */}
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSettingsMenu((v) => !v);
+                  setShowDepthSubmenu(false);
+                }}
+                className={`h-8 px-2.5 rounded-full border flex items-center gap-1.5 text-[13px] font-medium transition-all select-none
+                  ${showSettingsMenu
+                    ? 'border-primary/30 bg-primary-soft text-primary'
+                    : 'border-borderGray bg-white text-secondaryText hover:bg-bgLight hover:border-gray-3'
+                  }`}
+              >
+                <Cpu size={13} className="shrink-0" />
+                <span className="max-w-[90px] truncate leading-none">
+                  {MODEL_OPTIONS.find((m) => m.id === selectedModel)?.label ?? selectedModel}
+                </span>
+                <span className="inline-flex items-center justify-center rounded px-1 py-0.5 text-[10px] font-semibold leading-none bg-gray-1 text-tertiaryText">
+                  {THINKING_DEPTH_OPTIONS.find((d) => d.id === selectedDepth)?.label}
+                </span>
+                <ChevronUp
+                  size={12}
+                  className={`shrink-0 transition-transform duration-200 ${showSettingsMenu ? 'rotate-0' : 'rotate-180'}`}
+                />
+              </button>
+
+              {/* 一级下拉菜单 */}
+              {showSettingsMenu && (
+                <div
+                  ref={primaryMenuRef}
+                  className="absolute bottom-full right-0 mb-2 z-50 w-[220px] rounded-xl border border-[#e6ecf2] bg-white shadow-[0_8px_24px_rgba(15,23,42,0.12)]"
+                  onMouseDown={(e) => e.preventDefault()}
+                >
+                  {/* 模型区域标题 */}
+                  <div className="px-3 pt-2.5 pb-1">
+                    <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-tertiaryText">
+                      <Cpu size={11} />
+                      模型
+                    </span>
+                  </div>
+
+                  {/* 模型列表 */}
+                  <div className="px-1.5 pb-1">
+                    {MODEL_OPTIONS.map((model) => (
+                      <button
+                        key={model.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedModel(model.id);
+                          setShowSettingsMenu(false);
+                          setShowDepthSubmenu(false);
+                        }}
+                        className="w-full flex items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left transition-colors text-primaryText hover:bg-[#f4f7fb]"
+                      >
+                        <span className="text-[13px] font-medium leading-tight truncate">{model.label}</span>
+                        <span className="flex items-center gap-1.5 shrink-0 w-4">
+                          {selectedModel === model.id && (
+                            <Check size={14} className="text-primaryText shrink-0" />
+                          )}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* 分割线 */}
+                  <div className="mx-3 border-t border-[#eef2f6]" />
+
+                  {/* 思考深度入口（带子菜单） */}
+                  <div className="px-1.5 py-1.5">
+                    <div
+                      ref={depthRowRef}
+                      className="relative"
+                      onMouseEnter={() => {
+                        if (depthSubmenuTimerRef.current) clearTimeout(depthSubmenuTimerRef.current);
+                        // 计算 fixed 坐标
+                        if (depthRowRef.current && primaryMenuRef.current) {
+                          const primaryRect = primaryMenuRef.current.getBoundingClientRect();
+                          setDepthSubmenuPos({
+                            // 底部与一级菜单底部对齐
+                            bottom: window.innerHeight - primaryRect.bottom,
+                            left: primaryRect.left - 209,  // 200px宽 + 9px间距
+                          });
+                        }
+                        setShowDepthSubmenu(true);
+                      }}
+                      onMouseLeave={() => {
+                        depthSubmenuTimerRef.current = setTimeout(() => setShowDepthSubmenu(false), 120);
+                      }}
+                    >
+                      <button
+                        type="button"
+                        className={`w-full flex items-center justify-between gap-2 rounded-lg px-2.5 py-2 transition-colors
+                          ${showDepthSubmenu ? 'bg-[#f4f7fb]' : 'hover:bg-[#f4f7fb]'}`}
+                      >
+                        <span className="flex items-center gap-2">
+                          <Brain size={13} className="text-tertiaryText shrink-0" />
+                          <span className="text-[13px] font-medium text-primaryText leading-tight">思考深度</span>
+                        </span>
+                        <span className="flex items-center gap-1.5 shrink-0">
+                          <span className="rounded px-1.5 py-0.5 text-[10px] font-semibold leading-none bg-gray-1 text-tertiaryText">
+                            {THINKING_DEPTH_OPTIONS.find((d) => d.id === selectedDepth)?.label}
+                          </span>
+                          <ChevronRight size={13} className="text-tertiaryText" />
+                        </span>
+                      </button>
+
+                      {/* 思考深度子菜单 —— fixed 定位，完全脱离 overflow 裁切 */}
+                      {showDepthSubmenu && depthSubmenuPos && (
+                        <div
+                          style={{ position: 'fixed', bottom: `${depthSubmenuPos.bottom}px`, left: `${depthSubmenuPos.left}px` }}
+                          className="z-[9999] w-[200px] rounded-xl border border-[#e6ecf2] bg-white shadow-[0_8px_24px_rgba(15,23,42,0.12)] overflow-hidden py-1.5"
+                          onMouseEnter={() => {
+                            if (depthSubmenuTimerRef.current) clearTimeout(depthSubmenuTimerRef.current);
+                            setShowDepthSubmenu(true);
+                          }}
+                          onMouseLeave={() => {
+                            depthSubmenuTimerRef.current = setTimeout(() => setShowDepthSubmenu(false), 120);
+                          }}
+                        >
+                          {THINKING_DEPTH_OPTIONS.map((depth) => {
+                            const isActive = selectedDepth === depth.id;
+                            return (
+                              <button
+                                key={depth.id}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedDepth(depth.id);
+                                  setShowDepthSubmenu(false);
+                                  setShowSettingsMenu(false);
+                                }}
+                                className={`flex items-center justify-between gap-2 rounded-lg mx-1.5 px-2.5 py-2 text-left transition-colors w-[calc(100%-0.75rem)]
+                                   ${isActive ? 'bg-[#f4f7fb]' : 'hover:bg-[#f8fafc]'}`}
+                              >
+                                <span className="flex flex-col gap-0.5 min-w-0">
+                                  <span className="flex items-center gap-1.5">
+                                    <span className="text-[13px] font-semibold text-primaryText">{depth.label}</span>
+                                    {isActive && <span className="inline-block w-1.5 h-1.5 rounded-full bg-gray-3" />}
+                                  </span>
+                                  <span className="text-[11px] text-tertiaryText leading-tight">{depth.desc}</span>
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* ── 发送按钮 ─────────────────────────────────── */}
             <button
               onClick={handleSend}
               disabled={disabled || !val.trim()}
