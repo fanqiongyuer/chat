@@ -1,9 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
-import { ChevronDown, Menu, Plus, Search, Upload, Users } from 'lucide-react';
+import { ChevronDown, FileText, LayoutTemplate, Menu, Plus, Search, Upload, Users } from 'lucide-react';
 import { Select } from 'antd';
-import { BaseButton, BaseDocumentUpload, BaseEmpty, BaseModal } from '../components';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { BaseActionMenu, BaseButton, BaseDocumentUpload, BaseEmpty, BaseModal } from '../components';
+import type { BaseActionMenuItem, BaseActionMenuProps } from '../components';
 import { EXPERIMENTS_BY_PROJECT, PROJECT_MEMBERS, mockProjects } from '../mock/projects';
+import { DEFAULT_TEMPLATES, type ProjectTemplate } from './ProjectsPage';
 import { type LayoutOutletContext } from '../components/Layout';
 
 type DetailTab = 'experiment' | 'chat';
@@ -206,6 +210,9 @@ export default function ProjectDetailPage() {
   const [isTagExpanded, setIsTagExpanded] = useState(false);
   const [showTagToggle, setShowTagToggle] = useState(false);
   const [showCreateDocModal, setShowCreateDocModal] = useState(false);
+  const [showNewDocMenu, setShowNewDocMenu] = useState(false);
+  const [showTemplatePickerModal, setShowTemplatePickerModal] = useState(false);
+  const [previewTemplate, setPreviewTemplate] = useState<ProjectTemplate | null>(null);
   const [showMemberModal, setShowMemberModal] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [createDocError, setCreateDocError] = useState('');
@@ -217,6 +224,7 @@ export default function ProjectDetailPage() {
   const [isEditingProjectName, setIsEditingProjectName] = useState(false);
   const [isEditingProjectDesc, setIsEditingProjectDesc] = useState(false);
   const tagFilterRef = useRef<HTMLDivElement | null>(null);
+  const newDocMenuTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const project = useMemo(() => mockProjects.find((item) => item.id === id), [id]);
 
@@ -276,6 +284,12 @@ export default function ProjectDetailPage() {
     setLocalDocs([...experimentList]);
   }, [experimentList]);
 
+  useEffect(() => {
+    return () => {
+      if (newDocMenuTimerRef.current) clearTimeout(newDocMenuTimerRef.current);
+    };
+  }, []);
+
   const resetCreateDocForm = () => {
     setSelectedFiles([]);
     setCreateDocError('');
@@ -300,8 +314,47 @@ export default function ProjectDetailPage() {
     setInvitePermission('浏览');
   };
 
-  const handlePendingDocAction = () => {
-    // 新建文档流程后续接入，当前不打开导入弹窗。
+  const handleCreateBlankDoc = () => {
+    setShowNewDocMenu(false);
+    // TODO: 新建空白文档流程后续接入
+  };
+
+  const handleOpenTemplatePicker = () => {
+    setShowNewDocMenu(false);
+    setShowTemplatePickerModal(true);
+  };
+
+  const newDocMenuItems = useMemo<BaseActionMenuItem[]>(
+    () => [
+      { key: 'blank', label: '新建文档', icon: <FileText size={16} /> },
+      { key: 'template', label: '从模版新建', icon: <LayoutTemplate size={16} /> },
+    ],
+    [],
+  );
+
+  const handleNewDocMenuItemClick: BaseActionMenuProps['onItemClick'] = (item) => {
+    if (item.key === 'blank') {
+      handleCreateBlankDoc();
+    } else if (item.key === 'template') {
+      handleOpenTemplatePicker();
+    }
+  };
+
+  const closeTemplatePickerModal = () => {
+    setShowTemplatePickerModal(false);
+  };
+
+  const handlePickTemplate = (_template: ProjectTemplate) => {
+    closeTemplatePickerModal();
+    // TODO: 基于模版内容创建文档流程后续接入
+  };
+
+  const handlePreviewTemplate = (template: ProjectTemplate) => {
+    setPreviewTemplate(template);
+  };
+
+  const closeTemplatePreviewModal = () => {
+    setPreviewTemplate(null);
   };
 
   const handleImportDocClick = () => {
@@ -643,16 +696,41 @@ export default function ProjectDetailPage() {
                 </div>
 
                 <div className="flex items-center gap-5">
-                  <BaseButton
-                    type="ghost"
-                    size="small"
-                    rounded="large"
-                    icon={activeTab === 'experiment' ? <Plus size={16} /> : undefined}
-                    className="!h-auto !gap-1 !border-transparent !bg-transparent !px-0 !py-0 !text-sm !font-semibold !text-[var(--color-primary)] hover:!bg-transparent hover:!text-[var(--color-primary-hover)]"
-                    onClick={activeTab === 'experiment' ? handlePendingDocAction : undefined}
-                  >
-                    {activeTab === 'experiment' ? '新建' : '发起对话'}
-                  </BaseButton>
+                  {activeTab === 'experiment' ? (
+                    <div
+                      onMouseEnter={() => {
+                        if (newDocMenuTimerRef.current) clearTimeout(newDocMenuTimerRef.current);
+                        setShowNewDocMenu(true);
+                      }}
+                      onMouseLeave={() => {
+                        newDocMenuTimerRef.current = setTimeout(() => setShowNewDocMenu(false), 120);
+                      }}
+                    >
+                      <BaseActionMenu
+                        open={showNewDocMenu}
+                        onOpenChange={setShowNewDocMenu}
+                        placement="bottom-end"
+                        width={200}
+                        trigger={
+                          <span className="inline-flex items-center gap-1 text-sm font-semibold text-[var(--color-primary)] transition-colors hover:text-[var(--color-primary-hover)]">
+                            <Plus size={16} />
+                            新建
+                          </span>
+                        }
+                        items={newDocMenuItems}
+                        onItemClick={handleNewDocMenuItemClick}
+                      />
+                    </div>
+                  ) : (
+                    <BaseButton
+                      type="ghost"
+                      size="small"
+                      rounded="large"
+                      className="!h-auto !gap-1 !border-transparent !bg-transparent !px-0 !py-0 !text-sm !font-semibold !text-[var(--color-primary)] hover:!bg-transparent hover:!text-[var(--color-primary-hover)]"
+                    >
+                      发起对话
+                    </BaseButton>
+                  )}
                   {activeTab === 'experiment' && (
                     <>
                       <span className="h-4 border-l border-[var(--color-line-subtle)]" aria-hidden="true" />
@@ -796,6 +874,91 @@ export default function ProjectDetailPage() {
           </div>
 
           {createDocError && <div className="text-sm text-[var(--color-danger)]">{createDocError}</div>}
+        </div>
+      </BaseModal>
+
+      <BaseModal
+        visible={showTemplatePickerModal}
+        title="从模版新建"
+        width={1040}
+        maskClosable={false}
+        footer={null}
+        onCancel={closeTemplatePickerModal}
+        bodyClassName="!px-6 !py-5"
+      >
+        <div className="grid grid-cols-4 gap-4">
+          {DEFAULT_TEMPLATES.map((tpl) => (
+            <div
+              key={tpl.id}
+              className="group flex flex-col overflow-hidden rounded-lg border border-[var(--color-line-subtle)] bg-[var(--color-surface-muted)]"
+            >
+              <div className="flex items-center gap-2 px-3 pt-3">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[var(--color-primary-soft)] text-[var(--color-primary)]">
+                  <FileText size={14} />
+                </span>
+                <span className="truncate text-sm font-semibold text-primaryText">{tpl.name}</span>
+              </div>
+
+              <div className="relative mx-3 mb-3 mt-2.5 aspect-[4/5] overflow-hidden rounded-md bg-white">
+                <div className="pointer-events-none origin-top-left scale-[0.62] px-3 py-2.5" style={{ width: '161%' }}>
+                  <div className="prose prose-slate max-w-none text-primaryText prose-p:my-1.5 prose-p:text-xs prose-p:leading-5 prose-li:text-xs prose-li:leading-5 prose-headings:text-primaryText prose-h2:mt-0 prose-h2:mb-1.5 prose-h2:text-sm prose-h2:font-semibold prose-h3:mt-2 prose-h3:mb-1 prose-h3:text-xs prose-h3:font-semibold prose-strong:text-primaryText prose-hr:my-2 prose-li:my-0.5 prose-ol:pl-4 prose-ul:pl-4 prose-table:text-xs prose-th:py-1 prose-td:py-1 prose-blockquote:border-l-2 prose-blockquote:pl-2 prose-blockquote:text-secondaryText">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{tpl.body}</ReactMarkdown>
+                  </div>
+                </div>
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-white to-transparent" />
+
+                {/* hover 蒙层：预览 / 使用 */}
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center gap-2 bg-white/70 opacity-0 backdrop-blur-[1px] transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
+                  <BaseButton
+                    type="secondary"
+                    size="small"
+                    rounded="large"
+                    onClick={() => handlePreviewTemplate(tpl)}
+                  >
+                    预览
+                  </BaseButton>
+                  <BaseButton
+                    type="primary"
+                    size="small"
+                    rounded="large"
+                    onClick={() => handlePickTemplate(tpl)}
+                  >
+                    使用
+                  </BaseButton>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </BaseModal>
+
+      <BaseModal
+        visible={!!previewTemplate}
+        title={previewTemplate?.name ?? '模版预览'}
+        width={640}
+        maskClosable={false}
+        onCancel={closeTemplatePreviewModal}
+        bodyClassName="!px-6 !py-5"
+        footer={(
+          <div className="flex justify-end gap-2 px-5 py-3">
+            <BaseButton type="secondary" size="medium" onClick={closeTemplatePreviewModal}>
+              取消
+            </BaseButton>
+            <BaseButton
+              type="primary"
+              size="medium"
+              onClick={() => {
+                if (previewTemplate) handlePickTemplate(previewTemplate);
+                closeTemplatePreviewModal();
+              }}
+            >
+              使用该模版
+            </BaseButton>
+          </div>
+        )}
+      >
+        <div className="prose prose-slate max-w-none pb-2 text-primaryText prose-p:my-3 prose-p:text-sm prose-p:leading-7 prose-li:text-sm prose-li:leading-7 prose-headings:text-primaryText prose-headings:tracking-[-0.01em] prose-h2:mt-4 prose-h2:mb-2 prose-h2:text-[16px] prose-h2:font-semibold prose-h3:mt-4 prose-h3:mb-2 prose-h3:text-base prose-h3:font-semibold prose-strong:text-primaryText prose-code:before:content-none prose-code:after:content-none prose-hr:my-5 prose-li:my-1 prose-li:marker:text-secondaryText prose-ol:pl-6 prose-ul:pl-6 prose-blockquote:border-l-2 prose-blockquote:border-[var(--color-line-subtle)] prose-blockquote:pl-3 prose-blockquote:text-secondaryText">
+          {previewTemplate && <ReactMarkdown remarkPlugins={[remarkGfm]}>{previewTemplate.body}</ReactMarkdown>}
         </div>
       </BaseModal>
 

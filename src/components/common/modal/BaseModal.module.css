@@ -19,7 +19,9 @@
   box-shadow: 0 6px 16px 0 rgba(0, 0, 0, 0.08), 0 3px 6px -4px rgba(0, 0, 0, 0.12);
   z-index: 1001;
   max-height: 90vh;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   animation: slideUp 0.3s ease;
 }
 
@@ -34,6 +36,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-shrink: 0;
 }
 
 .modalTitle {
@@ -70,6 +73,8 @@
   padding: 20px;
   min-height: 80px;
   color: var(--color-text-primary);
+  overflow-y: auto;
+  flex: 1 1 auto;
 }
 
 .modalFooter {
@@ -79,6 +84,7 @@
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .btn {
