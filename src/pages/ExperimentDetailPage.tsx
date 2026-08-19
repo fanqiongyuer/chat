@@ -2,8 +2,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useNavigate, useOutletContext, useParams, useSearchParams } from 'react-router-dom';
-import { Check, ChevronDown, Menu, MoreHorizontal, Plus, Trash2, X } from 'lucide-react';
-import { BaseActionMenu, BaseButton, BaseEmpty, BaseModal, ShareModal } from '../components';
+import { ArrowLeft, Check, ChevronDown, Menu, MoreHorizontal, Plus, Trash2, X } from 'lucide-react';
+import { BaseActionMenu, BaseButton, BaseEmpty, BaseInput, BaseModal, ShareModal } from '../components';
 import type { BaseActionMenuItem, BaseActionMenuProps } from '../components';
 import {
   EXPERIMENT_DETAILS_BY_PROJECT,
@@ -34,6 +34,12 @@ export default function ExperimentDetailPage() {
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showDocActionMenu, setShowDocActionMenu] = useState(false);
+  const [showMoveDocumentModal, setShowMoveDocumentModal] = useState(false);
+  const [moveTargetProjectId, setMoveTargetProjectId] = useState('');
+  const [showCreateMoveProjectPopover, setShowCreateMoveProjectPopover] = useState(false);
+  const [newMoveProjectName, setNewMoveProjectName] = useState('');
+  const [moveProjectError, setMoveProjectError] = useState('');
+  const [movableProjects, setMovableProjects] = useState(mockProjects);
   const [mode, setMode] = useState<'view' | 'edit'>('view');
   const [docTitle, setDocTitle] = useState('');
   const [docTags, setDocTags] = useState<string[]>([]);
@@ -64,6 +70,10 @@ export default function ExperimentDetailPage() {
       active: item.id === targetProjectId,
     })),
     [targetProjectId],
+  );
+  const moveTargetProject = useMemo(
+    () => movableProjects.find((item) => item.id === moveTargetProjectId),
+    [movableProjects, moveTargetProjectId],
   );
   const experiment = useMemo(() => {
     if (!projectId || !experimentId) return null;
@@ -293,6 +303,7 @@ export default function ExperimentDetailPage() {
   const docActionMenuItems = useMemo<BaseActionMenuItem[]>(
     () => [
       { key: 'importContent', label: '导入内容' },
+      { key: 'moveDocument', label: '移动文档' },
       { key: 'saveAsTemplate', label: '保存为模版' },
       { key: 'share', label: '分享文档' },
     ],
@@ -302,11 +313,63 @@ export default function ExperimentDetailPage() {
   const handleDocActionMenuItemClick: BaseActionMenuProps['onItemClick'] = (item) => {
     if (item.key === 'importContent') {
       handleImportClick();
+    } else if (item.key === 'moveDocument') {
+      setShowDocActionMenu(false);
+      setMoveTargetProjectId('');
+      setShowCreateMoveProjectPopover(false);
+      setNewMoveProjectName('');
+      setMoveProjectError('');
+      setShowMoveDocumentModal(true);
     } else if (item.key === 'saveAsTemplate') {
       handleSaveAsTemplate();
     } else if (item.key === 'share') {
       handleShareClick();
     }
+  };
+
+  const closeMoveDocumentModal = () => {
+    setShowMoveDocumentModal(false);
+    setShowCreateMoveProjectPopover(false);
+    setMoveProjectError('');
+  };
+
+  const handleCreateMoveProject = () => {
+    const name = newMoveProjectName.trim();
+    if (!name) {
+      setMoveProjectError('请输入项目名称');
+      return;
+    }
+    const duplicateProject = movableProjects.find(
+      (item) => item.name.trim().toLowerCase() === name.toLowerCase(),
+    );
+    if (duplicateProject) {
+      setMoveTargetProjectId(duplicateProject.id);
+    } else {
+      const newProject = {
+        id: `p-local-${Date.now()}`,
+        name,
+        desc: '暂无项目描述',
+        count: 0,
+        knowledge: 0,
+        members: 1,
+        visibility: 'private' as const,
+        privateType: 'team' as const,
+      };
+      setMovableProjects((current) => [newProject, ...current]);
+      setMoveTargetProjectId(newProject.id);
+    }
+    setNewMoveProjectName('');
+    setMoveProjectError('');
+    setShowCreateMoveProjectPopover(false);
+  };
+
+  const handleConfirmMoveDocument = () => {
+    if (!moveTargetProject) {
+      setMoveProjectError('请选择要迁移到的项目');
+      return;
+    }
+    setShowMoveDocumentModal(false);
+    navigate(`/project/${moveTargetProject.id}`);
   };
 
   const closeDeleteConfirmModal = () => {
@@ -382,30 +445,14 @@ export default function ExperimentDetailPage() {
               关闭分享
             </button>
           ) : (
-            <div className="flex items-center gap-2 text-sm">
-              <button
-                type="button"
-                onClick={() => navigate('/projects')}
-                className="text-tertiaryText transition-colors hover:text-primaryText"
-              >
-                项目
-              </button>
-              <span className="text-tertiaryText">/</span>
-              <button
-                type="button"
-                onClick={() => parentPath && navigate(parentPath)}
-                disabled={!parentPath}
-                className={`transition-colors ${
-                  parentPath
-                    ? 'text-tertiaryText hover:text-primaryText'
-                    : 'cursor-not-allowed text-tertiaryText/60'
-                }`}
-              >
-                {project?.name ?? '实验详情'}
-              </button>
-              <span className="text-tertiaryText">/</span>
-              <span className="font-medium text-primaryText">{experiment?.title ?? '实验详情'}</span>
-            </div>
+            <button
+              type="button"
+              onClick={() => navigate(parentPath ?? '/projects')}
+              className="inline-flex items-center gap-1 text-sm text-tertiaryText transition-colors hover:text-primaryText"
+            >
+              <ArrowLeft size={16} />
+              返回
+            </button>
           )}
         </div>
 
@@ -491,6 +538,102 @@ export default function ExperimentDetailPage() {
           </BaseButton>
         </div>
       )}
+
+      <BaseModal
+        show={showMoveDocumentModal}
+        title="移动文档"
+        okText="确定迁移"
+        cancelText="取消"
+        width={520}
+        okButtonProps={{ disabled: !moveTargetProjectId }}
+        onCancel={closeMoveDocumentModal}
+        onClose={closeMoveDocumentModal}
+        onConfirm={handleConfirmMoveDocument}
+      >
+        <div className="py-2">
+          <div className="mb-4 flex items-center justify-between gap-3 text-sm">
+            <span className="text-secondaryText">选择文档要迁移到的项目</span>
+            <button
+              type="button"
+              onClick={() => {
+                setNewMoveProjectName('');
+                setMoveProjectError('');
+                setShowCreateMoveProjectPopover(true);
+              }}
+              className="shrink-0 font-semibold text-primary transition-colors hover:text-[var(--color-primary-hover)]"
+            >
+              新建项目
+            </button>
+          </div>
+          <div className="space-y-2">
+            {movableProjects
+              .filter((item) => item.id !== projectId)
+              .map((item) => {
+                const isSelected = moveTargetProjectId === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      setMoveTargetProjectId(item.id);
+                      setMoveProjectError('');
+                    }}
+                    className={`flex w-full items-center justify-between rounded-lg border px-4 py-3 text-left text-sm transition-colors ${
+                      isSelected
+                        ? 'border-primary bg-[var(--color-primary-soft)] font-semibold text-primary'
+                        : 'border-[var(--color-line-subtle)] text-primaryText hover:bg-bgLight'
+                    }`}
+                  >
+                    <span className="truncate">{item.name}</span>
+                    {isSelected && <Check size={16} />}
+                  </button>
+                );
+              })}
+          </div>
+          {showCreateMoveProjectPopover && (
+            <div className="absolute top-[88px] right-5 z-10 w-[300px] rounded-xl border border-[#e6ecf2] bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.12)]">
+                <div className="space-y-3">
+                  <div>
+                    <div className="mb-1.5 text-sm font-semibold text-primaryText">新建项目</div>
+                    <BaseInput
+                      autoFocus
+                      value={newMoveProjectName}
+                      placeholder="请输入项目名称"
+                      error={Boolean(moveProjectError)}
+                      onChange={(event) => {
+                        setNewMoveProjectName(event.target.value);
+                        setMoveProjectError('');
+                      }}
+                      size="medium"
+                      containerClassName="!px-3"
+                    />
+                    {moveProjectError && <p className="mt-1.5 text-sm text-[var(--color-danger)]">{moveProjectError}</p>}
+                  </div>
+                  <div className="flex items-center justify-end gap-2">
+                    <BaseButton
+                      type="secondary"
+                      size="small"
+                      onClick={() => {
+                        setShowCreateMoveProjectPopover(false);
+                        setMoveProjectError('');
+                      }}
+                    >
+                      取消
+                    </BaseButton>
+                    <BaseButton
+                      type="primary"
+                      size="small"
+                      onClick={handleCreateMoveProject}
+                      disabled={!newMoveProjectName.trim()}
+                    >
+                      确认
+                    </BaseButton>
+                  </div>
+                </div>
+              </div>
+            )}
+        </div>
+      </BaseModal>
 
       <BaseModal
         show={showSaveToProjectModal}

@@ -201,14 +201,6 @@ export default function ProjectTemplateEditPage() {
               <Menu size={20} />
             </button>
           )}
-          <button
-            type="button"
-            onClick={goBackToProjects}
-            className="p-1.5 -ml-1 text-secondaryText hover:bg-bgLight rounded-full transition-colors"
-            title="返回"
-          >
-            <ArrowLeft size={18} />
-          </button>
           {isSharedView ? (
             <button
               type="button"
@@ -219,17 +211,14 @@ export default function ProjectTemplateEditPage() {
               关闭分享
             </button>
           ) : (
-            <div className="flex items-center gap-2 text-sm">
-              <button
-                type="button"
-                onClick={goBackToProjects}
-                className="text-tertiaryText transition-colors hover:text-primaryText"
-              >
-                项目模版
-              </button>
-              <span className="text-tertiaryText">/</span>
-              <span className="font-medium text-primaryText">模版详情</span>
-            </div>
+            <button
+              type="button"
+              onClick={goBackToProjects}
+              className="inline-flex items-center gap-1 text-sm text-tertiaryText transition-colors hover:text-primaryText"
+            >
+              <ArrowLeft size={16} />
+              返回
+            </button>
           )}
         </div>
 

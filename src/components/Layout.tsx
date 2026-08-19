@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { Folder, Clock3, Settings, Search, ChevronDown, ChevronRight, PanelLeftClose, Menu, SquarePen, MoreHorizontal, Pencil, Share2, Trash2, Pin, AlertTriangle } from 'lucide-react';
-import { BaseActionMenu, BaseEmpty, BaseModal } from './common';
+import { Check, Folder, Clock3, Settings, Search, ChevronDown, ChevronRight, PanelLeftClose, Menu, SquarePen, MoreHorizontal, Pencil, Share2, Trash2, Pin, AlertTriangle } from 'lucide-react';
+import { BaseActionMenu, BaseButton, BaseEmpty, BaseInput, BaseModal } from './common';
 import type { BaseActionMenuItem, BaseActionMenuProps } from './common';
 import { mockProjects } from '../mock/projects';
 import { mockChats, type MockChat } from '../mock/chats';
@@ -12,6 +12,7 @@ export interface LayoutOutletContext {
   setIsSidebarOpen: React.Dispatch<React.SetStateAction<boolean>>;
   chats: MockChat[];
   setChats: React.Dispatch<React.SetStateAction<MockChat[]>>;
+  openMoveChatModal: (chat: MockChat) => void;
   setAiUsageWarningActive: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
@@ -168,6 +169,11 @@ export default function Layout() {
   const [showAllChatsModal, setShowAllChatsModal] = useState(false);
   const [allChatsKeyword, setAllChatsKeyword] = useState('');
   const [isAllChatsModalScrolling, setIsAllChatsModalScrolling] = useState(false);
+  const [chatToMove, setChatToMove] = useState<MockChat | null>(null);
+  const [moveTargetProjectId, setMoveTargetProjectId] = useState('');
+  const [showCreateMoveProjectPopover, setShowCreateMoveProjectPopover] = useState(false);
+  const [newMoveProjectName, setNewMoveProjectName] = useState('');
+  const [moveProjectError, setMoveProjectError] = useState('');
   const [aiUsageWarningActive, setAiUsageWarningActive] = useState(() => calculateIsAiUsageBudgetLow());
   const [aiUsageWarningDismissed, setAiUsageWarningDismissed] = useState(false);
   const chatRenameInputRef = useRef<HTMLInputElement | null>(null);
@@ -183,6 +189,60 @@ export default function Layout() {
 
   const toggleProject = (projectId: string) => {
     setExpandedProjects(prev => ({ ...prev, [projectId]: !prev[projectId] }));
+  };
+
+  const openMoveChatModal = (chat: MockChat) => {
+    setChatMenuOpenId(null);
+    setChatToMove(chat);
+    setMoveTargetProjectId(chat.projectId ?? '');
+    setNewMoveProjectName('');
+    setMoveProjectError('');
+    setShowCreateMoveProjectPopover(false);
+  };
+
+  const closeMoveChatModal = () => {
+    setChatToMove(null);
+    setShowCreateMoveProjectPopover(false);
+    setMoveProjectError('');
+  };
+
+  const handleCreateMoveProject = () => {
+    const name = newMoveProjectName.trim();
+    if (!name) {
+      setMoveProjectError('请输入项目名称');
+      return;
+    }
+    const duplicateProject = mockProjects.find((project) => project.name.trim().toLowerCase() === name.toLowerCase());
+    if (duplicateProject) {
+      setMoveTargetProjectId(duplicateProject.id);
+    } else {
+      const newProject = {
+        id: `p-local-${Date.now()}`,
+        name,
+        desc: '暂无项目描述',
+        count: 0,
+        knowledge: 0,
+        members: 1,
+        visibility: 'private' as const,
+        privateType: 'team' as const,
+      };
+      mockProjects.unshift(newProject);
+      setMoveTargetProjectId(newProject.id);
+    }
+    setNewMoveProjectName('');
+    setMoveProjectError('');
+    setShowCreateMoveProjectPopover(false);
+  };
+
+  const handleConfirmMoveChat = () => {
+    if (!chatToMove || !moveTargetProjectId) {
+      setMoveProjectError('请选择要迁移到的项目');
+      return;
+    }
+    setChats((prev) => prev.map((chat) => (
+      chat.id === chatToMove.id ? { ...chat, projectId: moveTargetProjectId } : chat
+    )));
+    closeMoveChatModal();
   };
 
   const handleDeleteChat = (chatId: string) => {
@@ -473,6 +533,11 @@ export default function Layout() {
       icon: <Share2 size={14} />,
     },
     {
+      key: 'move',
+      label: '迁移项目',
+      icon: <Folder size={14} />,
+    },
+    {
       key: 'pin',
       label: chat.isPinned ? '取消置顶' : '置顶对话',
       icon: <Pin size={14} />,
@@ -509,6 +574,10 @@ export default function Layout() {
             if (item.key === 'share') {
               navigate(`/chat/${chat.id}?share=1`);
               setChatMenuOpenId(null);
+              return;
+            }
+            if (item.key === 'move') {
+              openMoveChatModal(chat);
               return;
             }
             if (item.key === 'pin') {
@@ -952,10 +1021,94 @@ export default function Layout() {
                 <Menu size={20} />
               </button>
             )}
-            <Outlet context={{ isSidebarOpen, setIsSidebarOpen, chats, setChats, setAiUsageWarningActive }} />
+            <Outlet context={{ isSidebarOpen, setIsSidebarOpen, chats, setChats, openMoveChatModal, setAiUsageWarningActive }} />
           </div>
         </div>
       </main>
+
+      <BaseModal
+        visible={chatToMove !== null}
+        title="迁移项目"
+        okText="确定迁移"
+        cancelText="取消"
+        width={520}
+        okButtonProps={{ disabled: !moveTargetProjectId }}
+        onCancel={closeMoveChatModal}
+        onClose={closeMoveChatModal}
+        onConfirm={handleConfirmMoveChat}
+      >
+        <div className="py-2">
+          <div className="mb-4 flex items-center justify-between gap-3 text-sm">
+            <span className="text-secondaryText">选择对话要迁移到的项目</span>
+            <button
+              type="button"
+              onClick={() => {
+                setNewMoveProjectName('');
+                setMoveProjectError('');
+                setShowCreateMoveProjectPopover(true);
+              }}
+              className="shrink-0 font-semibold text-primary transition-colors hover:text-[var(--color-primary-hover)]"
+            >
+              新建项目
+            </button>
+          </div>
+          <div className="space-y-2">
+            {mockProjects
+              .filter((project) => project.id !== chatToMove?.projectId)
+              .map((project) => {
+                const isSelected = moveTargetProjectId === project.id;
+                return (
+                  <button
+                    key={project.id}
+                    type="button"
+                    onClick={() => {
+                      setMoveTargetProjectId(project.id);
+                      setMoveProjectError('');
+                    }}
+                    className={`flex w-full items-center justify-between rounded-lg border px-4 py-3 text-left text-sm transition-colors ${
+                      isSelected
+                        ? 'border-primary bg-[var(--color-primary-soft)] font-semibold text-primary'
+                        : 'border-[var(--color-line-subtle)] text-primaryText hover:bg-bgLight'
+                    }`}
+                  >
+                    <span className="truncate">{project.name}</span>
+                    {isSelected && <Check size={16} />}
+                  </button>
+                );
+              })}
+          </div>
+          {showCreateMoveProjectPopover && (
+            <div className="absolute top-[88px] right-5 z-10 w-[300px] rounded-xl border border-[#e6ecf2] bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.12)]">
+              <div className="space-y-3">
+                <div>
+                  <div className="mb-1.5 text-sm font-semibold text-primaryText">新建项目</div>
+                  <BaseInput
+                    autoFocus
+                    value={newMoveProjectName}
+                    placeholder="请输入项目名称"
+                    error={Boolean(moveProjectError)}
+                    onChange={(event) => {
+                      setNewMoveProjectName(event.target.value);
+                      setMoveProjectError('');
+                    }}
+                    size="medium"
+                    containerClassName="!px-3"
+                  />
+                  {moveProjectError && <p className="mt-1.5 text-sm text-[var(--color-danger)]">{moveProjectError}</p>}
+                </div>
+                <div className="flex items-center justify-end gap-2">
+                  <BaseButton type="secondary" size="small" onClick={() => setShowCreateMoveProjectPopover(false)}>
+                    取消
+                  </BaseButton>
+                  <BaseButton type="primary" size="small" onClick={handleCreateMoveProject} disabled={!newMoveProjectName.trim()}>
+                    确认
+                  </BaseButton>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </BaseModal>
 
       <BaseModal
         visible={showAllChatsModal}
@@ -993,26 +1146,50 @@ export default function Layout() {
                 const isTaskChat = isTaskConversationChat(chat);
 
                 return (
-                  <button
+                  <div
                     key={chat.id}
-                    type="button"
+                    role="button"
+                    tabIndex={0}
                     onClick={() => handleOpenChatFromModal(chat.id)}
-                    className="w-full rounded-lg px-4 py-3 text-left transition-colors hover:bg-[#F8FAFC]"
+                    onKeyDown={(event) => event.key === 'Enter' && handleOpenChatFromModal(chat.id)}
+                    className="group flex w-full items-start justify-between rounded-lg px-4 py-3 text-left transition-colors hover:bg-[#F8FAFC]"
                   >
-                    <div className="flex min-w-0 items-center gap-2">
-                      <span className="truncate text-sm font-medium text-primaryText">{chat.title}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span className="truncate text-sm font-medium text-primaryText">{chat.title}</span>
                       {isTaskChat && (
                         <span className="shrink-0 rounded-full bg-[#F1F5F9] px-1.5 py-0.5 text-[11px] leading-[14px] text-[#7A869A]">
                           任务
                         </span>
                       )}
                     </div>
-                    <div className="mt-1 flex items-center gap-1 text-xs text-tertiaryText">
-                      <span className="truncate">{projectName}</span>
-                      <span>·</span>
-                      <span>{chat.date}</span>
+                      <div className="mt-1 flex items-center gap-1 text-xs text-tertiaryText">
+                        <span className="truncate">{projectName}</span>
+                        <span>·</span>
+                        <span>{chat.date}</span>
+                      </div>
                     </div>
-                  </button>
+                    <BaseActionMenu
+                      open={chatMenuOpenId === `all-${chat.id}`}
+                      onOpenChange={(open) => setChatMenuOpenId(open ? `all-${chat.id}` : null)}
+                      placement="bottom-end"
+                      width={160}
+                      trigger={<MoreHorizontal size={16} />}
+                      onTriggerClick={(event) => event.stopPropagation()}
+                      items={buildChatMenuItems(chat)}
+                      footerItems={chatMenuFooterItems}
+                      onItemClick={(item, event) => {
+                        event.stopPropagation();
+                        if (item.key === 'move') openMoveChatModal(chat);
+                        else if (item.key === 'rename') startChatRename(chat);
+                        else if (item.key === 'share') navigate(`/chat/${chat.id}?share=1`);
+                        else if (item.key === 'pin') handleTogglePinChat(chat.id);
+                        else if (item.key === 'delete') handleDeleteChat(chat.id);
+                        setChatMenuOpenId(null);
+                      }}
+                      triggerClassName="hidden h-7 w-7 items-center justify-center rounded-md text-secondaryText group-hover:inline-flex hover:bg-bgLight"
+                    />
+                  </div>
                 );
               })}
             </div>

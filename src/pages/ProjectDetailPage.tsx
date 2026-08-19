@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
-import { ArrowLeft, ChevronDown, Menu, Plus, Search, Upload, Users } from 'lucide-react';
+import { ArrowLeft, ChevronDown, Folder, Menu, MoreHorizontal, Plus, Search, Upload, Users } from 'lucide-react';
 import { Select } from 'antd';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -202,7 +202,7 @@ const getFileNameWithoutExt = (fileName: string) => {
 export default function ProjectDetailPage() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  const { isSidebarOpen, setIsSidebarOpen, chats } = useOutletContext<LayoutOutletContext>();
+  const { isSidebarOpen, setIsSidebarOpen, chats, openMoveChatModal } = useOutletContext<LayoutOutletContext>();
 
   const [activeTab, setActiveTab] = useState<DetailTab>('experiment');
   const [searchKeyword, setSearchKeyword] = useState('');
@@ -216,6 +216,7 @@ export default function ProjectDetailPage() {
   const [showMemberModal, setShowMemberModal] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [createDocError, setCreateDocError] = useState('');
+  const [chatActionMenuId, setChatActionMenuId] = useState<string | null>(null);
   const [memberModalError, setMemberModalError] = useState('');
   const [selectedInviteMemberIds, setSelectedInviteMemberIds] = useState<string[]>([]);
   const [invitePermission, setInvitePermission] = useState<MemberPermission>('浏览');
@@ -545,17 +546,14 @@ export default function ProjectDetailPage() {
               <Menu size={20} />
             </button>
           )}
-          <div className="flex items-center gap-2 text-sm">
-            <button
-              type="button"
-              onClick={() => navigate('/projects')}
-              className="text-tertiaryText transition-colors hover:text-primaryText"
-            >
-              项目
-            </button>
-            <span className="text-tertiaryText">/</span>
-            <span className="font-medium text-primaryText">{projectNameDraft || project?.name || '详情'}</span>
-          </div>
+<button
+type="button"
+onClick={() => navigate('/projects')}
+className="inline-flex items-center gap-1 text-sm text-tertiaryText transition-colors hover:text-primaryText"
+>
+<ArrowLeft size={16} />
+返回
+</button>
         </div>
 
         {project && (
@@ -828,17 +826,38 @@ export default function ProjectDetailPage() {
               ) : conversationList.length > 0 ? (
                 <div className="mt-4 space-y-2">
                   {conversationList.map((chat) => (
-                    <button
+                    <div
                       key={chat.id}
-                      type="button"
+                      role="button"
+                      tabIndex={0}
                       onClick={() => navigate(`/chat/${chat.id}`)}
-                      className="-ml-2 w-[calc(100%+0.5rem)] rounded-lg px-2 py-3 text-left transition-colors hover:bg-[#f8fafc]"
+                      onKeyDown={(event) => event.key === 'Enter' && navigate(`/chat/${chat.id}`)}
+                      className="group -ml-2 flex w-[calc(100%+0.5rem)] items-center justify-between rounded-lg px-2 py-3 text-left transition-colors hover:bg-[#f8fafc]"
                     >
-                      <div className="truncate text-sm font-medium text-primaryText">{chat.title}</div>
-                      <div className="mt-1 text-xs text-tertiaryText">
-                        {formatChatDateTime(chat.date, chat.id)}
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-medium text-primaryText">{chat.title}</div>
+                        <div className="mt-1 text-xs text-tertiaryText">
+                          {formatChatDateTime(chat.date, chat.id)}
+                        </div>
                       </div>
-                    </button>
+                      <BaseActionMenu
+                        open={chatActionMenuId === chat.id}
+                        onOpenChange={(open) => setChatActionMenuId(open ? chat.id : null)}
+                        placement="bottom-end"
+                        width={150}
+                        trigger={<MoreHorizontal size={16} />}
+                        onTriggerClick={(event) => event.stopPropagation()}
+                        items={[{ key: 'move', label: '迁移项目', icon: <Folder size={14} /> }]}
+                        onItemClick={(item, event) => {
+                          event.stopPropagation();
+                          if (item.key === 'move') {
+                            openMoveChatModal(chat);
+                          }
+                          setChatActionMenuId(null);
+                        }}
+                        triggerClassName="hidden h-7 w-7 items-center justify-center rounded-md text-secondaryText group-hover:inline-flex hover:bg-bgLight"
+                      />
+                    </div>
                   ))}
                 </div>
               ) : (
