@@ -334,12 +334,20 @@ export default function ProjectsPage() {
     },
   ];
 
-  // 从模版详情/编辑页返回时，自动重新打开项目模版弹窗
+  // 从模版详情页返回，或由现有文档保存模版后，自动打开项目模版列表。
   useEffect(() => {
-    const state = location.state as { reopenTemplateModal?: boolean } | null;
+    const state = location.state as {
+      reopenTemplateModal?: boolean;
+      templateScope?: TemplateScope;
+      newTemplate?: ProjectTemplate;
+    } | null;
     if (state?.reopenTemplateModal) {
+      if (state.newTemplate) {
+        setTemplates((prev) => [state.newTemplate!, ...prev]);
+      }
+      setTemplateScope(state.templateScope ?? 'team');
       setShowTemplateModal(true);
-      // 清除 state，避免刷新后重复触发
+      // 清除 state，避免刷新后重复触发及重复加入模版。
       navigate(location.pathname, { replace: true, state: {} });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -399,9 +407,6 @@ export default function ProjectsPage() {
               <Menu size={20} />
             </button>
           )}
-          <div className="flex items-center gap-2 text-sm">
-            <span className="font-medium text-primaryText">项目</span>
-          </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <BaseButton
@@ -567,10 +572,6 @@ export default function ProjectsPage() {
               </div>
             </div>
           ))}
-
-          {filteredTemplates.length === 0 && (
-            <div className="col-span-full py-10 text-center text-sm text-tertiaryText">暂无模版</div>
-          )}
         </div>
       </BaseModal>
 

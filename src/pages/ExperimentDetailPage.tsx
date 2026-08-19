@@ -13,6 +13,7 @@ import {
   type ExperimentTimelineEntry,
 } from '../mock/projects';
 import { type LayoutOutletContext } from '../components/Layout';
+import type { ProjectTemplate } from './ProjectsPage';
 
 const getDefaultTimelineEntry = (timeline: ExperimentTimelineEntry[]) =>
   timeline.find((entry) => entry.status !== '实验结束') ?? timeline[0] ?? null;
@@ -264,11 +265,22 @@ export default function ExperimentDetailPage() {
 
   const handleSaveAsTemplate = () => {
     setShowDocActionMenu(false);
-    navigate('/project-templates/new', {
+    const template: ProjectTemplate = {
+      id: `tpl-local-${Date.now()}`,
+      name: docTitle.trim() || experiment?.title || '未命名模版',
+      content: '由现有文档保存',
+      body: docContent,
+      scope: 'personal',
+      creator: '当前用户',
+      modifier: '当前用户',
+      updatedAt: new Date().toISOString().slice(0, 10),
+    };
+
+    navigate('/projects', {
       state: {
-        mode: 'edit',
-        initialTitle: docTitle || experiment?.title || '',
-        initialContent: docContent,
+        reopenTemplateModal: true,
+        templateScope: 'personal',
+        newTemplate: template,
       },
     });
   };
