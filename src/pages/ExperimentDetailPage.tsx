@@ -1,9 +1,10 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
-import { Menu } from 'lucide-react';
-import { BaseButton, BaseEmpty, BaseModal } from '../components';
+import { useNavigate, useOutletContext, useParams, useSearchParams } from 'react-router-dom';
+import { Check, ChevronDown, Menu, MoreHorizontal, Plus, Trash2, X } from 'lucide-react';
+import { BaseActionMenu, BaseButton, BaseEmpty, BaseModal, ShareModal } from '../components';
+import type { BaseActionMenuItem, BaseActionMenuProps } from '../components';
 import {
   EXPERIMENT_DETAILS_BY_PROJECT,
   PROJECT_MEMBERS,
@@ -22,14 +23,47 @@ export default function ExperimentDetailPage() {
     projectId: string;
     experimentId: string;
   }>();
+  const [searchParams] = useSearchParams();
+  const isSharedView = searchParams.get('shared') === 'true';
+  const [saveToLibraryDone, setSaveToLibraryDone] = useState(false);
+  const [showSaveToProjectModal, setShowSaveToProjectModal] = useState(false);
+  const [showProjectPicker, setShowProjectPicker] = useState(false);
+  const [targetProjectId, setTargetProjectId] = useState('');
   const { isSidebarOpen, setIsSidebarOpen } = useOutletContext<LayoutOutletContext>();
   const [isContentScrolling, setIsContentScrolling] = useState(false);
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [showDocActionMenu, setShowDocActionMenu] = useState(false);
+  const [mode, setMode] = useState<'view' | 'edit'>('view');
+  const [docTitle, setDocTitle] = useState('');
+  const [docTags, setDocTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState('');
+  const [isAddingTag, setIsAddingTag] = useState(false);
+  const [editingTagIndex, setEditingTagIndex] = useState<number | null>(null);
+  const [editingTagValue, setEditingTagValue] = useState('');
+  const [docContent, setDocContent] = useState('');
+  const [saveHint, setSaveHint] = useState<'' | 'saving' | 'saved'>('');
   const contentScrollTimerRef = useRef<number | null>(null);
+  const importInputRef = useRef<HTMLInputElement | null>(null);
+  const tagInputRef = useRef<HTMLInputElement | null>(null);
+  const autoSaveTimerRef = useRef<number | null>(null);
+  const savedContentRef = useRef({ title: '', tags: [] as string[], content: '' });
 
   const project = useMemo(
     () => mockProjects.find((item) => item.id === projectId),
     [projectId],
+  );
+  const targetProject = useMemo(
+    () => mockProjects.find((item) => item.id === targetProjectId),
+    [targetProjectId],
+  );
+  const saveToProjectMenuItems = useMemo<BaseActionMenuItem[]>(
+    () => mockProjects.map((item) => ({
+      key: item.id,
+      label: <span className="block truncate">{item.name}</span>,
+      active: item.id === targetProjectId,
+    })),
+    [targetProjectId],
   );
   const experiment = useMemo(() => {
     if (!projectId || !experimentId) return null;
@@ -47,6 +81,147 @@ export default function ExperimentDetailPage() {
     if (!experiment) return null;
     return getDefaultTimelineEntry(experiment.timeline);
   }, [experiment]);
+
+  const originalMarkdown = useMemo(() => {
+    if (!activeTimeline) return '';
+    const sectionsMd = (activeTimeline.detailSections ?? [])
+      .map((section) => `## ${section.title}\n\n${section.content}`)
+      .join('\n\n');
+    return activeTimeline.markdownContent ?? sectionsMd ?? '';
+  }, [activeTimeline]);
+
+  const originalTitle = useMemo(
+    () => activeTimeline?.detailTitle ?? experiment?.title ?? '',
+    [activeTimeline, experiment],
+  );
+  const originalTags = useMemo(() => experiment?.tags ?? [], [experiment]);
+
+  useEffect(() => {
+    setDocTitle(originalTitle);
+    setDocTags(originalTags);
+    setDocContent(originalMarkdown);
+    savedContentRef.current = {
+      title: originalTitle,
+      tags: originalTags,
+      content: originalMarkdown,
+    };
+  }, [originalTitle, originalTags, originalMarkdown]);
+
+  const persistDoc = useCallback(
+    (next: { title: string; tags: string[]; content: string }) => {
+      // TODO: 对接后端保存接口，此处仅做本地保存演示
+      savedContentRef.current = next;
+      if (activeTimeline) {
+        activeTimeline.detailTitle = next.title;
+        activeTimeline.markdownContent = next.content;
+      }
+      if (experiment) {
+        experiment.tags = next.tags;
+      }
+      setSaveHint('saved');
+      window.setTimeout(() => setSaveHint(''), 1500);
+    },
+    [activeTimeline, experiment],
+  );
+
+  const scheduleAutoSave = useCallback(
+    (next: { title: string; tags: string[]; content: string }) => {
+      setSaveHint('saving');
+      if (autoSaveTimerRef.current !== null) {
+        window.clearTimeout(autoSaveTimerRef.current);
+      }
+      autoSaveTimerRef.current = window.setTimeout(() => {
+        persistDoc(next);
+      }, 800);
+    },
+    [persistDoc],
+  );
+
+  const handleDocContentChange = (value: string) => {
+    setDocContent(value);
+    scheduleAutoSave({ title: docTitle, tags: docTags, content: value });
+  };
+
+  const handleDocTitleChange = (value: string) => {
+    setDocTitle(value);
+    scheduleAutoSave({ title: value, tags: docTags, content: docContent });
+  };
+
+  const handleStartAddTag = () => {
+    setIsAddingTag(true);
+    setTagInput('');
+  };
+
+  const handleCommitAddTag = () => {
+    const trimmed = tagInput.trim();
+    if (trimmed && !docTags.includes(trimmed)) {
+      const nextTags = [...docTags, trimmed];
+      setDocTags(nextTags);
+      scheduleAutoSave({ title: docTitle, tags: nextTags, content: docContent });
+    }
+    setTagInput('');
+    setIsAddingTag(false);
+  };
+
+  const handleCancelAddTag = () => {
+    setTagInput('');
+    setIsAddingTag(false);
+  };
+
+  const handleAddTagKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter' || event.key === ',') {
+      event.preventDefault();
+      handleCommitAddTag();
+    } else if (event.key === 'Backspace' && tagInput === '') {
+      event.preventDefault();
+      handleCancelAddTag();
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      handleCancelAddTag();
+    }
+  };
+
+  const handleRemoveTag = (tag: string) => {
+    const nextTags = docTags.filter((item) => item !== tag);
+    setDocTags(nextTags);
+    scheduleAutoSave({ title: docTitle, tags: nextTags, content: docContent });
+  };
+
+  const handleStartEditTag = (index: number) => {
+    setEditingTagIndex(index);
+    setEditingTagValue(docTags[index] ?? '');
+  };
+
+  const handleCommitEditTag = () => {
+    if (editingTagIndex === null) return;
+    const trimmed = editingTagValue.trim();
+    if (!trimmed || docTags.includes(trimmed)) {
+      setEditingTagIndex(null);
+      setEditingTagValue('');
+      return;
+    }
+    const nextTags = [...docTags];
+    nextTags[editingTagIndex] = trimmed;
+    setDocTags(nextTags);
+    setEditingTagIndex(null);
+    setEditingTagValue('');
+    scheduleAutoSave({ title: docTitle, tags: nextTags, content: docContent });
+  };
+
+  const handleCancelEditTag = () => {
+    setEditingTagIndex(null);
+    setEditingTagValue('');
+  };
+
+  const handleEditTagKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      handleCommitEditTag();
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      handleCancelEditTag();
+    }
+  };
 
   const createdByName = useMemo(() => {
     if (!activeTimeline) return ownerName;
@@ -77,6 +252,63 @@ export default function ExperimentDetailPage() {
     setShowDeleteConfirmModal(true);
   };
 
+  const handleSaveAsTemplate = () => {
+    setShowDocActionMenu(false);
+    navigate('/project-templates/new', {
+      state: {
+        mode: 'edit',
+        initialTitle: docTitle || experiment?.title || '',
+        initialContent: docContent,
+      },
+    });
+  };
+
+  const handleImportClick = () => {
+    setShowDocActionMenu(false);
+    setMode('edit');
+    importInputRef.current?.click();
+  };
+
+  const handleImportFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = typeof reader.result === 'string' ? reader.result : '';
+      setDocContent(text);
+      scheduleAutoSave({ title: docTitle, tags: docTags, content: text });
+    };
+    reader.readAsText(file);
+
+    // 允许重复导入同一个文件
+    event.target.value = '';
+  };
+
+  const handleShareClick = () => {
+    setShowDocActionMenu(false);
+    setShowShareModal(true);
+  };
+
+  const docActionMenuItems = useMemo<BaseActionMenuItem[]>(
+    () => [
+      { key: 'importContent', label: '导入内容' },
+      { key: 'saveAsTemplate', label: '保存为模版' },
+      { key: 'share', label: '分享文档' },
+    ],
+    [],
+  );
+
+  const handleDocActionMenuItemClick: BaseActionMenuProps['onItemClick'] = (item) => {
+    if (item.key === 'importContent') {
+      handleImportClick();
+    } else if (item.key === 'saveAsTemplate') {
+      handleSaveAsTemplate();
+    } else if (item.key === 'share') {
+      handleShareClick();
+    }
+  };
+
   const closeDeleteConfirmModal = () => {
     setShowDeleteConfirmModal(false);
   };
@@ -86,10 +318,43 @@ export default function ExperimentDetailPage() {
     navigate(parentPath ?? '/projects');
   };
 
+  // 被分享者打开时强制只读模式
+  useEffect(() => {
+    if (isSharedView) {
+      setMode('view');
+    }
+  }, [isSharedView]);
+
+  const handleSwitchMode = (nextMode: 'view' | 'edit') => {
+    if (nextMode === mode) return;
+    if (nextMode === 'view') {
+      // 切换到浏览时，立即保存最后修改内容
+      if (autoSaveTimerRef.current !== null) {
+        window.clearTimeout(autoSaveTimerRef.current);
+        autoSaveTimerRef.current = null;
+      }
+      const snapshot = { title: docTitle, tags: docTags, content: docContent };
+      const saved = savedContentRef.current;
+      if (
+        snapshot.title !== saved.title ||
+        snapshot.content !== saved.content ||
+        snapshot.tags.join('|') !== saved.tags.join('|')
+      ) {
+        persistDoc(snapshot);
+      } else {
+        setSaveHint('');
+      }
+    }
+    setMode(nextMode);
+  };
+
   useEffect(() => {
     return () => {
       if (contentScrollTimerRef.current !== null) {
         window.clearTimeout(contentScrollTimerRef.current);
+      }
+      if (autoSaveTimerRef.current !== null) {
+        window.clearTimeout(autoSaveTimerRef.current);
       }
     };
   }, []);
@@ -107,46 +372,172 @@ export default function ExperimentDetailPage() {
               <Menu size={20} />
             </button>
           )}
-          <div className="flex items-center gap-2 text-sm">
+          {isSharedView ? (
             <button
               type="button"
-              onClick={() => navigate('/projects')}
-              className="text-tertiaryText transition-colors hover:text-primaryText"
+              onClick={() => navigate(-1)}
+              className="inline-flex items-center gap-1 text-sm text-tertiaryText transition-colors hover:text-primaryText"
             >
-              项目
+              <X size={16} />
+              关闭分享
             </button>
-            <span className="text-tertiaryText">/</span>
-            <button
-              type="button"
-              onClick={() => parentPath && navigate(parentPath)}
-              disabled={!parentPath}
-              className={`transition-colors ${
-                parentPath
-                  ? 'text-tertiaryText hover:text-primaryText'
-                  : 'cursor-not-allowed text-tertiaryText/60'
-              }`}
-            >
-              {project?.name ?? '实验详情'}
-            </button>
-            <span className="text-tertiaryText">/</span>
-            <span className="font-medium text-primaryText">{experiment?.title ?? '实验详情'}</span>
-          </div>
+          ) : (
+            <div className="flex items-center gap-2 text-sm">
+              <button
+                type="button"
+                onClick={() => navigate('/projects')}
+                className="text-tertiaryText transition-colors hover:text-primaryText"
+              >
+                项目
+              </button>
+              <span className="text-tertiaryText">/</span>
+              <button
+                type="button"
+                onClick={() => parentPath && navigate(parentPath)}
+                disabled={!parentPath}
+                className={`transition-colors ${
+                  parentPath
+                    ? 'text-tertiaryText hover:text-primaryText'
+                    : 'cursor-not-allowed text-tertiaryText/60'
+                }`}
+              >
+                {project?.name ?? '实验详情'}
+              </button>
+              <span className="text-tertiaryText">/</span>
+              <span className="font-medium text-primaryText">{experiment?.title ?? '实验详情'}</span>
+            </div>
+          )}
         </div>
 
-        <div className="flex items-center gap-2">
+        {!isSharedView && (
+          <div className="flex items-center gap-2">
+            <input
+              ref={importInputRef}
+              type="file"
+              accept=".md,.txt,.markdown"
+              className="hidden"
+              onChange={handleImportFileChange}
+            />
+            <div className="inline-flex items-center gap-1 rounded-lg bg-bgLight p-0.5">
+              <button
+                type="button"
+                onClick={() => handleSwitchMode('view')}
+                className={`rounded-md px-3 py-1 text-sm transition-colors ${
+                  mode === 'view'
+                    ? 'bg-white text-primaryText shadow-sm'
+                    : 'text-secondaryText hover:text-primaryText'
+                }`}
+              >
+                浏览
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSwitchMode('edit')}
+                className={`rounded-md px-3 py-1 text-sm transition-colors ${
+                  mode === 'edit'
+                    ? 'bg-white text-primaryText shadow-sm'
+                    : 'text-secondaryText hover:text-primaryText'
+                }`}
+              >
+                编辑
+              </button>
+            </div>
+            {saveHint === 'saving' && (
+              <span className="text-xs text-tertiaryText">保存中…</span>
+            )}
+            {saveHint === 'saved' && (
+              <span className="text-xs text-tertiaryText">已保存</span>
+            )}
+            <button
+              type="button"
+              onClick={openDeleteConfirmModal}
+              className="inline-flex rounded-md p-1.5 text-secondaryText transition-colors hover:bg-bgLight hover:text-primaryText"
+              title="删除"
+            >
+              <Trash2 size={18} />
+            </button>
+            <BaseActionMenu
+              open={showDocActionMenu}
+              onOpenChange={setShowDocActionMenu}
+              placement="bottom-end"
+              width={140}
+              trigger={
+                <span className="inline-flex rounded-md p-1.5 text-secondaryText transition-colors hover:bg-bgLight hover:text-primaryText">
+                  <MoreHorizontal size={20} />
+                </span>
+              }
+              items={docActionMenuItems}
+              onItemClick={handleDocActionMenuItemClick}
+            />
+          </div>
+        )}
+      </header>
+
+      {isSharedView && (
+        <div className="flex shrink-0 items-center justify-between border-b border-[var(--color-line-subtle)] bg-[var(--color-primary-50,#fef9e6)] px-4 py-2.5 md:px-8 lg:px-10">
+          <span className="text-sm text-secondaryText">你正在查看分享的文档</span>
           <BaseButton
-            type="secondary"
+            type={saveToLibraryDone ? 'secondary' : 'primary'}
             size="small"
             rounded="large"
-            onClick={openDeleteConfirmModal}
+            disabled={saveToLibraryDone}
+            icon={saveToLibraryDone ? <Check size={16} /> : undefined}
+            onClick={() => {
+              setShowProjectPicker(false);
+              setShowSaveToProjectModal(true);
+            }}
           >
-            删除
-          </BaseButton>
-          <BaseButton type="primary" size="small" rounded="large">
-            编辑
+            {saveToLibraryDone ? '已保存成功' : '保存到我的项目'}
           </BaseButton>
         </div>
-      </header>
+      )}
+
+      <BaseModal
+        show={showSaveToProjectModal}
+        title="保存到我的项目"
+        okText="确认保存"
+        cancelText="取消"
+        okButtonProps={{ disabled: !targetProjectId }}
+        onCancel={() => {
+          setShowProjectPicker(false);
+          setShowSaveToProjectModal(false);
+        }}
+        onClose={() => {
+          setShowProjectPicker(false);
+          setShowSaveToProjectModal(false);
+        }}
+        onConfirm={() => {
+          setSaveToLibraryDone(true);
+          setShowSaveToProjectModal(false);
+        }}
+      >
+        <div className="py-2">
+          <p className="mb-4 text-sm text-secondaryText">请选择文档要保存到的归属项目</p>
+          <BaseActionMenu
+            open={showProjectPicker}
+            onOpenChange={setShowProjectPicker}
+            placement="bottom-start"
+            width={400}
+            portal
+            items={saveToProjectMenuItems}
+            onItemClick={(item) => {
+              setTargetProjectId(item.key);
+              setShowProjectPicker(false);
+            }}
+            trigger={
+              <span className="flex w-full items-center justify-between gap-3 rounded-lg border border-borderGray bg-white px-3 py-2.5 text-sm text-secondaryText transition-colors hover:bg-bgLight">
+                <span className="min-w-0 truncate text-left">
+                  {targetProject?.name ?? '请选择项目'}
+                </span>
+                <ChevronDown size={16} className="shrink-0" />
+              </span>
+            }
+            className="!flex w-full"
+            triggerClassName="w-full"
+            listClassName="max-h-[220px] overflow-y-auto"
+          />
+        </div>
+      </BaseModal>
 
       <div className="flex-1 min-h-0 overflow-hidden px-4 pb-8 pt-4 md:px-8 lg:px-10 md:pt-6">
         <div className="mx-auto flex h-full min-h-0 max-w-[1240px] flex-col">
@@ -157,16 +548,102 @@ export default function ExperimentDetailPage() {
           ) : (
             <>
               <section className="mb-4 shrink-0">
-                <h1 className="text-2xl font-semibold text-primaryText">
-                  {activeTimeline?.detailTitle ?? experiment.title}
-                </h1>
-                <div className="mt-3 flex items-center justify-between gap-4">
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-tertiaryText">
-                    <span>创建人: {createdByName}</span>
-                    <span>最近修改: {modifiedByName}</span>
-                    <span>{activeTimeline?.updatedAt ?? experiment.updatedAt}</span>
+                {mode === 'edit' ? (
+                  <input
+                    value={docTitle}
+                    onChange={(event) => handleDocTitleChange(event.target.value)}
+                    placeholder="请输入文档标题"
+                    className="w-full border-none bg-transparent text-2xl font-semibold text-primaryText outline-none placeholder:text-tertiaryText"
+                  />
+                ) : (
+                  <h1 className="text-2xl font-semibold text-primaryText">
+                    {docTitle || '未命名文档'}
+                  </h1>
+                )}
+
+                {mode === 'view' && (
+                  <div className="mt-3 flex items-center justify-between gap-4">
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-tertiaryText">
+                      <span>创建人: {createdByName}</span>
+                      <span>最近修改: {modifiedByName}</span>
+                      <span>{activeTimeline?.updatedAt ?? experiment.updatedAt}</span>
+                    </div>
                   </div>
-                </div>
+                )}
+
+                {mode === 'edit' ? (
+                  <div className="mt-4 flex flex-wrap items-center gap-2">
+                    {docTags.map((tag, index) =>
+                      editingTagIndex === index ? (
+                        <input
+                          key={`edit-${index}`}
+                          value={editingTagValue}
+                          onChange={(event) => setEditingTagValue(event.target.value)}
+                          onKeyDown={handleEditTagKeyDown}
+                          onBlur={handleCommitEditTag}
+                          autoFocus
+                          className="min-w-[80px] rounded-full border border-[var(--color-line-subtle)] bg-bgLight px-2.5 py-1 text-xs text-primaryText outline-none"
+                        />
+                      ) : (
+                        <span
+                          key={tag}
+                          className="inline-flex items-center gap-1 rounded-full border border-[var(--color-line-subtle)] bg-bgLight px-2.5 py-1 text-xs text-secondaryText"
+                        >
+                          <button
+                            type="button"
+                            onClick={() => handleStartEditTag(index)}
+                            className="transition-colors hover:text-primaryText"
+                          >
+                            {tag}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveTag(tag)}
+                            className="text-tertiaryText transition-colors hover:text-danger"
+                          >
+                            <X size={12} />
+                          </button>
+                        </span>
+                      ),
+                    )}
+                    {isAddingTag ? (
+                      <input
+                        ref={tagInputRef}
+                        value={tagInput}
+                        onChange={(event) => setTagInput(event.target.value)}
+                        onKeyDown={handleAddTagKeyDown}
+                        onBlur={handleCommitAddTag}
+                        autoFocus
+                        placeholder="输入标签后回车"
+                        className="min-w-[100px] rounded-full border border-dashed border-[var(--color-line-subtle)] bg-bgLight px-2.5 py-1 text-xs text-primaryText outline-none placeholder:text-tertiaryText"
+                      />
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleStartAddTag}
+                        className="inline-flex items-center gap-1 rounded-full border border-dashed border-[var(--color-line-subtle)] px-2.5 py-1 text-xs text-tertiaryText transition-colors hover:border-[var(--color-primary)] hover:text-primaryText"
+                      >
+                        <Plus size={12} />
+                        {docTags.length === 0 ? '添加标签' : '继续添加'}
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="mt-4 flex flex-wrap items-center gap-2">
+                    {docTags.length > 0 ? (
+                      docTags.map((tag) => (
+                        <span
+                          key={tag}
+                          className="inline-flex items-center rounded-full border border-[var(--color-line-subtle)] bg-bgLight px-2.5 py-1 text-xs text-secondaryText"
+                        >
+                          {tag}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-xs text-tertiaryText">暂无标签</span>
+                    )}
+                  </div>
+                )}
                 <div className="mt-4 h-px bg-[var(--color-line-subtle)]" />
               </section>
 
@@ -176,30 +653,23 @@ export default function ExperimentDetailPage() {
                   isContentScrolling ? 'is-scrolling' : ''
                 }`}
               >
-                {activeTimeline?.markdownContent ? (
-                  <div className="prose prose-slate max-w-none text-primaryText prose-p:my-3 prose-p:text-sm prose-p:leading-7 prose-li:text-sm prose-li:leading-7 prose-headings:text-primaryText prose-headings:tracking-[-0.01em] prose-h2:mt-4 prose-h2:mb-2 prose-h2:text-[16px] prose-h2:font-semibold prose-h3:mt-4 prose-h3:mb-2 prose-h3:text-base prose-h3:font-semibold prose-strong:text-primaryText prose-code:before:content-none prose-code:after:content-none prose-hr:my-5 prose-li:my-1 prose-li:marker:text-secondaryText prose-ol:pl-6 prose-ul:pl-6 prose-blockquote:border-l-2 prose-blockquote:border-[var(--color-line-subtle)] prose-blockquote:pl-3 prose-blockquote:text-secondaryText prose-a:text-primary prose-a:no-underline hover:prose-a:underline">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                      {activeTimeline.markdownContent}
-                    </ReactMarkdown>
-                  </div>
+                {mode === 'edit' ? (
+                  <textarea
+                    value={docContent}
+                    onChange={(event) => handleDocContentChange(event.target.value)}
+                    placeholder="请输入文档内容，支持 Markdown 语法"
+                    className="h-full min-h-[400px] w-full resize-none border-none bg-transparent text-sm leading-7 text-primaryText outline-none placeholder:text-tertiaryText"
+                  />
                 ) : (
-                  <>
-                    <div className="mt-6 grid gap-4 md:grid-cols-2">
-                      {(activeTimeline?.detailSections ?? []).map((section) => (
-                        <article
-                          key={section.title}
-                          className="rounded-xl border border-[var(--color-line-subtle)] bg-white p-4"
-                        >
-                          <div className="text-sm font-medium text-primaryText">
-                            {section.title}
-                          </div>
-                          <p className="mt-2 text-sm leading-6 text-secondaryText">
-                            {section.content}
-                          </p>
-                        </article>
-                      ))}
-                    </div>
-                  </>
+                  <div className="prose prose-slate max-w-none text-primaryText prose-p:my-3 prose-p:text-sm prose-p:leading-7 prose-li:text-sm prose-li:leading-7 prose-headings:text-primaryText prose-headings:tracking-[-0.01em] prose-h2:mt-4 prose-h2:mb-2 prose-h2:text-[16px] prose-h2:font-semibold prose-h3:mt-4 prose-h3:mb-2 prose-h3:text-base prose-h3:font-semibold prose-strong:text-primaryText prose-code:before:content-none prose-code:after:content-none prose-hr:my-5 prose-li:my-1 prose-li:marker:text-secondaryText prose-ol:pl-6 prose-ul:pl-6 prose-blockquote:border-l-2 prose-blockquote:border-[var(--color-line-subtle)] prose-blockquote:pl-3 prose-blockquote:text-secondaryText prose-a:text-primary prose-a:no-underline hover:prose-a:underline">
+                    {docContent.trim() ? (
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {docContent}
+                      </ReactMarkdown>
+                    ) : (
+                      <p className="text-sm text-tertiaryText">暂无内容</p>
+                    )}
+                  </div>
                 )}
 
                 <div className="mt-8 border-t border-[var(--color-line-subtle)] pt-6">
@@ -231,6 +701,13 @@ export default function ExperimentDetailPage() {
           )}
         </div>
       </div>
+
+      <ShareModal
+        visible={showShareModal}
+        title="分享文档"
+        shareUrl={`${window.location.origin}/project/${projectId}/experiment/${experimentId}?shared=true`}
+        onClose={() => setShowShareModal(false)}
+      />
 
       <BaseModal
         visible={showDeleteConfirmModal}

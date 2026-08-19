@@ -49,3 +49,6 @@ export type { BasePaginationProps } from './pagination';
 
 export { BaseEmpty } from './empty';
 export type { BaseEmptyProps } from './empty';
+
+// 分享弹窗
+export { default as ShareModal } from '../ShareModal';

@@ -93,7 +93,7 @@ export const BaseActionMenu: React.FC<BaseActionMenuProps> = ({
   );
 
   const menuStyle = useMemo(
-    () => (width ? { width: typeof width === 'number' ? `${width}px` : width } : undefined),
+    () => (width ? { width: typeof width === 'number' ? `${width}px` : width, minWidth: 'auto' } : undefined),
     [width]
   );
 

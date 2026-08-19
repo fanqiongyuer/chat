@@ -3,11 +3,14 @@ import { useLocation, useNavigate, useOutletContext } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { mockProjects, type MockProject } from '../mock/projects';
-import { FileText, Plus, Menu, LayoutTemplate } from 'lucide-react';
-import { BaseButton, BaseDocumentUpload, BaseInput, BaseModal } from '../components';
+import { Plus, Menu, LayoutTemplate, MoreHorizontal } from 'lucide-react';
+import { BaseActionMenu, BaseButton, BaseDocumentUpload, BaseInput, BaseModal } from '../components';
+import type { BaseActionMenuItem } from '../components';
 import { type LayoutOutletContext } from '../components/Layout';
 
 // ─── 模版类型 ─────────────────────────────────────────────────────────────────
+export type TemplateScope = 'team' | 'personal';
+
 export interface ProjectTemplate {
   id: string;
   name: string;
@@ -15,6 +18,10 @@ export interface ProjectTemplate {
   /** 模版正文，Markdown 格式，用于渲染真实样式预览 */
   body: string;
   builtin?: boolean;
+  creator?: string;
+  modifier?: string;
+  updatedAt?: string;
+  scope?: TemplateScope;
 }
 
 export const DEFAULT_TEMPLATES: ProjectTemplate[] = [
@@ -23,6 +30,10 @@ export const DEFAULT_TEMPLATES: ProjectTemplate[] = [
     name: '空白项目',
     content: '从零开始创建项目',
     builtin: true,
+    scope: 'team',
+    creator: '张明',
+    modifier: '张明',
+    updatedAt: '2024-01-15',
     body: `## 项目简介
 
 请输入项目背景与目标。
@@ -38,6 +49,10 @@ export const DEFAULT_TEMPLATES: ProjectTemplate[] = [
     name: '科研项目',
     content: '适合文献调研与论文写作',
     builtin: true,
+    scope: 'team',
+    creator: '李华',
+    modifier: '李华',
+    updatedAt: '2024-02-20',
     body: `## 研究背景
 
 围绕课题的研究现状、存在的问题与研究意义展开说明。
@@ -64,6 +79,10 @@ export const DEFAULT_TEMPLATES: ProjectTemplate[] = [
     name: '产品研发',
     content: '需求梳理与迭代管理',
     builtin: true,
+    scope: 'team',
+    creator: '王芳',
+    modifier: '王芳',
+    updatedAt: '2024-03-10',
     body: `## 需求背景
 
 描述用户痛点、业务目标与需求来源。
@@ -93,6 +112,10 @@ export const DEFAULT_TEMPLATES: ProjectTemplate[] = [
     name: '法律案件',
     content: '案件资料与合规分析',
     builtin: true,
+    scope: 'team',
+    creator: '赵强',
+    modifier: '赵强',
+    updatedAt: '2024-01-28',
     body: `## 案件概况
 
 简述案件类型、当事人信息与争议焦点。
@@ -119,6 +142,10 @@ export const DEFAULT_TEMPLATES: ProjectTemplate[] = [
     name: '市场营销',
     content: 'campaign 策划与效果复盘',
     builtin: true,
+    scope: 'team',
+    creator: '陈露',
+    modifier: '陈露',
+    updatedAt: '2024-02-15',
     body: `## 活动背景
 
 阐述市场环境、目标人群与营销诉求。
@@ -145,6 +172,10 @@ export const DEFAULT_TEMPLATES: ProjectTemplate[] = [
     name: '培训课程',
     content: '课程大纲与考核设计',
     builtin: true,
+    scope: 'team',
+    creator: '孙伟',
+    modifier: '孙伟',
+    updatedAt: '2024-03-05',
     body: `## 课程目标
 
 明确学员画像与预期收获。
@@ -171,6 +202,10 @@ export const DEFAULT_TEMPLATES: ProjectTemplate[] = [
     name: '活动策划',
     content: '流程编排与物料清单',
     builtin: true,
+    scope: 'team',
+    creator: '周婷',
+    modifier: '周婷',
+    updatedAt: '2024-02-08',
     body: `## 活动概述
 
 说明活动主题、时间地点与参与对象。
@@ -198,6 +233,10 @@ export const DEFAULT_TEMPLATES: ProjectTemplate[] = [
     name: '用户访谈',
     content: '提纲设计与洞察沉淀',
     builtin: true,
+    scope: 'team',
+    creator: '吴鹏',
+    modifier: '吴鹏',
+    updatedAt: '2024-01-18',
     body: `## 访谈目的
 
 明确本次访谈希望验证的假设与问题。
@@ -224,6 +263,10 @@ export const DEFAULT_TEMPLATES: ProjectTemplate[] = [
     name: '财务预算',
     content: '预算编制与支出跟踪',
     builtin: true,
+    scope: 'team',
+    creator: '郑洁',
+    modifier: '郑洁',
+    updatedAt: '2024-03-12',
     body: `## 预算背景
 
 说明预算周期、编制依据与总体目标。
@@ -263,14 +306,33 @@ export default function ProjectsPage() {
 
   // 模版管理相关
   const [showTemplateModal, setShowTemplateModal] = useState(false);
-  const [templates] = useState<ProjectTemplate[]>(DEFAULT_TEMPLATES);
+  const [templates, setTemplates] = useState<ProjectTemplate[]>(DEFAULT_TEMPLATES);
+  const [templateScope, setTemplateScope] = useState<TemplateScope>('team');
+  const [activeTemplateMenuId, setActiveTemplateMenuId] = useState<string | null>(null);
+
+  const filteredTemplates = templates.filter((tpl) => (tpl.scope ?? 'team') === templateScope);
 
   const openTemplateModal = () => {
     setShowTemplateModal(true);
   };
   const closeTemplateModal = () => {
     setShowTemplateModal(false);
+    setActiveTemplateMenuId(null);
   };
+
+  const handleToggleTemplateScope = (tpl: ProjectTemplate) => {
+    tpl.scope = tpl.scope === 'team' ? 'personal' : 'team';
+    setActiveTemplateMenuId(null);
+    // 强制刷新列表
+    setTemplates([...templates]);
+  };
+
+  const getTemplateMenuItems = (tpl: ProjectTemplate): BaseActionMenuItem[] => [
+    {
+      key: 'toggleScope',
+      label: tpl.scope === 'team' ? '转为个人模版' : '转为团队模版',
+    },
+  ];
 
   // 从模版详情/编辑页返回时，自动重新打开项目模版弹窗
   useEffect(() => {
@@ -326,11 +388,6 @@ export default function ProjectsPage() {
   const goViewTemplate = (id: string) => {
     closeTemplateModal();
     navigate(`/project-templates/${id}`, { state: { mode: 'preview' } });
-  };
-
-  const goEditExistingTemplate = (id: string) => {
-    closeTemplateModal();
-    navigate(`/project-templates/${id}`, { state: { mode: 'edit' } });
   };
 
   return (
@@ -411,23 +468,81 @@ export default function ProjectsPage() {
         title="项目模版"
         width={1040}
         maskClosable={false}
-        okText="新建模版"
-        cancelText="取消"
+        footer={null}
         onCancel={closeTemplateModal}
-        onConfirm={() => goEditTemplate('new')}
-        bodyClassName="!px-6 !py-5"
+        bodyClassName="!px-6 !py-5 !h-[720px] !overflow-y-auto"
       >
+        <div className="mb-4 flex items-center gap-2">
+          <div className="inline-flex items-center gap-1 rounded-lg bg-bgLight p-0.5">
+            <button
+              type="button"
+              onClick={() => setTemplateScope('team')}
+              className={`rounded-md px-3 py-1 text-sm transition-colors ${
+                templateScope === 'team'
+                  ? 'bg-white text-primaryText shadow-sm'
+                  : 'text-secondaryText hover:text-primaryText'
+              }`}
+            >
+              团队模版
+            </button>
+            <button
+              type="button"
+              onClick={() => setTemplateScope('personal')}
+              className={`rounded-md px-3 py-1 text-sm transition-colors ${
+                templateScope === 'personal'
+                  ? 'bg-white text-primaryText shadow-sm'
+                  : 'text-secondaryText hover:text-primaryText'
+              }`}
+            >
+              个人模版
+            </button>
+          </div>
+        </div>
+
         <div className="grid grid-cols-4 gap-4">
-          {templates.map((tpl) => (
+          {/* 新建模版卡片 */}
+          <button
+            type="button"
+            onClick={() => goEditTemplate('new')}
+            className="group flex flex-col overflow-hidden rounded-lg border border-dashed border-[var(--color-border-soft)] bg-[var(--color-surface-muted)] text-left transition-colors hover:border-[var(--color-primary)]"
+          >
+            <div className="px-3 pt-3">
+              <span className="truncate text-sm font-semibold text-primaryText">新建模版</span>
+            </div>
+
+            <div className="relative mx-3 mb-3 mt-2.5 aspect-[4/5] overflow-hidden rounded-md bg-white">
+              <div className="flex h-full w-full items-center justify-center">
+                <Plus size={28} className="text-[var(--color-gray-3)] transition-colors group-hover:text-[var(--color-primary)]" />
+              </div>
+            </div>
+          </button>
+
+          {filteredTemplates.map((tpl) => (
             <div
               key={tpl.id}
               className="group flex flex-col overflow-hidden rounded-lg border border-[var(--color-line-subtle)] bg-[var(--color-surface-muted)]"
             >
-              <div className="flex items-center gap-2 px-3 pt-3">
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[var(--color-primary-soft)] text-[var(--color-primary)]">
-                  <FileText size={14} />
-                </span>
+              <div className="flex items-center justify-between px-3 pt-3">
                 <span className="truncate text-sm font-semibold text-primaryText">{tpl.name}</span>
+                <div className="opacity-0 transition-opacity group-hover:opacity-100">
+                  <BaseActionMenu
+                    open={activeTemplateMenuId === tpl.id}
+                    onOpenChange={(open) => setActiveTemplateMenuId(open ? tpl.id : null)}
+                    placement="bottom-end"
+                    width={140}
+                    trigger={
+                      <span className="inline-flex rounded-md p-1 text-secondaryText transition-colors hover:bg-bgLight hover:text-primaryText">
+                        <MoreHorizontal size={16} />
+                      </span>
+                    }
+                    items={getTemplateMenuItems(tpl)}
+                    onItemClick={(item) => {
+                      if (item.key === 'toggleScope') {
+                        handleToggleTemplateScope(tpl);
+                      }
+                    }}
+                  />
+                </div>
               </div>
 
               <div className="relative mx-3 mb-3 mt-2.5 aspect-[4/5] overflow-hidden rounded-md bg-white">
@@ -438,30 +553,22 @@ export default function ProjectsPage() {
                 </div>
                 <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-white to-transparent" />
 
-                {/* hover 蒙层：查看 / 编辑 */}
-                <div className="pointer-events-none absolute inset-0 flex items-center justify-center gap-2 bg-white/70 opacity-0 backdrop-blur-[1px] transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
+                {/* hover 蒙层：查看 */}
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-white/70 opacity-0 backdrop-blur-[1px] transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
                   <BaseButton
-                    type="secondary"
+                    type="primary"
                     size="small"
                     rounded="large"
                     onClick={() => goViewTemplate(tpl.id)}
                   >
                     查看
                   </BaseButton>
-                  <BaseButton
-                    type="primary"
-                    size="small"
-                    rounded="large"
-                    onClick={() => goEditExistingTemplate(tpl.id)}
-                  >
-                    编辑
-                  </BaseButton>
                 </div>
               </div>
             </div>
           ))}
 
-          {templates.length === 0 && (
+          {filteredTemplates.length === 0 && (
             <div className="col-span-full py-10 text-center text-sm text-tertiaryText">暂无模版</div>
           )}
         </div>
