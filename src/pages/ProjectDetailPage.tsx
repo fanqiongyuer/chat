@@ -6,7 +6,13 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { BaseActionMenu, BaseButton, BaseDocumentUpload, BaseEmpty, BaseModal } from '../components';
 import type { BaseActionMenuItem, BaseActionMenuProps } from '../components';
-import { EXPERIMENTS_BY_PROJECT, PROJECT_MEMBERS, mockProjects } from '../mock/projects';
+import {
+  EXPERIMENT_DETAILS_BY_PROJECT,
+  EXPERIMENTS_BY_PROJECT,
+  PROJECT_MEMBERS,
+  mockProjects,
+  type ProjectExperimentDetail,
+} from '../mock/projects';
 import { DEFAULT_TEMPLATES, type ProjectTemplate } from './ProjectsPage';
 import { type LayoutOutletContext } from '../components/Layout';
 
@@ -345,9 +351,67 @@ export default function ProjectDetailPage() {
     setShowTemplatePickerModal(false);
   };
 
-  const handlePickTemplate = (_template: ProjectTemplate) => {
+  const handlePickTemplate = (template: ProjectTemplate) => {
+    if (!id) return;
+
+    const documentId = createLocalDocId();
+    const documentTitle = template.name.trim() || '未命名文档';
+    const now = new Date();
+    const updatedAt = formatDateToCnymdhm(now);
+    const ownerId = projectMembers[0]?.id ?? 'm-system';
+    const document: ProjectExperimentDetail = {
+      id: documentId,
+      title: documentTitle,
+      summary: `基于「${documentTitle}」模版创建`,
+      ownerId,
+      status: '进行中',
+      tags: ['模版创建'],
+      subtitle: '基于项目模版创建的文档',
+      updatedAt,
+      timeline: [
+        {
+          id: `${documentId}-create`,
+          date: updatedAt,
+          status: '创建试验方案',
+          summary: `使用「${documentTitle}」模版创建文档`,
+          actor: '当前用户',
+          updatedAt,
+          detailTitle: documentTitle,
+          detailDescription: '基于项目模版创建',
+          detailSections: [],
+          attachments: [],
+          markdownContent: template.body,
+        },
+      ],
+      resources: [],
+    };
+
+    EXPERIMENT_DETAILS_BY_PROJECT[id] = [document, ...(EXPERIMENT_DETAILS_BY_PROJECT[id] ?? [])];
+    EXPERIMENTS_BY_PROJECT[id] = [
+      {
+        id: document.id,
+        title: document.title,
+        summary: document.summary,
+        ownerId: document.ownerId,
+        status: document.status,
+        tags: document.tags,
+      },
+      ...(EXPERIMENTS_BY_PROJECT[id] ?? []),
+    ];
+    setLocalDocs((prev) => [
+      {
+        id: document.id,
+        title: document.title,
+        summary: document.summary,
+        ownerId: document.ownerId,
+        status: document.status,
+        tags: document.tags,
+      },
+      ...prev,
+    ]);
     closeTemplatePickerModal();
-    // TODO: 基于模版内容创建文档流程后续接入
+    setPreviewTemplate(null);
+    navigate(`/project/${id}/experiment/${documentId}`, { state: { mode: 'edit' } });
   };
 
   const handlePreviewTemplate = (template: ProjectTemplate) => {

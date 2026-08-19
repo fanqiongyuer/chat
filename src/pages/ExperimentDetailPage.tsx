@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { useNavigate, useOutletContext, useParams, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useOutletContext, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Check, ChevronDown, Menu, MoreHorizontal, Plus, Trash2, X } from 'lucide-react';
 import { BaseActionMenu, BaseButton, BaseEmpty, BaseInput, BaseModal, ShareModal } from '../components';
 import type { BaseActionMenuItem, BaseActionMenuProps } from '../components';
@@ -20,6 +20,7 @@ const getDefaultTimelineEntry = (timeline: ExperimentTimelineEntry[]) =>
 
 export default function ExperimentDetailPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { projectId, experimentId } = useParams<{
     projectId: string;
     experimentId: string;
@@ -41,7 +42,9 @@ export default function ExperimentDetailPage() {
   const [newMoveProjectName, setNewMoveProjectName] = useState('');
   const [moveProjectError, setMoveProjectError] = useState('');
   const [movableProjects, setMovableProjects] = useState(mockProjects);
-  const [mode, setMode] = useState<'view' | 'edit'>('view');
+  const [mode, setMode] = useState<'view' | 'edit'>(
+    (location.state as { mode?: 'view' | 'edit' } | null)?.mode ?? 'view',
+  );
   const [docTitle, setDocTitle] = useState('');
   const [docTags, setDocTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
@@ -393,12 +396,17 @@ export default function ExperimentDetailPage() {
     navigate(parentPath ?? '/projects');
   };
 
-  // 被分享者打开时强制只读模式
+  // 新建文档可直接进入编辑状态；被分享者打开时始终只读。
   useEffect(() => {
     if (isSharedView) {
       setMode('view');
+      return;
     }
-  }, [isSharedView]);
+    const requestedMode = (location.state as { mode?: 'view' | 'edit' } | null)?.mode;
+    if (requestedMode) {
+      setMode(requestedMode);
+    }
+  }, [isSharedView, location.state]);
 
   const handleSwitchMode = (nextMode: 'view' | 'edit') => {
     if (nextMode === mode) return;
