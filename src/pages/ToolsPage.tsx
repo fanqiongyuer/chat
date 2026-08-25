@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Cascader, DatePicker, Radio, TimePicker } from 'antd';
 import dayjs from 'dayjs';
 import { useNavigate, useOutletContext } from 'react-router-dom';
-import { Menu, Plus, MoreHorizontal, Pencil, Trash2, ChevronLeft, ChevronDown, Folder } from 'lucide-react';
+import { Menu, Plus, MoreHorizontal, Pencil, Trash2, ChevronLeft, ChevronDown, Folder, Check } from 'lucide-react';
 import { mockProjects } from '../mock/projects';
 import { BaseActionMenu, BaseButton, BaseInput, BaseModal, BaseTable, BaseToggle } from '../components';
 import type { BaseActionMenuItem, BaseTableColumn, BaseActionMenuProps } from '../components';
@@ -413,6 +413,7 @@ export default function ToolsPage() {
   const [literatureForm, setLiteratureForm] = useState<LiteratureTrackForm>(initialLiteratureTrackForm);
   const [weeklyScheduleForm, setWeeklyScheduleForm] = useState<WeeklyScheduleForm>(initialWeeklyScheduleForm);
   const [showWeeklyProjectDropdown, setShowWeeklyProjectDropdown] = useState(false);
+  const [taskStatusToast, setTaskStatusToast] = useState('');
 
   const closeTaskConfigModal = () => {
     setShowLiteratureModal(false);
@@ -490,16 +491,12 @@ export default function ToolsPage() {
   };
 
   const handleToggleStatus = (taskId: string) => {
-    setTasks((prev) =>
-      prev.map((task) =>
-        task.id === taskId
-          ? {
-              ...task,
-              isEnabled: !task.isEnabled,
-            }
-          : task,
-      ),
-    );
+    const task = tasks.find((item) => item.id === taskId);
+    if (!task) return;
+    const isEnabling = !task.isEnabled;
+    setTasks((prev) => prev.map((item) => item.id === taskId ? { ...item, isEnabled: isEnabling } : item));
+    setTaskStatusToast(`已成功${isEnabling ? '开启' : '关闭'}任务「${task.name}」`);
+    window.setTimeout(() => setTaskStatusToast(''), 2200);
   };
 
   const handleEditTask = (taskId: string) => {
@@ -809,6 +806,10 @@ export default function ToolsPage() {
 
   return (
     <div className="flex h-full w-full flex-col bg-white">
+      <div className={`pointer-events-none fixed left-1/2 top-1/2 z-[1400] inline-flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 rounded-lg bg-black/70 px-4 py-2.5 text-sm text-white shadow-lg backdrop-blur-sm transition-all duration-200 ${taskStatusToast ? 'opacity-100' : 'opacity-0'}`}>
+        <Check size={16} className="text-white" />
+        {taskStatusToast}
+      </div>
       <header className="z-10 flex h-16 shrink-0 items-center justify-between bg-white/80 px-4 backdrop-blur-sm">
         <div className="flex items-center gap-3 min-w-0">
           {!isSidebarOpen && (

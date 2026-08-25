@@ -45,7 +45,9 @@ export interface ChatFileOption {
   operatedAt?: string;
 }
 
-interface UploadedInputFile extends InputAttachment {}
+interface UploadedInputFile extends InputAttachment {
+  uploadProgress: number;
+}
 
 const MAX_UPLOAD_COUNT = 50;
 const MAX_UPLOAD_FILE_SIZE = 100 * 1024 * 1024;
@@ -253,20 +255,22 @@ const InputArea = ({ onSend, disabled, leadingControls }: InputAreaProps) => {
   const filePickerRef = useRef<HTMLInputElement | null>(null);
   const filePickerId = useId();
   const uploadedFilesRef = useRef<UploadedInputFile[]>([]);
+const uploadProgressTimersRef = useRef<Record<string, number>>({});
 
   useEffect(() => {
     uploadedFilesRef.current = uploadedFiles;
   }, [uploadedFiles]);
 
-  useEffect(() => {
-    return () => {
-      uploadedFilesRef.current.forEach((file) => {
-        if (file.previewUrl) {
-          URL.revokeObjectURL(file.previewUrl);
-        }
-      });
-    };
-  }, []);
+useEffect(() => {
+return () => {
+Object.values(uploadProgressTimersRef.current).forEach((timer) => window.clearInterval(timer));
+uploadedFilesRef.current.forEach((file) => {
+if (file.previewUrl) {
+URL.revokeObjectURL(file.previewUrl);
+}
+});
+};
+}, []);
 
   // 点击外部关闭设置菜单
   useEffect(() => {
@@ -469,7 +473,21 @@ const InputArea = ({ onSend, disabled, leadingControls }: InputAreaProps) => {
           name: file.name,
           mimeType: file.type || 'application/octet-stream',
           previewUrl: isImage ? URL.createObjectURL(file) : undefined,
+          uploadProgress: 0,
         });
+
+        const timer = window.setInterval(() => {
+          setUploadedFiles((currentFiles) => currentFiles.map((currentFile) => {
+            if (currentFile.id !== signature || currentFile.uploadProgress >= 100) return currentFile;
+            const uploadProgress = Math.min(100, currentFile.uploadProgress + Math.max(8, Math.ceil((100 - currentFile.uploadProgress) / 4)));
+            if (uploadProgress === 100) {
+              window.clearInterval(uploadProgressTimersRef.current[signature]);
+              delete uploadProgressTimersRef.current[signature];
+            }
+            return { ...currentFile, uploadProgress };
+          }));
+        }, 180);
+        uploadProgressTimersRef.current[signature] = timer;
       });
 
       return merged;
@@ -484,6 +502,10 @@ const InputArea = ({ onSend, disabled, leadingControls }: InputAreaProps) => {
       if (target?.previewUrl) {
         URL.revokeObjectURL(target.previewUrl);
       }
+      if (uploadProgressTimersRef.current[fileId]) {
+        window.clearInterval(uploadProgressTimersRef.current[fileId]);
+        delete uploadProgressTimersRef.current[fileId];
+      }
       return prev.filter((file) => file.id !== fileId);
     });
   }, []);
@@ -497,7 +519,7 @@ const InputArea = ({ onSend, disabled, leadingControls }: InputAreaProps) => {
   }, []);
 
   const handleSend = useCallback(() => {
-    if (!val.trim() || disabled) return;
+    if (!val.trim() || disabled || uploadedFiles.some((file) => file.uploadProgress < 100)) return;
 
     onSend({
       content: val,
@@ -593,6 +615,8 @@ const InputArea = ({ onSend, disabled, leadingControls }: InputAreaProps) => {
                       {file.name}
                     </span>
                   </span>
+                  {file.uploadProgress < 100 && <span className="text-xs tabular-nums text-tertiaryText">{file.uploadProgress}%</span>}
+                  {file.uploadProgress < 100 && <span className="absolute inset-x-3 bottom-0 h-0.5 overflow-hidden rounded-full bg-[#edf0f3]"><span className="block h-full rounded-full bg-[var(--color-primary)] transition-[width] duration-150" style={{ width: `${file.uploadProgress}%` }} /></span>}
                   <button
                     type="button"
                     onClick={() => handleRemoveUploadedFile(file.id)}

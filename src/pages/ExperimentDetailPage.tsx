@@ -53,8 +53,10 @@ export default function ExperimentDetailPage() {
   const [editingTagValue, setEditingTagValue] = useState('');
   const [docContent, setDocContent] = useState('');
   const [saveHint, setSaveHint] = useState<'' | 'saving' | 'saved'>('');
+  const [uploadedAttachments, setUploadedAttachments] = useState<Array<{ id: string; name: string; progress: number }>>([]);
   const contentScrollTimerRef = useRef<number | null>(null);
   const importInputRef = useRef<HTMLInputElement | null>(null);
+  const attachmentUploadTimersRef = useRef<Record<string, number>>({});
   const tagInputRef = useRef<HTMLInputElement | null>(null);
   const autoSaveTimerRef = useRef<number | null>(null);
   const savedContentRef = useRef({ title: '', tags: [] as string[], content: '' });
@@ -288,27 +290,38 @@ export default function ExperimentDetailPage() {
     });
   };
 
-  const handleImportClick = () => {
+  const handleUploadAttachmentClick = () => {
     setShowDocActionMenu(false);
-    setMode('edit');
     importInputRef.current?.click();
   };
 
-  const handleImportFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const handleUploadAttachmentChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? []);
+    if (files.length === 0) return;
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const text = typeof reader.result === 'string' ? reader.result : '';
-      setDocContent(text);
-      scheduleAutoSave({ title: docTitle, tags: docTags, content: text });
-    };
-    reader.readAsText(file);
+    files.forEach((file) => {
+      const id = `${file.name}-${file.size}-${file.lastModified}`;
+      setUploadedAttachments((attachments) => attachments.some((attachment) => attachment.id === id)
+        ? attachments
+        : [...attachments, { id, name: file.name, progress: 0 }]);
 
-    // 允许重复导入同一个文件
+      const timer = window.setInterval(() => {
+        setUploadedAttachments((attachments) => attachments.map((attachment) => {
+          if (attachment.id !== id || attachment.progress >= 100) return attachment;
+          const progress = Math.min(100, attachment.progress + Math.max(8, Math.ceil((100 - attachment.progress) / 4)));
+          if (progress === 100) {
+            window.clearInterval(attachmentUploadTimersRef.current[id]);
+            delete attachmentUploadTimersRef.current[id];
+            if (activeTimeline && !activeTimeline.attachments.includes(file.name)) activeTimeline.attachments.push(file.name);
+          }
+          return { ...attachment, progress };
+        }));
+      }, 180);
+      attachmentUploadTimersRef.current[id] = timer;
+    });
+
     event.target.value = '';
-  };
+  }; 
 
   const handleShareClick = () => {
     setShowDocActionMenu(false);
@@ -317,7 +330,7 @@ export default function ExperimentDetailPage() {
 
   const docActionMenuItems = useMemo<BaseActionMenuItem[]>(
     () => [
-      { key: 'importContent', label: '导入内容' },
+      { key: 'uploadAttachment', label: '上传附件' },
       { key: 'moveDocument', label: '移动文档' },
       { key: 'saveAsTemplate', label: '保存为模版' },
       { key: 'share', label: '分享文档' },
@@ -326,8 +339,8 @@ export default function ExperimentDetailPage() {
   );
 
   const handleDocActionMenuItemClick: BaseActionMenuProps['onItemClick'] = (item) => {
-    if (item.key === 'importContent') {
-      handleImportClick();
+    if (item.key === 'uploadAttachment') {
+      handleUploadAttachmentClick();
     } else if (item.key === 'moveDocument') {
       setShowDocActionMenu(false);
       setMoveTargetProjectId('');
@@ -481,9 +494,9 @@ export default function ExperimentDetailPage() {
             <input
               ref={importInputRef}
               type="file"
-              accept=".md,.txt,.markdown"
+              multiple
               className="hidden"
-              onChange={handleImportFileChange}
+              onChange={handleUploadAttachmentChange}
             />
             <div className="inline-flex items-center gap-1 rounded-lg bg-bgLight p-0.5">
               <button
@@ -845,19 +858,26 @@ export default function ExperimentDetailPage() {
                     <span>更新时间 {activeTimeline?.updatedAt}</span>
                   </div>
                 </div>
+              </section>
 
-                <div className="mt-8 border-t border-[var(--color-line-subtle)] pt-6 pb-6">
-                  <div className="text-sm font-medium text-primaryText">附件</div>
-                  <div className="mt-3 flex flex-wrap gap-2.5">
-                    {(activeTimeline?.attachments ?? []).map((attachment) => (
-                      <span
-                        key={attachment}
-                        className="inline-flex items-center rounded-full border border-[var(--color-line-subtle)] bg-white px-3 py-1.5 text-sm text-secondaryText"
-                      >
-                        {attachment}
-                      </span>
-                    ))}
-                  </div>
+              <section className="shrink-0 border-t border-[var(--color-line-subtle)] pt-5 pb-2">
+                <div className="text-sm font-medium text-primaryText">附件</div>
+                <div className="mt-3 flex flex-wrap gap-2.5">
+                  {(activeTimeline?.attachments ?? []).map((attachment) => (
+                    <span
+                      key={attachment}
+                      className="inline-flex items-center rounded-full border border-[var(--color-line-subtle)] bg-white px-3 py-1.5 text-sm text-secondaryText"
+                    >
+                      {attachment}
+                    </span>
+                  ))}
+                  {uploadedAttachments.filter((attachment) => attachment.progress < 100).map((attachment) => (
+                    <span key={attachment.id} className="relative inline-flex items-center gap-2 overflow-hidden rounded-full border border-[var(--color-line-subtle)] bg-white px-3 py-1.5 text-sm text-secondaryText">
+                      <span className="max-w-[200px] truncate">{attachment.name}</span>
+                      <span className="tabular-nums text-xs text-tertiaryText">{attachment.progress}%</span>
+                      <span className="absolute inset-x-3 bottom-0 h-0.5 overflow-hidden rounded-full bg-[#edf0f3]"><span className="block h-full rounded-full bg-[var(--color-primary)] transition-[width] duration-150" style={{ width: `${attachment.progress}%` }} /></span>
+                    </span>
+                  ))}
                 </div>
               </section>
             </>

@@ -1626,7 +1626,7 @@ setPreviewTabs((prevTabs) => {
                 {showCreateProjectPopover && (
                   <div
                     ref={createProjectPopoverRef}
-                    className="absolute left-[272px] bottom-[calc(100%+8px)] z-[1301] w-[300px] rounded-xl border border-[#e6ecf2] bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.12)]"
+                    className="absolute bottom-0 left-[272px] z-[1301] w-[300px] rounded-xl border border-[#e6ecf2] bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.12)]"
                   >
                     <div className="space-y-3">
                       <div>
