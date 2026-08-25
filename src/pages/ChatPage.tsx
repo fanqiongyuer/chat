@@ -1,4 +1,7 @@
 import React, { useState, useRef, useEffect, useLayoutEffect, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { useNavigate, useParams, useOutletContext, useLocation } from 'react-router-dom';
 import { Menu, Folder, ChevronDown, ChevronRight, Plus, FileText, FlaskConical, Search, X, Copy, Check } from 'lucide-react';
 import MessageItem from '../components/chat/MessageItem';
@@ -13,16 +16,64 @@ import { BaseActionMenu, BaseButton, BaseInput, BaseModal } from '../components'
 import type { BaseActionMenuItem, BaseActionMenuProps } from '../components';
 import { type LayoutOutletContext } from '../components/Layout';
 
+interface GeneratedDocument {
+  title: string;
+  projectName: string;
+  saved?: boolean;
+  content?: string;
+}
+
 interface Message {
   role: 'user' | 'assistant';
   content: string;
   attachments?: InputAttachment[];
   references?: InputSendPayload['references'];
+  generatedDocument?: GeneratedDocument;
 }
 
 type AssistantFeedback = 'like' | 'dislike';
 
 const CHAT_MESSAGES_STORAGE_KEY = 'deeptrace-chat-messages';
+const GENERATED_DOCUMENT_DEMO_CHAT_ID = 'c-generated-document';
+
+const GENERATED_DOCUMENT_MOCK_MESSAGES: Message[] = [
+  {
+    role: 'user',
+    content: '基于刚才的讨论，生成一份 AI 方向的深度研究路线图，形成一个文档。',
+  },
+  {
+    role: 'assistant',
+    content: '我已将研究重点、阶段目标和交付物整理为文档，你可以保存到当前项目中继续完善。',
+    generatedDocument: {
+      title: '近期生物 AI 研究进展概述',
+      projectName: 'CRISPR实验优化',
+      saved: false,
+      content: `# 近期生物 AI 研究进展概述
+
+## 研究背景
+
+生物 AI 正从单点预测走向覆盖数据、模型与实验闭环的系统化研究范式。当前研究需要同时兼顾高质量数据构建、模型泛化能力评估，以及湿实验反馈驱动的持续迭代。
+
+## 近期研究重点
+
+- 建立覆盖序列、结构与表型信息的高质量多模态生物数据集
+- 评估模型在候选序列筛选、功能预测等任务中的泛化能力
+- 结合湿实验反馈，持续优化研究路径和候选优先级
+
+## 阶段性计划
+
+1. 完成相关文献、现有数据与可用工具的系统盘点
+2. 形成候选研究方向的价值评估与排序框架
+3. 输出可执行的实验验证方案、关键里程碑与协作分工
+
+## 预期产出
+
+- 生物 AI 研究方向评估报告
+- 候选任务与数据集清单
+- 实验验证与迭代优化路线图`,
+    },
+  },
+];
 
 function loadChatMessagesFromStorage(): Record<string, Message[]> {
   if (typeof window === 'undefined') return {};
@@ -46,6 +97,7 @@ function loadChatMessagesFromStorage(): Record<string, Message[]> {
           const content = (item as { content?: string }).content;
           const attachments = (item as { attachments?: InputAttachment[] }).attachments;
           const references = (item as { references?: InputSendPayload['references'] }).references;
+          const generatedDocument = (item as { generatedDocument?: GeneratedDocument }).generatedDocument;
 
           if ((role === 'user' || role === 'assistant') && typeof content === 'string') {
             return {
@@ -53,6 +105,7 @@ function loadChatMessagesFromStorage(): Record<string, Message[]> {
               content,
               attachments: Array.isArray(attachments) ? attachments : [],
               references: Array.isArray(references) ? references : [],
+              generatedDocument,
             } as Message;
           }
 
@@ -130,7 +183,7 @@ interface ProjectPanelContent {
   experiments: ProjectExperimentListItem[];
 }
 
-type PreviewItemType = 'knowledge' | 'experiment-log';
+type PreviewItemType = 'knowledge' | 'experiment-log' | 'generated-document';
 
 interface PreviewItem {
   key: string;
@@ -299,8 +352,20 @@ const [showCreateProjectPopover, setShowCreateProjectPopover] = useState(false);
 const [newProjectName, setNewProjectName] = useState('');
 
   const [showProjectDropdown, setShowProjectDropdown] = useState(false);
-  const [previewTabs, setPreviewTabs] = useState<PreviewItem[]>([]);
-  const [activePreviewKey, setActivePreviewKey] = useState<string | null>(null);
+const [previewTabs, setPreviewTabs] = useState<PreviewItem[]>([]);
+const [activePreviewKey, setActivePreviewKey] = useState<string | null>(null);
+const [previewDrafts, setPreviewDrafts] = useState<Record<string, string>>({});
+const [isPreviewDraftSaved, setIsPreviewDraftSaved] = useState(false);
+const [savedDraftProjectName, setSavedDraftProjectName] = useState('');
+const [isSaveDraftModalOpen, setIsSaveDraftModalOpen] = useState(false);
+const [saveDraftProjectId, setSaveDraftProjectId] = useState('p-crispr');
+const [isSaveDraftProjectDropdownOpen, setIsSaveDraftProjectDropdownOpen] = useState(false);
+const [saveDraftTags, setSaveDraftTags] = useState<string[]>([]);
+const [saveDraftTagSearchKeyword, setSaveDraftTagSearchKeyword] = useState('');
+const [isSaveDraftTagDropdownOpen, setIsSaveDraftTagDropdownOpen] = useState(false);
+const [saveDraftTagMenuPosition, setSaveDraftTagMenuPosition] = useState<React.CSSProperties>({});
+const saveDraftTagPickerRef = useRef<HTMLDivElement | null>(null);
+const saveDraftTagMenuRef = useRef<HTMLDivElement | null>(null);
   const [fileSearchQuery, setFileSearchQuery] = useState('');
   const [assistantFeedbackMap, setAssistantFeedbackMap] = useState<Record<string, AssistantFeedback>>({});
   const [activeTimelineMessageIndex, setActiveTimelineMessageIndex] = useState(0);
@@ -504,13 +569,13 @@ const chatScrollContainerRef = useRef<HTMLDivElement | null>(null);
       return;
     }
 
-    setMessages(chatMessages[chatId] ?? []);
+    setMessages(chatId === GENERATED_DOCUMENT_DEMO_CHAT_ID ? GENERATED_DOCUMENT_MOCK_MESSAGES : (chatMessages[chatId] ?? []));
     shouldStickToBottomRef.current = true;
   }, [chatId, chatMessages]);
 
   // 从后端加载特定对话的消息
   useEffect(() => {
-    if (!chatId || chatMessages[chatId]) {
+    if (!chatId || chatId === GENERATED_DOCUMENT_DEMO_CHAT_ID || chatMessages[chatId]) {
       return;
     }
 
@@ -906,8 +971,72 @@ const chatScrollContainerRef = useRef<HTMLDivElement | null>(null);
   }, [panelContent, normalizedFileSearchQuery]);
 
 
+  const saveDraftTagOptions = useMemo(() => {
+    const tags = new Set<string>();
+    Object.values(KNOWLEDGE_BY_PROJECT).flat().forEach((document) => document.tags.forEach((tag) => tags.add(tag)));
+    Object.values(EXPERIMENTS_BY_PROJECT).flat().forEach((experiment) => experiment.tags.forEach((tag) => tags.add(tag)));
+    return [...tags].sort((left, right) => left.localeCompare(right, 'zh-CN'));
+  }, []);
+
+  const filteredSaveDraftTagOptions = useMemo(() => {
+    const keyword = saveDraftTagSearchKeyword.trim().toLocaleLowerCase();
+    return keyword ? saveDraftTagOptions.filter((tag) => tag.toLocaleLowerCase().includes(keyword)) : saveDraftTagOptions;
+  }, [saveDraftTagOptions, saveDraftTagSearchKeyword]);
+
+  const toggleSaveDraftTag = (tag: string) => {
+    setSaveDraftTags((tags) => tags.includes(tag) ? tags.filter((item) => item !== tag) : [...tags, tag]);
+  };
+
+  const createSaveDraftTagFromSearch = () => {
+    const tag = saveDraftTagSearchKeyword.trim();
+    if (tag && !saveDraftTags.includes(tag)) setSaveDraftTags((tags) => [...tags, tag]);
+    setSaveDraftTagSearchKeyword('');
+    setIsSaveDraftTagDropdownOpen(true);
+  };
+
+  const openSaveDraftModal = () => {
+    setSaveDraftProjectId(currentChat?.projectId ?? selectedProject?.id ?? 'p-crispr');
+    setSaveDraftTags(['生物 AI', '研究进展']);
+    setSaveDraftTagSearchKeyword('');
+    setIsSaveDraftTagDropdownOpen(false);
+    setIsSaveDraftProjectDropdownOpen(false);
+    setIsSaveDraftModalOpen(true);
+  };
+
+  const confirmSaveDraft = () => {
+    setSavedDraftProjectName(projects.find((project) => project.id === saveDraftProjectId)?.name ?? '当前项目');
+    setIsPreviewDraftSaved(true);
+    setIsSaveDraftModalOpen(false);
+  };
+
+  const openSaveDraftTagDropdown = () => {
+    const rect = saveDraftTagPickerRef.current?.getBoundingClientRect();
+    if (rect) setSaveDraftTagMenuPosition({ position: 'fixed', top: rect.bottom + 8, left: rect.left, width: rect.width, zIndex: 1300 });
+    setIsSaveDraftProjectDropdownOpen(false);
+    setIsSaveDraftTagDropdownOpen(true);
+  };
+
+  const saveDraftProjectMenuItems = useMemo<BaseActionMenuItem[]>(() => projects.map((project) => ({
+    key: project.id,
+    label: project.name,
+    active: project.id === saveDraftProjectId,
+  })), [projects, saveDraftProjectId]);
+
+  useEffect(() => {
+    if (!isSaveDraftTagDropdownOpen) return;
+    const handlePointerDownOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (!saveDraftTagPickerRef.current?.contains(target) && !saveDraftTagMenuRef.current?.contains(target)) setIsSaveDraftTagDropdownOpen(false);
+    };
+    document.addEventListener('mousedown', handlePointerDownOutside);
+    return () => document.removeEventListener('mousedown', handlePointerDownOutside);
+  }, [isSaveDraftTagDropdownOpen]);
+
   const openPreviewItem = (item: PreviewItem) => {
-    setPreviewTabs((prevTabs) => {
+setPreviewDrafts((prevDrafts) => prevDrafts[item.key] === undefined ? { ...prevDrafts, [item.key]: item.content } : prevDrafts);
+setIsPreviewDraftSaved(false);
+setSavedDraftProjectName('');
+setPreviewTabs((prevTabs) => {
       const existingIndex = prevTabs.findIndex((tab) => tab.key === item.key);
       if (existingIndex === -1) {
         return [...prevTabs, item];
@@ -1614,9 +1743,16 @@ const chatScrollContainerRef = useRef<HTMLDivElement | null>(null);
                             : ''
                         }
                       >
-                        <MessageItem
-                          msg={msg}
-                          actionKey={actionKey}
+<MessageItem
+msg={msg}
+onPreviewGeneratedDocument={({ title, content }) => openPreviewItem({
+  key: `generated-document:${title}`,
+  type: 'generated-document',
+  title,
+  subtitle: 'AI 生成草稿',
+  content,
+})}
+actionKey={actionKey}
                           feedback={assistantFeedbackMap[actionKey]}
                           onFeedback={setAssistantFeedback}
                           onRefresh={() => regenerateAssistantMessage(idx)}
@@ -1824,11 +1960,11 @@ className={`w-full inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 pr-6 
                                 isActiveTab ? 'bg-[#fafafa] text-primaryText' : 'text-secondaryText hover:bg-[#fafafa]'
                               }`}
                         >
-                          {tab.type === 'knowledge' ? (
-                            <FileText size={14} className="text-tertiaryText shrink-0" />
-                          ) : (
-                            <FlaskConical size={14} className="text-tertiaryText shrink-0" />
-                          )}
+{tab.type === 'knowledge' || tab.type === 'generated-document' ? (
+<FileText size={14} className="text-tertiaryText shrink-0" />
+) : (
+<FlaskConical size={14} className="text-tertiaryText shrink-0" />
+)}
                           <span className="min-w-0 truncate text-left">{tab.title}</span>
                         </button>
                         <button
@@ -1859,24 +1995,53 @@ className={`w-full inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 pr-6 
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto px-4 pb-4 pt-2">
+              <div className={`flex-1 overflow-y-auto ${activePreviewItem?.type === 'generated-document' ? '' : 'px-4 pb-4 pt-2'}`}>
                 {activePreviewItem ? (
-                  <div className="space-y-4">
-                    <div className="space-y-1.5">
-                      <h3 className="text-base font-semibold text-primaryText break-words">{activePreviewItem.title}</h3>
-                      {activePreviewItem.type === 'knowledge' && (
-                        <div className="text-xs text-tertiaryText">{activePreviewItem.subtitle}</div>
-                      )}
+                  <div className={activePreviewItem.type === 'generated-document' ? 'min-h-full' : 'space-y-4'}>
+                    {activePreviewItem.type !== 'generated-document' && (
+                      <div className="space-y-1.5">
+                        <h3 className="text-base font-semibold text-primaryText break-words">{activePreviewItem.title}</h3>
+                        {activePreviewItem.type === 'knowledge' && (
+                          <div className="text-xs text-tertiaryText">{activePreviewItem.subtitle}</div>
+                        )}
+                      </div>
+                    )}
                   {activePreviewItem?.status && (
                     <div className="inline-flex items-center rounded-full bg-bgLight px-2 py-1 text-xs text-secondaryText">
                       <span>{activePreviewItem.status}</span>
                     </div>
                   )}
 
-                    </div>
-                    <div className="rounded-xl border border-borderGray bg-bgLight/40 p-3">
-                      <p className="text-sm text-secondaryText leading-6 whitespace-pre-line break-words">{activePreviewItem.content}</p>
-                    </div>
+                    {activePreviewItem.type === 'generated-document' ? (
+                      <div className="flex min-h-full flex-col bg-white">
+                        <div className="flex items-center justify-between border-b border-[var(--color-line-subtle)] px-4 py-3">
+                          <span className="text-sm font-medium text-secondaryText">AI 生成草稿</span>
+                          {isPreviewDraftSaved ? (
+                            <span className="inline-flex items-center gap-1 text-sm text-tertiaryText">
+                              <Check size={15} strokeWidth={2} />
+                              已保存至{savedDraftProjectName || '当前项目'}
+                            </span>
+                          ) : (
+                            <BaseButton
+                              type="primary"
+                              size="small"
+                              onClick={openSaveDraftModal}
+                            >
+                              保存
+                            </BaseButton>
+                          )}
+                        </div>
+                        <div className="flex-1 px-5 py-4">
+                          <div className="prose prose-slate max-w-none text-primaryText prose-p:my-3 prose-p:text-sm prose-p:leading-7 prose-li:text-sm prose-li:leading-7 prose-headings:text-primaryText prose-h1:mt-0 prose-h1:mb-5 prose-h1:text-xl prose-h1:font-semibold prose-h2:mt-7 prose-h2:mb-3 prose-h2:text-base prose-h2:font-semibold prose-ul:pl-5 prose-ol:pl-5">
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{previewDrafts[activePreviewItem.key] ?? activePreviewItem.content}</ReactMarkdown>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="rounded-xl border border-borderGray bg-bgLight/40 p-3">
+                        <p className="text-sm text-secondaryText leading-6 whitespace-pre-line break-words">{activePreviewItem.content}</p>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="h-full flex items-center justify-center text-center text-sm text-secondaryText px-4">
@@ -1887,6 +2052,80 @@ className={`w-full inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 pr-6 
             </div>
           </aside>
         )}
+
+        <BaseModal
+          visible={isSaveDraftModalOpen}
+          title="保存文档"
+          width={440}
+          onCancel={() => setIsSaveDraftModalOpen(false)}
+          cancelText="取消"
+          okText="保存"
+          onConfirm={confirmSaveDraft}
+          bodyClassName="!px-6 !py-5"
+        >
+          <div className="space-y-5">
+            <div>
+              <label className="mb-2 block text-sm font-medium text-primaryText">保存到项目</label>
+              <BaseActionMenu
+                open={isSaveDraftProjectDropdownOpen}
+                onOpenChange={(open) => { setIsSaveDraftProjectDropdownOpen(open); if (open) setIsSaveDraftTagDropdownOpen(false); }}
+                placement="bottom-start"
+                width="100%"
+                portal
+                trigger={<span className="flex h-10 w-full items-center justify-between rounded-lg border border-[var(--color-line-subtle)] bg-white px-3 text-sm text-primaryText transition-colors hover:border-[var(--color-gray-4)]"><span className="truncate">{projects.find((project) => project.id === saveDraftProjectId)?.name ?? '选择项目'}</span><ChevronDown size={16} className={`shrink-0 text-tertiaryText transition-transform ${isSaveDraftProjectDropdownOpen ? 'rotate-180' : ''}`} /></span>}
+                items={saveDraftProjectMenuItems}
+                onItemClick={(item) => { setSaveDraftProjectId(item.key); setIsSaveDraftProjectDropdownOpen(false); }}
+                className="block w-full"
+                triggerClassName="!flex !w-full"
+                listClassName="max-h-[220px] overflow-y-auto"
+              />
+            </div>
+            <div ref={saveDraftTagPickerRef} className="relative">
+              <label htmlFor="save-draft-tags" className="mb-2 block text-sm font-medium text-primaryText">设置项目标签</label>
+              <div className="flex min-h-10 items-center gap-2 rounded-lg border border-[var(--color-line-subtle)] bg-white px-3 py-2 transition-colors focus-within:border-[var(--color-primary)] focus-within:ring-2 focus-within:ring-[color-mix(in_srgb,var(--color-primary)_16%,transparent)]">
+                {!saveDraftTagSearchKeyword && saveDraftTags.length === 0 && <Search size={16} className="shrink-0 text-tertiaryText" />}
+                {saveDraftTags.length > 0 && <span className="flex shrink-0 flex-wrap gap-1">
+                  {saveDraftTags.map((tag) => <span key={tag} className="inline-flex items-center gap-1 rounded-md bg-bgLight py-0.5 pl-2 pr-1 text-sm text-secondaryText">
+                    {tag}
+                    <button type="button" onClick={() => toggleSaveDraftTag(tag)} className="rounded p-0.5 text-tertiaryText transition-colors hover:bg-white hover:text-primaryText" aria-label={`移除标签 ${tag}`}><X size={12} /></button>
+                  </span>)}
+                </span>}
+                <input
+                  id="save-draft-tags"
+                  value={saveDraftTagSearchKeyword}
+                  onFocus={openSaveDraftTagDropdown}
+                  onChange={(event) => { setSaveDraftTagSearchKeyword(event.target.value); openSaveDraftTagDropdown(); }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' && saveDraftTagSearchKeyword.trim() && !saveDraftTagOptions.includes(saveDraftTagSearchKeyword.trim())) {
+                      event.preventDefault();
+                      createSaveDraftTagFromSearch();
+                    }
+                  }}
+                  placeholder={saveDraftTags.length > 0 ? '继续搜索或新建标签' : '搜索或新建标签'}
+                  className="min-w-0 flex-1 bg-transparent text-sm text-primaryText outline-none placeholder:text-tertiaryText"
+                />
+                <button type="button" onClick={() => isSaveDraftTagDropdownOpen ? setIsSaveDraftTagDropdownOpen(false) : openSaveDraftTagDropdown()} className="shrink-0 text-tertiaryText" aria-label="切换标签列表"><ChevronDown size={16} className={`transition-transform ${isSaveDraftTagDropdownOpen ? 'rotate-180' : ''}`} /></button>
+              </div>
+              {isSaveDraftTagDropdownOpen && createPortal(<div ref={saveDraftTagMenuRef} style={saveDraftTagMenuPosition} className="overflow-hidden rounded-xl border border-[var(--color-line-subtle)] bg-white p-2 shadow-lg">
+                <div className="max-h-44 overflow-y-auto">
+                  {filteredSaveDraftTagOptions.length > 0 ? filteredSaveDraftTagOptions.map((tag) => {
+                    const isSelected = saveDraftTags.includes(tag);
+                    return <button key={tag} type="button" onClick={() => toggleSaveDraftTag(tag)} className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-primaryText hover:bg-bgLight">
+                      <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${isSelected ? 'border-[var(--color-primary)] bg-[var(--color-primary)] text-white' : 'border-[var(--color-gray-4)] bg-white'}`}>{isSelected && <Check size={12} strokeWidth={3} />}</span>
+                      {tag}
+                    </button>;
+                  }) : <div className="px-3 py-4 text-center text-sm text-tertiaryText">未找到匹配标签</div>}
+                </div>
+                {saveDraftTagSearchKeyword.trim() && !saveDraftTagOptions.includes(saveDraftTagSearchKeyword.trim()) && <div className="mt-2 border-t border-[var(--color-line-subtle)] pt-2">
+                  <button type="button" onClick={createSaveDraftTagFromSearch} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-primaryText hover:bg-bgLight">
+                    <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[var(--color-primary)] text-white"><Plus size={12} strokeWidth={2.5} /></span>
+                    新建标签「<span className="text-[var(--color-primary)]">{saveDraftTagSearchKeyword.trim()}</span>」
+                  </button>
+                </div>}
+              </div>, document.body)}
+            </div>
+          </div>
+        </BaseModal>
 
         {/* 右侧边栏 */}
         {!isNewChat && (

@@ -27,22 +27,14 @@ export interface ProjectTemplate {
 export const DEFAULT_TEMPLATES: ProjectTemplate[] = [
   {
     id: 'tpl-blank',
-    name: '空白项目',
-    content: '从零开始创建项目',
+    name: '空白文档',
+    content: '从零开始创建空白文档',
     builtin: true,
     scope: 'team',
     creator: '张明',
     modifier: '张明',
     updatedAt: '2024-01-15',
-    body: `## 项目简介
-
-请输入项目背景与目标。
-
-## 待办事项
-
-- [ ] 明确项目目标
-- [ ] 梳理关键里程碑
-`,
+    body: '',
   },
   {
     id: 'tpl-research',
@@ -416,7 +408,7 @@ export default function ProjectsPage() {
             icon={<LayoutTemplate size={14} />}
             onClick={openTemplateModal}
           >
-            项目模版
+            文档模版
           </BaseButton>
           <BaseButton
             type="primary"

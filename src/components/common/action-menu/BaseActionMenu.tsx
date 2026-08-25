@@ -33,15 +33,19 @@ export const BaseActionMenu: React.FC<BaseActionMenuProps> = ({
     const isEnd = placement === 'bottom-end' || placement === 'top-end';
     const isAbove = placement === 'top-start' || placement === 'top-end';
 
+    const percentWidth = typeof width === 'string' && width.endsWith('%')
+      ? Number.parseFloat(width) / 100
+      : null;
     const next: React.CSSProperties = {
       position: 'fixed',
       left: isEnd ? rect.right : rect.left,
       top: isAbove ? rect.top : rect.bottom,
       transform: isEnd ? 'translateX(-100%)' : 'none',
+      ...(percentWidth !== null && Number.isFinite(percentWidth) ? { width: rect.width * percentWidth } : {}),
     };
 
     setPortalStyle(next);
-  }, [open, portal, placement]);
+  }, [open, portal, placement, width]);
 
   // Adjust portal position after mount (to account for panel height when above)
   useEffect(() => {
@@ -93,8 +97,10 @@ export const BaseActionMenu: React.FC<BaseActionMenuProps> = ({
   );
 
   const menuStyle = useMemo(
-    () => (width ? { width: typeof width === 'number' ? `${width}px` : width, minWidth: 'auto' } : undefined),
-    [width]
+    () => (width && !(portal && typeof width === 'string' && width.endsWith('%'))
+      ? { width: typeof width === 'number' ? `${width}px` : width, minWidth: 'auto' }
+      : undefined),
+    [portal, width]
   );
 
   const renderMenuItem = useCallback(

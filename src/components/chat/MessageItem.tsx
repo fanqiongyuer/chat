@@ -3,7 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import type { Components, Options } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
-import { Copy, Check, ArrowRight, Paperclip, Puzzle, AtSign } from 'lucide-react';
+import { Copy, Check, ArrowRight, ChevronRight, Paperclip, Puzzle, AtSign, FileText } from 'lucide-react';
 import 'highlight.js/styles/atom-one-light.css';
 import 'katex/dist/katex.min.css';
 import AssistantActions from './AssistantActions';
@@ -26,11 +26,19 @@ interface MessageReference {
   label: string;
 }
 
+interface GeneratedDocument {
+  title: string;
+  projectName: string;
+  saved?: boolean;
+  content?: string;
+}
+
 interface Message {
   role: 'user' | 'assistant';
   content: string;
   attachments?: MessageAttachment[];
   references?: MessageReference[];
+  generatedDocument?: GeneratedDocument;
 }
 
 interface PaperRecommendationItem {
@@ -53,6 +61,7 @@ interface MessageItemProps {
   onRefresh?: () => void;
   isTyping?: boolean;
   isStreaming?: boolean;
+  onPreviewGeneratedDocument?: (document: { title: string; content: string }) => void;
 }
 
 let mermaidInitialized = false;
@@ -347,6 +356,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
   onRefresh,
   isTyping = false,
   isStreaming,
+  onPreviewGeneratedDocument,
 }) => {
   const isUser = msg.role === 'user';
   const streaming = isStreaming ?? isTyping;
@@ -675,6 +685,28 @@ const MessageItem: React.FC<MessageItemProps> = ({
                   {msg.content}
                 </ReactMarkdown>
               </div>
+            )}
+
+            {msg.generatedDocument && !streaming && (
+              <button
+                type="button"
+                onClick={() => onPreviewGeneratedDocument?.({
+                  title: msg.generatedDocument!.title,
+                  content: msg.generatedDocument!.content ?? '',
+                })}
+                className="group flex w-full max-w-[340px] items-center gap-2.5 rounded-xl border border-[var(--color-line-subtle)] bg-white px-3.5 py-3.5 text-left shadow-sm transition-colors hover:border-[var(--color-gray-3)]"
+              >
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-[var(--color-primary)] text-white">
+                  <FileText size={16} stroke="currentColor" strokeWidth={1.8} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="m-0 truncate text-sm font-medium text-primaryText">{msg.generatedDocument.title}</p>
+                  <p className="m-0 text-xs text-tertiaryText">已生成文档</p>
+                </div>
+                <span className="inline-flex shrink-0 items-center justify-center p-1 text-tertiaryText transition-colors group-hover:text-primaryText" aria-hidden="true">
+                  <ChevronRight size={16} strokeWidth={2} />
+                </span>
+              </button>
             )}
 
             {!isPaperRecommendationMessage && msg.content && !streaming && actionKey && onFeedback && onRefresh && (

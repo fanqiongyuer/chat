@@ -12,6 +12,14 @@ export interface MockChat {
 
 export const mockChats: MockChat[] = [
   {
+    id: 'c-generated-document',
+    title: 'AI 生成文档示例',
+    date: '刚刚',
+    count: 2,
+    projectId: 'p-crispr',
+    isPinned: true,
+  },
+  {
     id: 'c1',
     title: '文献汇总整理',
     date: '今天 10:25',

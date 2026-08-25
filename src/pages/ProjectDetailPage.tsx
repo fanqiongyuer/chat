@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
-import { ArrowLeft, ChevronDown, Folder, Menu, MoreHorizontal, Plus, Search, Upload, Users } from 'lucide-react';
+import { ArrowLeft, Check, ChevronDown, Folder, Menu, MoreHorizontal, Plus, Search, Upload, Users, X } from 'lucide-react';
 import { Select } from 'antd';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { BaseActionMenu, BaseButton, BaseDocumentUpload, BaseEmpty, BaseModal } from '../components';
-import type { BaseActionMenuItem, BaseActionMenuProps } from '../components';
+import type { BaseActionMenuProps } from '../components';
 import {
   EXPERIMENT_DETAILS_BY_PROJECT,
   EXPERIMENTS_BY_PROJECT,
@@ -216,8 +216,11 @@ export default function ProjectDetailPage() {
   const [isTagExpanded, setIsTagExpanded] = useState(false);
   const [showTagToggle, setShowTagToggle] = useState(false);
   const [showCreateDocModal, setShowCreateDocModal] = useState(false);
-  const [showNewDocMenu, setShowNewDocMenu] = useState(false);
   const [showTemplatePickerModal, setShowTemplatePickerModal] = useState(false);
+  const [selectedTemplateId, setSelectedTemplateId] = useState('tpl-blank');
+  const [templateDocumentTags, setTemplateDocumentTags] = useState<string[]>([]);
+  const [isTemplateTagDropdownOpen, setIsTemplateTagDropdownOpen] = useState(false);
+  const [templateTagSearchKeyword, setTemplateTagSearchKeyword] = useState('');
   const [previewTemplate, setPreviewTemplate] = useState<ProjectTemplate | null>(null);
   const [showMemberModal, setShowMemberModal] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -231,7 +234,7 @@ export default function ProjectDetailPage() {
   const [isEditingProjectName, setIsEditingProjectName] = useState(false);
   const [isEditingProjectDesc, setIsEditingProjectDesc] = useState(false);
   const tagFilterRef = useRef<HTMLDivElement | null>(null);
-  const newDocMenuTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const templateTagPickerRef = useRef<HTMLDivElement | null>(null);
 
   const project = useMemo(() => mockProjects.find((item) => item.id === id), [id]);
 
@@ -292,10 +295,17 @@ export default function ProjectDetailPage() {
   }, [experimentList]);
 
   useEffect(() => {
-    return () => {
-      if (newDocMenuTimerRef.current) clearTimeout(newDocMenuTimerRef.current);
+    if (!isTemplateTagDropdownOpen) return;
+
+    const handlePointerDownOutside = (event: MouseEvent) => {
+      if (!templateTagPickerRef.current?.contains(event.target as Node)) {
+        setIsTemplateTagDropdownOpen(false);
+      }
     };
-  }, []);
+
+    document.addEventListener('mousedown', handlePointerDownOutside);
+    return () => document.removeEventListener('mousedown', handlePointerDownOutside);
+  }, [isTemplateTagDropdownOpen]);
 
   const resetCreateDocForm = () => {
     setSelectedFiles([]);
@@ -321,34 +331,54 @@ export default function ProjectDetailPage() {
     setInvitePermission('浏览');
   };
 
-  const handleCreateBlankDoc = () => {
-    setShowNewDocMenu(false);
-    // TODO: 新建空白文档流程后续接入
-  };
-
   const handleOpenTemplatePicker = () => {
-    setShowNewDocMenu(false);
+    setTemplateDocumentTags([]);
+    setSelectedTemplateId('tpl-blank');
+    setIsTemplateTagDropdownOpen(false);
+    setTemplateTagSearchKeyword('');
+    setPreviewTemplate(null);
     setShowTemplatePickerModal(true);
-  };
-
-  const newDocMenuItems = useMemo<BaseActionMenuItem[]>(
-    () => [
-      { key: 'blank', label: '新建文档' },
-      { key: 'template', label: '从模版新建' },
-    ],
-    [],
-  );
-
-  const handleNewDocMenuItemClick: BaseActionMenuProps['onItemClick'] = (item) => {
-    if (item.key === 'blank') {
-      handleCreateBlankDoc();
-    } else if (item.key === 'template') {
-      handleOpenTemplatePicker();
-    }
   };
 
   const closeTemplatePickerModal = () => {
     setShowTemplatePickerModal(false);
+    setTemplateDocumentTags([]);
+    setIsTemplateTagDropdownOpen(false);
+    setTemplateTagSearchKeyword('');
+    setPreviewTemplate(null);
+  };
+
+  const templateTagOptions = useMemo(() => {
+    const tags = new Set<string>();
+    localDocs.forEach((document) => document.tags.forEach((tag) => tags.add(tag)));
+    return [...tags]
+      .sort((left, right) => left.localeCompare(right, 'zh-CN'))
+      .map((tag) => ({ label: tag, value: tag }));
+  }, [localDocs]);
+
+  const filteredTemplateTagOptions = useMemo(() => {
+    const keyword = templateTagSearchKeyword.trim().toLocaleLowerCase();
+    if (!keyword) return templateTagOptions;
+    return templateTagOptions.filter((tag) => tag.value.toLocaleLowerCase().includes(keyword));
+  }, [templateTagOptions, templateTagSearchKeyword]);
+
+  const toggleTemplateDocumentTag = (tag: string) => {
+    setTemplateDocumentTags((currentTags) =>
+      currentTags.includes(tag) ? currentTags.filter((currentTag) => currentTag !== tag) : [...currentTags, tag],
+    );
+  };
+
+  const removeTemplateDocumentTag = (tag: string) => {
+    setTemplateDocumentTags((currentTags) => currentTags.filter((currentTag) => currentTag !== tag));
+  };
+
+  const createTemplateTagFromSearch = () => {
+    const tag = templateTagSearchKeyword.trim();
+    if (tag && !templateDocumentTags.includes(tag)) {
+      setTemplateDocumentTags((currentTags) => [...currentTags, tag]);
+    }
+    setTemplateTagSearchKeyword('');
+    setIsTemplateTagDropdownOpen(true);
   };
 
   const handlePickTemplate = (template: ProjectTemplate) => {
@@ -365,7 +395,7 @@ export default function ProjectDetailPage() {
       summary: `基于「${documentTitle}」模版创建`,
       ownerId,
       status: '进行中',
-      tags: ['模版创建'],
+      tags: templateDocumentTags,
       subtitle: '基于项目模版创建的文档',
       updatedAt,
       timeline: [
@@ -410,7 +440,6 @@ export default function ProjectDetailPage() {
       ...prev,
     ]);
     closeTemplatePickerModal();
-    setPreviewTemplate(null);
     navigate(`/project/${id}/experiment/${documentId}`, { state: { mode: 'edit' } });
   };
 
@@ -759,30 +788,14 @@ className="inline-flex items-center gap-1 text-sm text-tertiaryText transition-c
 
                 <div className="flex items-center gap-5">
                   {activeTab === 'experiment' ? (
-                    <div
-                      onMouseEnter={() => {
-                        if (newDocMenuTimerRef.current) clearTimeout(newDocMenuTimerRef.current);
-                        setShowNewDocMenu(true);
-                      }}
-                      onMouseLeave={() => {
-                        newDocMenuTimerRef.current = setTimeout(() => setShowNewDocMenu(false), 120);
-                      }}
+                    <button
+                      type="button"
+                      onClick={handleOpenTemplatePicker}
+                      className="inline-flex items-center gap-1 text-sm font-semibold text-[var(--color-primary)] transition-colors hover:text-[var(--color-primary-hover)]"
                     >
-                      <BaseActionMenu
-                        open={showNewDocMenu}
-                        onOpenChange={setShowNewDocMenu}
-                        placement="bottom-end"
-                        width={160}
-                        trigger={
-                          <span className="inline-flex items-center gap-1 text-sm font-semibold text-[var(--color-primary)] transition-colors hover:text-[var(--color-primary-hover)]">
-                            <Plus size={16} />
-                            新建
-                          </span>
-                        }
-                        items={newDocMenuItems}
-                        onItemClick={handleNewDocMenuItemClick}
-                      />
-                    </div>
+                      <Plus size={16} />
+                      新建
+                    </button>
                   ) : (
                     <BaseButton
                       type="ghost"
@@ -861,14 +874,21 @@ className="inline-flex items-center gap-1 text-sm text-tertiaryText transition-c
                         key={item.id}
                         type="button"
                         onClick={() => navigate(`/project/${project.id}/experiment/${item.id}`)}
-                        className="rounded-lg border border-[var(--color-line-subtle)] bg-[var(--color-surface)] px-4 py-3.5 text-left transition-all hover:border-[var(--color-gray-3)] hover:shadow-sm"
+                        className="flex min-h-[132px] flex-col rounded-lg border border-[var(--color-line-subtle)] bg-[var(--color-surface)] px-4 py-3.5 text-left transition-all hover:border-[var(--color-gray-3)] hover:shadow-sm"
                       >
-                        <h3 className="truncate text-base font-medium text-primaryText">{item.title}</h3>
-                        <p className="mt-1.5 line-clamp-2 text-sm leading-5 text-secondaryText">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <h3 className="truncate text-base font-medium text-primaryText">{item.title}</h3>
+                          {item.id === 'exp-crispr-1' && (
+                            <span className="shrink-0 rounded-full bg-[var(--color-primary)] px-1.5 py-[2px] text-xs font-medium leading-none text-white">
+                              NEW
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-1.5 min-h-[40px] line-clamp-2 text-sm leading-5 text-secondaryText">
                           {item.summary}
                         </p>
                         {item.tags.length > 0 && (
-                          <div className="mt-3 flex flex-wrap gap-2">
+                          <div className="mt-auto flex flex-wrap gap-2 pt-3">
                             {item.tags.map((tag) => (
                               <span
                                 key={`${item.id}-${tag}`}
@@ -962,27 +982,107 @@ className="inline-flex items-center gap-1 text-sm text-tertiaryText transition-c
 
       <BaseModal
         visible={showTemplatePickerModal}
-        title="从模版新建"
+        title="新建文档"
         width={1040}
         maskClosable={false}
-        footer={previewTemplate ? (
+        footer={
           <div className="flex justify-end gap-2 px-6 py-4">
+            <BaseButton type="secondary" size="medium" onClick={closeTemplatePickerModal}>
+              取消
+            </BaseButton>
             <BaseButton
               type="primary"
               size="medium"
+              disabled={!previewTemplate && !selectedTemplateId}
               onClick={() => {
-                if (previewTemplate) handlePickTemplate(previewTemplate);
+                const template = previewTemplate ?? DEFAULT_TEMPLATES.find((item) => item.id === selectedTemplateId);
+                if (template) handlePickTemplate(template);
               }}
             >
-              使用该模版
+              新建文档
             </BaseButton>
           </div>
-        ) : null}
+        }
         onCancel={closeTemplatePickerModal}
         bodyClassName="!px-6 !py-5"
       >
+        {!previewTemplate && <div ref={templateTagPickerRef} className="relative mb-5">
+          <label htmlFor="template-tag-search" className="mb-2 block text-sm font-medium text-primaryText">
+            设置项目标签
+          </label>
+          <div className="flex min-h-10 items-center gap-2 rounded-lg border border-[var(--color-line-subtle)] bg-white px-3 py-2 transition-colors focus-within:border-[var(--color-primary)] focus-within:ring-2 focus-within:ring-[color-mix(in_srgb,var(--color-primary)_16%,transparent)]">
+            {!templateTagSearchKeyword && templateDocumentTags.length === 0 && <Search size={16} className="shrink-0 text-tertiaryText" />}
+            {templateDocumentTags.length > 0 && (
+              <span className="flex shrink-0 flex-wrap gap-1">
+                {templateDocumentTags.map((tag) => (
+                  <span key={tag} className="inline-flex items-center gap-1 rounded-md bg-bgLight py-0.5 pl-2 pr-1 text-sm text-secondaryText">
+                    {tag}
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        removeTemplateDocumentTag(tag);
+                      }}
+                      className="rounded p-0.5 text-tertiaryText transition-colors hover:bg-white hover:text-primaryText"
+                      aria-label={`移除标签 ${tag}`}
+                    >
+                      <X size={12} />
+                    </button>
+                  </span>
+                ))}
+              </span>
+            )}
+            <input
+              id="template-tag-search"
+              value={templateTagSearchKeyword}
+              onFocus={() => setIsTemplateTagDropdownOpen(true)}
+              onChange={(event) => {
+                setTemplateTagSearchKeyword(event.target.value);
+                setIsTemplateTagDropdownOpen(true);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && templateTagSearchKeyword.trim() && !templateTagOptions.some((tag) => tag.value === templateTagSearchKeyword.trim())) {
+                  event.preventDefault();
+                  createTemplateTagFromSearch();
+                }
+              }}
+              placeholder={templateDocumentTags.length > 0 ? '继续搜索或新建标签' : '搜索或新建标签'}
+              className="min-w-0 flex-1 bg-transparent text-sm text-primaryText outline-none placeholder:text-tertiaryText"
+            />
+            <button type="button" onClick={() => setIsTemplateTagDropdownOpen((isOpen) => !isOpen)} className="shrink-0 text-tertiaryText" aria-label="切换标签列表">
+              <ChevronDown size={16} className={`transition-transform ${isTemplateTagDropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
+          </div>
+
+          {isTemplateTagDropdownOpen && (
+            <div className="absolute z-30 mt-2 w-full overflow-hidden rounded-xl border border-[var(--color-line-subtle)] bg-white p-2 shadow-lg">
+              <div className="max-h-44 overflow-y-auto">
+                {filteredTemplateTagOptions.length > 0 ? filteredTemplateTagOptions.map((tag) => {
+                  const isSelected = templateDocumentTags.includes(tag.value);
+                  return (
+                    <button key={tag.value} type="button" onClick={() => toggleTemplateDocumentTag(tag.value)} className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-primaryText hover:bg-bgLight">
+                      <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${isSelected ? 'border-[var(--color-primary)] bg-[var(--color-primary)] text-white' : 'border-[var(--color-gray-4)] bg-white'}`}>
+                        {isSelected && <Check size={12} strokeWidth={3} />}
+                      </span>
+                      {tag.label}
+                    </button>
+                  );
+                }) : <div className="px-3 py-4 text-center text-sm text-tertiaryText">未找到匹配标签</div>}
+              </div>
+              {templateTagSearchKeyword.trim() && !templateTagOptions.some((tag) => tag.value === templateTagSearchKeyword.trim()) && (
+                <div className="mt-2 border-t border-[var(--color-line-subtle)] pt-2">
+                  <button type="button" onClick={createTemplateTagFromSearch} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-primaryText hover:bg-bgLight">
+                    <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[var(--color-primary)] text-white"><Plus size={12} strokeWidth={2.5} /></span>
+                    新建标签「<span className="text-[var(--color-primary)]">{templateTagSearchKeyword.trim()}</span>」
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>}
+
         {previewTemplate ? (
-          <div className="flex h-[775px] flex-col">
+          <div className="flex h-[690px] flex-col">
             <button
               type="button"
               onClick={closeTemplatePreviewModal}
@@ -998,12 +1098,25 @@ className="inline-flex items-center gap-1 text-sm text-tertiaryText transition-c
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-4 gap-4">
-            {DEFAULT_TEMPLATES.map((tpl) => (
-              <div
+          <section>
+            <h3 className="mb-3 text-sm font-medium text-primaryText">选择项目模版</h3>
+            <div className="grid grid-cols-4 gap-4">
+            {DEFAULT_TEMPLATES.map((tpl) => {
+              const isSelected = selectedTemplateId === tpl.id;
+              return (
+              <button
                 key={tpl.id}
-                className="group flex flex-col overflow-hidden rounded-lg border border-[var(--color-line-subtle)] bg-[var(--color-surface-muted)]"
+                type="button"
+                onClick={() => setSelectedTemplateId(tpl.id)}
+                className={`group relative flex flex-col overflow-hidden rounded-lg border bg-[var(--color-surface-muted)] text-left transition-all ${
+                  isSelected
+                    ? 'border-[var(--color-primary)] ring-2 ring-[color-mix(in_srgb,var(--color-primary)_16%,transparent)]'
+                    : 'border-[var(--color-line-subtle)] hover:border-[var(--color-gray-3)]'
+                }`}
               >
+                <span className={`absolute right-2 top-2 z-10 flex h-5 w-5 items-center justify-center rounded-full border ${isSelected ? 'border-[var(--color-primary)] bg-[var(--color-primary)] text-white' : 'border-[var(--color-gray-3)] bg-white text-transparent'}`}>
+                  <Check size={13} strokeWidth={3} />
+                </span>
                 <div className="px-3 pt-3">
                   <span className="truncate text-sm font-semibold text-primaryText">{tpl.name}</span>
                 </div>
@@ -1016,29 +1129,27 @@ className="inline-flex items-center gap-1 text-sm text-tertiaryText transition-c
                   </div>
                   <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-white to-transparent" />
 
-                  {/* hover 蒙层：预览 / 使用 */}
-                  <div className="pointer-events-none absolute inset-0 flex items-center justify-center gap-2 bg-white/70 opacity-0 backdrop-blur-[1px] transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
-                    <BaseButton
-                      type="secondary"
-                      size="small"
-                      rounded="large"
-                      onClick={() => handlePreviewTemplate(tpl)}
-                    >
-                      预览
-                    </BaseButton>
-                    <BaseButton
-                      type="primary"
-                      size="small"
-                      rounded="large"
-                      onClick={() => handlePickTemplate(tpl)}
-                    >
-                      使用
-                    </BaseButton>
+                  <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-white/70 opacity-0 backdrop-blur-[1px] transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
+                    {tpl.id !== 'tpl-blank' && (
+                      <BaseButton
+                        type="secondary"
+                        size="small"
+                        rounded="large"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handlePreviewTemplate(tpl);
+                        }}
+                      >
+                        预览
+                      </BaseButton>
+                    )}
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              </button>
+              );
+            })}
+            </div>
+          </section>
         )}
       </BaseModal>
 

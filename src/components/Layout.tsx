@@ -68,6 +68,17 @@ const TASK_DEMO_CHAT: MockChat =
     source: 'task',
   };
 
+const GENERATED_DOCUMENT_DEMO_CHAT_ID = 'c-generated-document';
+const GENERATED_DOCUMENT_DEMO_CHAT: MockChat =
+  mockChats.find((chat) => chat.id === GENERATED_DOCUMENT_DEMO_CHAT_ID) ?? {
+    id: GENERATED_DOCUMENT_DEMO_CHAT_ID,
+    title: 'AI 生成文档示例',
+    date: '刚刚',
+    count: 2,
+    projectId: 'p-crispr',
+    isPinned: true,
+  };
+
 const isTaskConversationChat = (chat: MockChat) =>
   chat.isTaskConversation === true ||
   chat.source === 'task' ||
@@ -82,15 +93,25 @@ const ensureTaskDemoChat = (chats: MockChat[]) => {
   return [TASK_DEMO_CHAT, ...chats.filter((chat) => chat.id !== TASK_DEMO_CHAT_ID)];
 };
 
+const ensureGeneratedDocumentDemoChat = (chats: MockChat[]) => {
+  if (chats.some((chat) => chat.id === GENERATED_DOCUMENT_DEMO_CHAT_ID)) {
+    return chats;
+  }
+
+  return [GENERATED_DOCUMENT_DEMO_CHAT, ...chats];
+};
+
+const ensureSidebarDemoChats = (chats: MockChat[]) => ensureGeneratedDocumentDemoChat(ensureTaskDemoChat(chats));
+
 function loadChatsFromStorage(): MockChat[] {
   if (typeof window === 'undefined') return [];
 
   try {
     const raw = window.localStorage.getItem(CHATS_STORAGE_KEY);
-    if (!raw) return ensureTaskDemoChat([]);
-
+    if (!raw) return ensureSidebarDemoChats([]);
+    
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return ensureTaskDemoChat([]);
+    if (!Array.isArray(parsed)) return ensureSidebarDemoChats([]);
 
     const normalizedChats = parsed
       .filter((chat) => chat && typeof chat === 'object')
@@ -123,9 +144,9 @@ function loadChatsFromStorage(): MockChat[] {
       })
       .filter((chat) => chat.id && chat.title);
 
-    return ensureTaskDemoChat(normalizedChats);
+    return ensureSidebarDemoChats(normalizedChats);
   } catch {
-    return ensureTaskDemoChat([]);
+    return ensureSidebarDemoChats([]);
   }
 }
 
