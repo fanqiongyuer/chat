@@ -36,6 +36,8 @@ export default function ExperimentDetailPage() {
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showDocActionMenu, setShowDocActionMenu] = useState(false);
+  const [showSaveTemplateSuccessModal, setShowSaveTemplateSuccessModal] = useState(false);
+  const [savedTemplate, setSavedTemplate] = useState<ProjectTemplate | null>(null);
   const [showMoveDocumentModal, setShowMoveDocumentModal] = useState(false);
   const [moveTargetProjectId, setMoveTargetProjectId] = useState('');
   const [showCreateMoveProjectPopover, setShowCreateMoveProjectPopover] = useState(false);
@@ -270,7 +272,7 @@ export default function ExperimentDetailPage() {
 
   const handleSaveAsTemplate = () => {
     setShowDocActionMenu(false);
-    const template: ProjectTemplate = {
+    setSavedTemplate({
       id: `tpl-local-${Date.now()}`,
       name: docTitle.trim() || experiment?.title || '未命名模版',
       content: '由现有文档保存',
@@ -279,13 +281,18 @@ export default function ExperimentDetailPage() {
       creator: '当前用户',
       modifier: '当前用户',
       updatedAt: new Date().toISOString().slice(0, 10),
-    };
+    });
+    setShowSaveTemplateSuccessModal(true);
+  };
 
+  const handleViewSavedTemplate = () => {
+    if (!savedTemplate) return;
+    setShowSaveTemplateSuccessModal(false);
     navigate('/projects', {
       state: {
         reopenTemplateModal: true,
         templateScope: 'personal',
-        newTemplate: template,
+        newTemplate: savedTemplate,
       },
     });
   };
@@ -884,6 +891,28 @@ export default function ExperimentDetailPage() {
           )}
         </div>
       </div>
+
+      <BaseModal
+        visible={showSaveTemplateSuccessModal}
+        title="保存成功"
+        width={420}
+        maskClosable={false}
+        onCancel={() => setShowSaveTemplateSuccessModal(false)}
+        footer={(
+          <div className="flex justify-end gap-2 border-t border-[var(--color-line-soft)] px-5 py-3">
+            <BaseButton type="secondary" size="medium" onClick={() => setShowSaveTemplateSuccessModal(false)}>
+              取消
+            </BaseButton>
+            <BaseButton type="primary" size="medium" onClick={handleViewSavedTemplate}>
+              去查看
+            </BaseButton>
+          </div>
+        )}
+      >
+        <p className="text-sm leading-6 text-secondaryText">
+          文档已保存至个人模版，可前往模版列表查看。
+        </p>
+      </BaseModal>
 
       <ShareModal
         visible={showShareModal}
