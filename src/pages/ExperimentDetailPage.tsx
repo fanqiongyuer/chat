@@ -18,6 +18,16 @@ import type { ProjectTemplate } from './ProjectsPage';
 const getDefaultTimelineEntry = (timeline: ExperimentTimelineEntry[]) =>
   timeline.find((entry) => entry.status !== '实验结束') ?? timeline[0] ?? null;
 
+const DOCUMENT_TAG_CANDIDATES = [
+  '实验目标', '脱靶控制', '流程优化', '结果验证', '性能评估', '靶点研究', '设计规范',
+  '数据分析', '文献研究', '实验设计', '统计评估', '机器学习', '样本管理', '项目管理',
+  '科研协作', '安全合规', '伦理审查', '报告撰写', '知识沉淀', '细胞培养', '基因编辑',
+  '药物筛选', '动物模型', '生物信息学', '组学研究', '蛋白表达', '免疫检测', '质控管理',
+  '技术调研', '方案评审', '进度跟踪', '风险控制', '成果转化', '专利申请', '数据治理',
+  '模型训练', '算法优化', '可视化分析', '论文发表', '团队协同', '设备管理', '试剂采购',
+  '临床样本', '多中心研究', '随访管理', '研究备案',
+];
+
 export default function ExperimentDetailPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -49,17 +59,18 @@ export default function ExperimentDetailPage() {
   );
   const [docTitle, setDocTitle] = useState('');
   const [docTags, setDocTags] = useState<string[]>([]);
-  const [tagInput, setTagInput] = useState('');
-  const [isAddingTag, setIsAddingTag] = useState(false);
-  const [editingTagIndex, setEditingTagIndex] = useState<number | null>(null);
-  const [editingTagValue, setEditingTagValue] = useState('');
+  const [isDocumentTagExpanded, setIsDocumentTagExpanded] = useState(false);
+  const [showDocumentTagToggle, setShowDocumentTagToggle] = useState(false);
+  const [isCreatingDocumentTag, setIsCreatingDocumentTag] = useState(false);
+  const [documentTagInput, setDocumentTagInput] = useState('');
+  const [customDocumentTags, setCustomDocumentTags] = useState<string[]>([]);
   const [docContent, setDocContent] = useState('');
   const [saveHint, setSaveHint] = useState<'' | 'saving' | 'saved'>('');
   const [uploadedAttachments, setUploadedAttachments] = useState<Array<{ id: string; name: string; progress: number }>>([]);
   const contentScrollTimerRef = useRef<number | null>(null);
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const attachmentUploadTimersRef = useRef<Record<string, number>>({});
-  const tagInputRef = useRef<HTMLInputElement | null>(null);
+  const documentTagListRef = useRef<HTMLDivElement | null>(null);
   const autoSaveTimerRef = useRef<number | null>(null);
   const savedContentRef = useRef({ title: '', tags: [] as string[], content: '' });
 
@@ -165,80 +176,45 @@ export default function ExperimentDetailPage() {
     scheduleAutoSave({ title: value, tags: docTags, content: docContent });
   };
 
-  const handleStartAddTag = () => {
-    setIsAddingTag(true);
-    setTagInput('');
-  };
+  const documentTagOptions = useMemo(
+    () => Array.from(new Set([...DOCUMENT_TAG_CANDIDATES, ...customDocumentTags, ...docTags])),
+    [customDocumentTags, docTags],
+  );
 
-  const handleCommitAddTag = () => {
-    const trimmed = tagInput.trim();
-    if (trimmed && !docTags.includes(trimmed)) {
-      const nextTags = [...docTags, trimmed];
-      setDocTags(nextTags);
-      scheduleAutoSave({ title: docTitle, tags: nextTags, content: docContent });
-    }
-    setTagInput('');
-    setIsAddingTag(false);
-  };
-
-  const handleCancelAddTag = () => {
-    setTagInput('');
-    setIsAddingTag(false);
-  };
-
-  const handleAddTagKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'Enter' || event.key === ',') {
-      event.preventDefault();
-      handleCommitAddTag();
-    } else if (event.key === 'Backspace' && tagInput === '') {
-      event.preventDefault();
-      handleCancelAddTag();
-    } else if (event.key === 'Escape') {
-      event.preventDefault();
-      handleCancelAddTag();
-    }
-  };
-
-  const handleRemoveTag = (tag: string) => {
-    const nextTags = docTags.filter((item) => item !== tag);
-    setDocTags(nextTags);
-    scheduleAutoSave({ title: docTitle, tags: nextTags, content: docContent });
-  };
-
-  const handleStartEditTag = (index: number) => {
-    setEditingTagIndex(index);
-    setEditingTagValue(docTags[index] ?? '');
-  };
-
-  const handleCommitEditTag = () => {
-    if (editingTagIndex === null) return;
-    const trimmed = editingTagValue.trim();
-    if (!trimmed || docTags.includes(trimmed)) {
-      setEditingTagIndex(null);
-      setEditingTagValue('');
+  useEffect(() => {
+    const container = documentTagListRef.current;
+    if (!container || mode !== 'edit') {
+      setShowDocumentTagToggle(false);
       return;
     }
-    const nextTags = [...docTags];
-    nextTags[editingTagIndex] = trimmed;
+
+    const updateOverflow = () => setShowDocumentTagToggle(container.scrollHeight > 72);
+    updateOverflow();
+    const observer = new ResizeObserver(updateOverflow);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [documentTagOptions, isCreatingDocumentTag, mode]);
+
+  const toggleDocumentTag = (tag: string) => {
+    const nextTags = docTags.includes(tag)
+      ? docTags.filter((item) => item !== tag)
+      : [...docTags, tag];
     setDocTags(nextTags);
-    setEditingTagIndex(null);
-    setEditingTagValue('');
     scheduleAutoSave({ title: docTitle, tags: nextTags, content: docContent });
   };
 
-  const handleCancelEditTag = () => {
-    setEditingTagIndex(null);
-    setEditingTagValue('');
-  };
-
-  const handleEditTagKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      handleCommitEditTag();
-    } else if (event.key === 'Escape') {
-      event.preventDefault();
-      handleCancelEditTag();
+  const createDocumentTag = () => {
+    const tag = documentTagInput.trim();
+    if (tag) {
+      setCustomDocumentTags((currentTags) => currentTags.includes(tag) ? currentTags : [...currentTags, tag]);
+      if (!docTags.includes(tag)) {
+        const nextTags = [...docTags, tag];
+        setDocTags(nextTags);
+        scheduleAutoSave({ title: docTitle, tags: nextTags, content: docContent });
+      }
     }
+    setDocumentTagInput('');
+    setIsCreatingDocumentTag(false);
   };
 
   const createdByName = useMemo(() => {
@@ -755,60 +731,76 @@ export default function ExperimentDetailPage() {
                 )}
 
                 {mode === 'edit' ? (
-                  <div className="mt-4 flex flex-wrap items-center gap-2">
-                    {docTags.map((tag, index) =>
-                      editingTagIndex === index ? (
+                  <div className="mt-4">
+                    <div
+                      ref={documentTagListRef}
+                      className={`flex flex-wrap gap-2 overflow-hidden transition-[max-height] duration-200 ${
+                        isDocumentTagExpanded ? 'max-h-64 overflow-y-auto pr-1' : 'max-h-[72px]'
+                      }`}
+                    >
+                      {isCreatingDocumentTag ? (
                         <input
-                          key={`edit-${index}`}
-                          value={editingTagValue}
-                          onChange={(event) => setEditingTagValue(event.target.value)}
-                          onKeyDown={handleEditTagKeyDown}
-                          onBlur={handleCommitEditTag}
                           autoFocus
-                          className="min-w-[80px] rounded-full border border-[var(--color-line-subtle)] bg-bgLight px-2.5 py-1 text-xs text-primaryText outline-none"
+                          value={documentTagInput}
+                          onChange={(event) => setDocumentTagInput(event.target.value)}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter') {
+                              event.preventDefault();
+                              createDocumentTag();
+                            } else if (event.key === 'Escape') {
+                              setDocumentTagInput('');
+                              setIsCreatingDocumentTag(false);
+                            }
+                          }}
+                          onBlur={() => {
+                            if (!documentTagInput.trim()) setIsCreatingDocumentTag(false);
+                          }}
+                          placeholder="输入标签名称"
+                          className="box-border h-8 w-32 shrink-0 rounded-md border border-[var(--color-primary)] px-2 text-sm text-primaryText outline-none"
                         />
                       ) : (
-                        <span
-                          key={tag}
-                          className="inline-flex items-center gap-1 rounded-full border border-[var(--color-line-subtle)] bg-bgLight px-2.5 py-1 text-xs text-secondaryText"
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsCreatingDocumentTag(true);
+                            setIsDocumentTagExpanded(true);
+                          }}
+                          className="inline-flex box-border h-[30px] shrink-0 items-center gap-1 self-center rounded-md border border-dashed border-[var(--color-gray-3)] px-2.5 text-sm text-tertiaryText transition-colors hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
                         >
+                          <Plus size={14} />
+                          新建标签
+                        </button>
+                      )}
+                      {documentTagOptions.map((tag) => {
+                        const isSelected = docTags.includes(tag);
+                        return (
                           <button
+                            key={tag}
                             type="button"
-                            onClick={() => handleStartEditTag(index)}
-                            className="transition-colors hover:text-primaryText"
+                            onClick={() => toggleDocumentTag(tag)}
+                            className={`inline-flex h-8 items-center rounded-md px-2.5 text-sm transition-colors ${
+                              isSelected
+                                ? 'bg-[color-mix(in_srgb,var(--color-primary)_12%,white)] font-semibold text-[var(--color-primary)]'
+                                : 'bg-bgLight text-secondaryText hover:bg-[color-mix(in_srgb,var(--color-primary)_12%,white)] hover:font-semibold hover:text-[var(--color-primary)]'
+                            }`}
+                            aria-pressed={isSelected}
                           >
                             {tag}
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveTag(tag)}
-                            className="text-tertiaryText transition-colors hover:text-danger"
-                          >
-                            <X size={12} />
-                          </button>
-                        </span>
-                      ),
-                    )}
-                    {isAddingTag ? (
-                      <input
-                        ref={tagInputRef}
-                        value={tagInput}
-                        onChange={(event) => setTagInput(event.target.value)}
-                        onKeyDown={handleAddTagKeyDown}
-                        onBlur={handleCommitAddTag}
-                        autoFocus
-                        placeholder="输入标签后回车"
-                        className="min-w-[100px] rounded-full border border-dashed border-[var(--color-line-subtle)] bg-bgLight px-2.5 py-1 text-xs text-primaryText outline-none placeholder:text-tertiaryText"
-                      />
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={handleStartAddTag}
-                        className="inline-flex items-center gap-1 rounded-full border border-dashed border-[var(--color-line-subtle)] px-2.5 py-1 text-xs text-tertiaryText transition-colors hover:border-[var(--color-primary)] hover:text-primaryText"
-                      >
-                        <Plus size={12} />
-                        {docTags.length === 0 ? '添加标签' : '继续添加'}
-                      </button>
+                        );
+                      })}
+                    </div>
+                    {showDocumentTagToggle && (
+                      <div className="mt-5 flex justify-center">
+                        <button
+                          type="button"
+                          onClick={() => setIsDocumentTagExpanded((expanded) => !expanded)}
+                          className="inline-flex items-center gap-1.5 text-sm text-[var(--color-gray-5)] transition-colors hover:text-tertiaryText"
+                        >
+                          {isDocumentTagExpanded ? '收起标签' : '展开全部标签'}
+                          <ChevronDown size={13} className={`transition-transform ${isDocumentTagExpanded ? 'rotate-180' : ''}`} />
+                        </button>
+                      </div>
                     )}
                   </div>
                 ) : (
@@ -817,7 +809,7 @@ export default function ExperimentDetailPage() {
                       docTags.map((tag) => (
                         <span
                           key={tag}
-                          className="inline-flex items-center rounded-full border border-[var(--color-line-subtle)] bg-bgLight px-2.5 py-1 text-xs text-secondaryText"
+                          className="inline-flex h-8 items-center rounded-md bg-bgLight px-2.5 text-sm text-secondaryText"
                         >
                           {tag}
                         </span>

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
-import { ArrowLeft, Check, ChevronDown, Folder, Menu, MoreHorizontal, Plus, Search, Upload, Users, X } from 'lucide-react';
+import { ArrowLeft, Check, ChevronDown, Folder, Menu, MoreHorizontal, Plus, Search, Upload, Users } from 'lucide-react';
 import { Select } from 'antd';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -205,6 +205,16 @@ const getFileNameWithoutExt = (fileName: string) => {
   return fileName.slice(0, idx);
 };
 
+const PROJECT_TAG_CANDIDATES = [
+  '实验目标', '脱靶控制', '流程优化', '结果验证', '性能评估', '靶点研究', '设计规范',
+  '数据分析', '文献研究', '实验设计', '统计评估', '机器学习', '样本管理', '项目管理',
+  '科研协作', '安全合规', '伦理审查', '报告撰写', '知识沉淀', '细胞培养', '基因编辑',
+  '药物筛选', '动物模型', '生物信息学', '组学研究', '蛋白表达', '免疫检测', '质控管理',
+  '技术调研', '方案评审', '进度跟踪', '风险控制', '成果转化', '专利申请', '数据治理',
+  '模型训练', '算法优化', '可视化分析', '论文发表', '团队协同', '设备管理', '试剂采购',
+  '临床样本', '多中心研究', '随访管理', '研究备案',
+];
+
 export default function ProjectDetailPage() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
@@ -219,8 +229,11 @@ export default function ProjectDetailPage() {
   const [showTemplatePickerModal, setShowTemplatePickerModal] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState('tpl-blank');
   const [templateDocumentTags, setTemplateDocumentTags] = useState<string[]>([]);
-  const [isTemplateTagDropdownOpen, setIsTemplateTagDropdownOpen] = useState(false);
+  const [isTemplateTagExpanded, setIsTemplateTagExpanded] = useState(false);
+  const [showTemplateTagToggle, setShowTemplateTagToggle] = useState(false);
+  const [isCreatingTemplateTag, setIsCreatingTemplateTag] = useState(false);
   const [templateTagSearchKeyword, setTemplateTagSearchKeyword] = useState('');
+  const [customTemplateTags, setCustomTemplateTags] = useState<string[]>([]);
   const [previewTemplate, setPreviewTemplate] = useState<ProjectTemplate | null>(null);
   const [showMemberModal, setShowMemberModal] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -234,7 +247,7 @@ export default function ProjectDetailPage() {
   const [isEditingProjectName, setIsEditingProjectName] = useState(false);
   const [isEditingProjectDesc, setIsEditingProjectDesc] = useState(false);
   const tagFilterRef = useRef<HTMLDivElement | null>(null);
-  const templateTagPickerRef = useRef<HTMLDivElement | null>(null);
+  const templateTagListRef = useRef<HTMLDivElement | null>(null);
 
   const project = useMemo(() => mockProjects.find((item) => item.id === id), [id]);
 
@@ -294,19 +307,6 @@ export default function ProjectDetailPage() {
     setLocalDocs([...experimentList]);
   }, [experimentList]);
 
-  useEffect(() => {
-    if (!isTemplateTagDropdownOpen) return;
-
-    const handlePointerDownOutside = (event: MouseEvent) => {
-      if (!templateTagPickerRef.current?.contains(event.target as Node)) {
-        setIsTemplateTagDropdownOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handlePointerDownOutside);
-    return () => document.removeEventListener('mousedown', handlePointerDownOutside);
-  }, [isTemplateTagDropdownOpen]);
-
   const resetCreateDocForm = () => {
     setSelectedFiles([]);
     setCreateDocError('');
@@ -334,7 +334,8 @@ export default function ProjectDetailPage() {
   const handleOpenTemplatePicker = () => {
     setTemplateDocumentTags([]);
     setSelectedTemplateId('tpl-blank');
-    setIsTemplateTagDropdownOpen(false);
+    setIsTemplateTagExpanded(false);
+    setIsCreatingTemplateTag(false);
     setTemplateTagSearchKeyword('');
     setPreviewTemplate(null);
     setShowTemplatePickerModal(true);
@@ -343,24 +344,33 @@ export default function ProjectDetailPage() {
   const closeTemplatePickerModal = () => {
     setShowTemplatePickerModal(false);
     setTemplateDocumentTags([]);
-    setIsTemplateTagDropdownOpen(false);
+    setIsTemplateTagExpanded(false);
+    setIsCreatingTemplateTag(false);
     setTemplateTagSearchKeyword('');
     setPreviewTemplate(null);
   };
 
   const templateTagOptions = useMemo(() => {
-    const tags = new Set<string>();
+    const tags = new Set<string>([...PROJECT_TAG_CANDIDATES, ...customTemplateTags]);
     localDocs.forEach((document) => document.tags.forEach((tag) => tags.add(tag)));
     return [...tags]
       .sort((left, right) => left.localeCompare(right, 'zh-CN'))
       .map((tag) => ({ label: tag, value: tag }));
-  }, [localDocs]);
+  }, [customTemplateTags, localDocs]);
 
-  const filteredTemplateTagOptions = useMemo(() => {
-    const keyword = templateTagSearchKeyword.trim().toLocaleLowerCase();
-    if (!keyword) return templateTagOptions;
-    return templateTagOptions.filter((tag) => tag.value.toLocaleLowerCase().includes(keyword));
-  }, [templateTagOptions, templateTagSearchKeyword]);
+  useEffect(() => {
+    const container = templateTagListRef.current;
+    if (!container || !showTemplatePickerModal || previewTemplate) {
+      setShowTemplateTagToggle(false);
+      return;
+    }
+
+    const updateOverflow = () => setShowTemplateTagToggle(container.scrollHeight > 72);
+    updateOverflow();
+    const observer = new ResizeObserver(updateOverflow);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [isCreatingTemplateTag, previewTemplate, showTemplatePickerModal, templateTagOptions]);
 
   const toggleTemplateDocumentTag = (tag: string) => {
     setTemplateDocumentTags((currentTags) =>
@@ -368,17 +378,16 @@ export default function ProjectDetailPage() {
     );
   };
 
-  const removeTemplateDocumentTag = (tag: string) => {
-    setTemplateDocumentTags((currentTags) => currentTags.filter((currentTag) => currentTag !== tag));
-  };
-
   const createTemplateTagFromSearch = () => {
     const tag = templateTagSearchKeyword.trim();
-    if (tag && !templateDocumentTags.includes(tag)) {
-      setTemplateDocumentTags((currentTags) => [...currentTags, tag]);
+    if (tag) {
+      setCustomTemplateTags((currentTags) => currentTags.includes(tag) ? currentTags : [...currentTags, tag]);
+      if (!templateDocumentTags.includes(tag)) {
+        setTemplateDocumentTags((currentTags) => [...currentTags, tag]);
+      }
     }
     setTemplateTagSearchKeyword('');
-    setIsTemplateTagDropdownOpen(true);
+    setIsCreatingTemplateTag(false);
   };
 
   const handlePickTemplate = (template: ProjectTemplate) => {
@@ -1006,79 +1015,80 @@ className="inline-flex items-center gap-1 text-sm text-tertiaryText transition-c
         onCancel={closeTemplatePickerModal}
         bodyClassName="!px-6 !py-5"
       >
-        {!previewTemplate && <div ref={templateTagPickerRef} className="relative mb-5">
-          <label htmlFor="template-tag-search" className="mb-2 block text-sm font-medium text-primaryText">
-            设置项目标签
-          </label>
-          <div className="flex min-h-10 items-center gap-2 rounded-lg border border-[var(--color-line-subtle)] bg-white px-3 py-2 transition-colors focus-within:border-[var(--color-primary)] focus-within:ring-2 focus-within:ring-[color-mix(in_srgb,var(--color-primary)_16%,transparent)]">
-            {!templateTagSearchKeyword && templateDocumentTags.length === 0 && <Search size={16} className="shrink-0 text-tertiaryText" />}
-            {templateDocumentTags.length > 0 && (
-              <span className="flex shrink-0 flex-wrap gap-1">
-                {templateDocumentTags.map((tag) => (
-                  <span key={tag} className="inline-flex items-center gap-1 rounded-md bg-bgLight py-0.5 pl-2 pr-1 text-sm text-secondaryText">
-                    {tag}
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        removeTemplateDocumentTag(tag);
-                      }}
-                      className="rounded p-0.5 text-tertiaryText transition-colors hover:bg-white hover:text-primaryText"
-                      aria-label={`移除标签 ${tag}`}
-                    >
-                      <X size={12} />
-                    </button>
-                  </span>
-                ))}
-              </span>
-            )}
-            <input
-              id="template-tag-search"
-              value={templateTagSearchKeyword}
-              onFocus={() => setIsTemplateTagDropdownOpen(true)}
-              onChange={(event) => {
-                setTemplateTagSearchKeyword(event.target.value);
-                setIsTemplateTagDropdownOpen(true);
-              }}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' && templateTagSearchKeyword.trim() && !templateTagOptions.some((tag) => tag.value === templateTagSearchKeyword.trim())) {
-                  event.preventDefault();
-                  createTemplateTagFromSearch();
-                }
-              }}
-              placeholder={templateDocumentTags.length > 0 ? '继续搜索或新建标签' : '搜索或新建标签'}
-              className="min-w-0 flex-1 bg-transparent text-sm text-primaryText outline-none placeholder:text-tertiaryText"
-            />
-            <button type="button" onClick={() => setIsTemplateTagDropdownOpen((isOpen) => !isOpen)} className="shrink-0 text-tertiaryText" aria-label="切换标签列表">
-              <ChevronDown size={16} className={`transition-transform ${isTemplateTagDropdownOpen ? 'rotate-180' : ''}`} />
-            </button>
-          </div>
-
-          {isTemplateTagDropdownOpen && (
-            <div className="absolute z-30 mt-2 w-full overflow-hidden rounded-xl border border-[var(--color-line-subtle)] bg-white p-2 shadow-lg">
-              <div className="max-h-44 overflow-y-auto">
-                {filteredTemplateTagOptions.length > 0 ? filteredTemplateTagOptions.map((tag) => {
-                  const isSelected = templateDocumentTags.includes(tag.value);
-                  return (
-                    <button key={tag.value} type="button" onClick={() => toggleTemplateDocumentTag(tag.value)} className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-primaryText hover:bg-bgLight">
-                      <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${isSelected ? 'border-[var(--color-primary)] bg-[var(--color-primary)] text-white' : 'border-[var(--color-gray-4)] bg-white'}`}>
-                        {isSelected && <Check size={12} strokeWidth={3} />}
-                      </span>
-                      {tag.label}
-                    </button>
-                  );
-                }) : <div className="px-3 py-4 text-center text-sm text-tertiaryText">未找到匹配标签</div>}
-              </div>
-              {templateTagSearchKeyword.trim() && !templateTagOptions.some((tag) => tag.value === templateTagSearchKeyword.trim()) && (
-                <div className="mt-2 border-t border-[var(--color-line-subtle)] pt-2">
-                  <button type="button" onClick={createTemplateTagFromSearch} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-primaryText hover:bg-bgLight">
-                    <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[var(--color-primary)] text-white"><Plus size={12} strokeWidth={2.5} /></span>
-                    新建标签「<span className="text-[var(--color-primary)]">{templateTagSearchKeyword.trim()}</span>」
-                  </button>
-                </div>
+        {!previewTemplate && <div className="mb-5">
+          <label className="mb-2 block text-sm font-medium text-primaryText">设置项目标签</label>
+          <div>
+            <div
+              ref={templateTagListRef}
+              className={`flex flex-wrap gap-2 overflow-hidden transition-[max-height] duration-200 ${
+                isTemplateTagExpanded ? 'max-h-64 overflow-y-auto pr-1' : 'max-h-[72px]'
+              }`}
+            >
+              {isCreatingTemplateTag ? (
+                <input
+                  autoFocus
+                  value={templateTagSearchKeyword}
+                  onChange={(event) => setTemplateTagSearchKeyword(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      createTemplateTagFromSearch();
+                    } else if (event.key === 'Escape') {
+                      setTemplateTagSearchKeyword('');
+                      setIsCreatingTemplateTag(false);
+                    }
+                  }}
+                  onBlur={() => {
+                    if (!templateTagSearchKeyword.trim()) setIsCreatingTemplateTag(false);
+                  }}
+                  placeholder="输入标签名称"
+                  className="box-border h-8 w-32 shrink-0 rounded-md border border-[var(--color-primary)] px-2 text-sm text-primaryText outline-none"
+                />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsCreatingTemplateTag(true);
+                    setIsTemplateTagExpanded(true);
+                  }}
+                  className="inline-flex box-border h-[30px] shrink-0 items-center gap-1 self-center rounded-md border border-dashed border-[var(--color-gray-3)] px-2.5 text-sm text-tertiaryText transition-colors hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
+                >
+                  <Plus size={14} />
+                  新建标签
+                </button>
               )}
+              {templateTagOptions.map((tag) => {
+                const isSelected = templateDocumentTags.includes(tag.value);
+                return (
+                  <button
+                    key={tag.value}
+                    type="button"
+                    onClick={() => toggleTemplateDocumentTag(tag.value)}
+                    className={`inline-flex h-8 items-center rounded-md px-2.5 text-sm transition-colors ${
+                      isSelected
+                        ? 'bg-[color-mix(in_srgb,var(--color-primary)_12%,white)] font-semibold text-[var(--color-primary)]'
+                        : 'bg-bgLight text-secondaryText hover:bg-[color-mix(in_srgb,var(--color-primary)_12%,white)] hover:font-semibold hover:text-[var(--color-primary)]'
+                    }`}
+                    aria-pressed={isSelected}
+                  >
+                    {tag.label}
+                  </button>
+                );
+              })}
             </div>
-          )}
+            {showTemplateTagToggle && (
+              <div className="mt-5 flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => setIsTemplateTagExpanded((expanded) => !expanded)}
+                  className="inline-flex items-center gap-1.5 text-sm text-[var(--color-gray-5)] transition-colors hover:text-tertiaryText"
+                >
+                  {isTemplateTagExpanded ? '收起标签' : '展开全部标签'}
+                  <ChevronDown size={13} className={`transition-transform ${isTemplateTagExpanded ? 'rotate-180' : ''}`} />
+                </button>
+              </div>
+            )}
+          </div>
         </div>}
 
         {previewTemplate ? (

@@ -361,11 +361,12 @@ const [isSaveDraftModalOpen, setIsSaveDraftModalOpen] = useState(false);
 const [saveDraftProjectId, setSaveDraftProjectId] = useState('p-crispr');
 const [isSaveDraftProjectDropdownOpen, setIsSaveDraftProjectDropdownOpen] = useState(false);
 const [saveDraftTags, setSaveDraftTags] = useState<string[]>([]);
-const [saveDraftTagSearchKeyword, setSaveDraftTagSearchKeyword] = useState('');
-const [isSaveDraftTagDropdownOpen, setIsSaveDraftTagDropdownOpen] = useState(false);
-const [saveDraftTagMenuPosition, setSaveDraftTagMenuPosition] = useState<React.CSSProperties>({});
-const saveDraftTagPickerRef = useRef<HTMLDivElement | null>(null);
-const saveDraftTagMenuRef = useRef<HTMLDivElement | null>(null);
+const [isSaveDraftTagExpanded, setIsSaveDraftTagExpanded] = useState(false);
+const [showSaveDraftTagToggle, setShowSaveDraftTagToggle] = useState(false);
+const [isCreatingSaveDraftTag, setIsCreatingSaveDraftTag] = useState(false);
+const [saveDraftTagInput, setSaveDraftTagInput] = useState('');
+const [customSaveDraftTags, setCustomSaveDraftTags] = useState<string[]>([]);
+const saveDraftTagListRef = useRef<HTMLDivElement | null>(null);
   const [fileSearchQuery, setFileSearchQuery] = useState('');
   const [assistantFeedbackMap, setAssistantFeedbackMap] = useState<Record<string, AssistantFeedback>>({});
   const [activeTimelineMessageIndex, setActiveTimelineMessageIndex] = useState(0);
@@ -972,33 +973,52 @@ const chatScrollContainerRef = useRef<HTMLDivElement | null>(null);
 
 
   const saveDraftTagOptions = useMemo(() => {
-    const tags = new Set<string>();
+    const tags = new Set<string>([
+      '实验目标', '脱靶控制', '流程优化', '结果验证', '性能评估', '靶点研究', '设计规范',
+      '数据分析', '文献研究', '实验设计', '统计评估', '机器学习', '样本管理', '项目管理',
+      '科研协作', '安全合规', '伦理审查', '报告撰写', '知识沉淀', '细胞培养', '基因编辑',
+      '药物筛选', '动物模型', '生物信息学', '组学研究', '蛋白表达', '免疫检测', '质控管理',
+      '技术调研', '方案评审', '进度跟踪', '风险控制', '成果转化', '专利申请', '数据治理',
+      ...customSaveDraftTags,
+    ]);
     Object.values(KNOWLEDGE_BY_PROJECT).flat().forEach((document) => document.tags.forEach((tag) => tags.add(tag)));
     Object.values(EXPERIMENTS_BY_PROJECT).flat().forEach((experiment) => experiment.tags.forEach((tag) => tags.add(tag)));
     return [...tags].sort((left, right) => left.localeCompare(right, 'zh-CN'));
-  }, []);
+  }, [customSaveDraftTags]);
 
-  const filteredSaveDraftTagOptions = useMemo(() => {
-    const keyword = saveDraftTagSearchKeyword.trim().toLocaleLowerCase();
-    return keyword ? saveDraftTagOptions.filter((tag) => tag.toLocaleLowerCase().includes(keyword)) : saveDraftTagOptions;
-  }, [saveDraftTagOptions, saveDraftTagSearchKeyword]);
+  useEffect(() => {
+    const container = saveDraftTagListRef.current;
+    if (!container || !isSaveDraftModalOpen) {
+      setShowSaveDraftTagToggle(false);
+      return;
+    }
+    const updateOverflow = () => setShowSaveDraftTagToggle(container.scrollHeight > 72);
+    updateOverflow();
+    const observer = new ResizeObserver(updateOverflow);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [isCreatingSaveDraftTag, isSaveDraftModalOpen, saveDraftTagOptions]);
 
   const toggleSaveDraftTag = (tag: string) => {
     setSaveDraftTags((tags) => tags.includes(tag) ? tags.filter((item) => item !== tag) : [...tags, tag]);
   };
 
-  const createSaveDraftTagFromSearch = () => {
-    const tag = saveDraftTagSearchKeyword.trim();
-    if (tag && !saveDraftTags.includes(tag)) setSaveDraftTags((tags) => [...tags, tag]);
-    setSaveDraftTagSearchKeyword('');
-    setIsSaveDraftTagDropdownOpen(true);
+  const createSaveDraftTag = () => {
+    const tag = saveDraftTagInput.trim();
+    if (tag) {
+      setCustomSaveDraftTags((tags) => tags.includes(tag) ? tags : [...tags, tag]);
+      if (!saveDraftTags.includes(tag)) setSaveDraftTags((tags) => [...tags, tag]);
+    }
+    setSaveDraftTagInput('');
+    setIsCreatingSaveDraftTag(false);
   };
 
   const openSaveDraftModal = () => {
     setSaveDraftProjectId(currentChat?.projectId ?? selectedProject?.id ?? 'p-crispr');
     setSaveDraftTags(['生物 AI', '研究进展']);
-    setSaveDraftTagSearchKeyword('');
-    setIsSaveDraftTagDropdownOpen(false);
+    setSaveDraftTagInput('');
+    setIsCreatingSaveDraftTag(false);
+    setIsSaveDraftTagExpanded(false);
     setIsSaveDraftProjectDropdownOpen(false);
     setIsSaveDraftModalOpen(true);
   };
@@ -1009,28 +1029,11 @@ const chatScrollContainerRef = useRef<HTMLDivElement | null>(null);
     setIsSaveDraftModalOpen(false);
   };
 
-  const openSaveDraftTagDropdown = () => {
-    const rect = saveDraftTagPickerRef.current?.getBoundingClientRect();
-    if (rect) setSaveDraftTagMenuPosition({ position: 'fixed', top: rect.bottom + 8, left: rect.left, width: rect.width, zIndex: 1300 });
-    setIsSaveDraftProjectDropdownOpen(false);
-    setIsSaveDraftTagDropdownOpen(true);
-  };
-
   const saveDraftProjectMenuItems = useMemo<BaseActionMenuItem[]>(() => projects.map((project) => ({
     key: project.id,
     label: project.name,
     active: project.id === saveDraftProjectId,
   })), [projects, saveDraftProjectId]);
-
-  useEffect(() => {
-    if (!isSaveDraftTagDropdownOpen) return;
-    const handlePointerDownOutside = (event: MouseEvent) => {
-      const target = event.target as Node;
-      if (!saveDraftTagPickerRef.current?.contains(target) && !saveDraftTagMenuRef.current?.contains(target)) setIsSaveDraftTagDropdownOpen(false);
-    };
-    document.addEventListener('mousedown', handlePointerDownOutside);
-    return () => document.removeEventListener('mousedown', handlePointerDownOutside);
-  }, [isSaveDraftTagDropdownOpen]);
 
   const openPreviewItem = (item: PreviewItem) => {
 setPreviewDrafts((prevDrafts) => prevDrafts[item.key] === undefined ? { ...prevDrafts, [item.key]: item.content } : prevDrafts);
@@ -2056,7 +2059,7 @@ className={`w-full inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 pr-6 
         <BaseModal
           visible={isSaveDraftModalOpen}
           title="保存文档"
-          width={440}
+          width={520}
           onCancel={() => setIsSaveDraftModalOpen(false)}
           cancelText="取消"
           okText="保存"
@@ -2068,7 +2071,7 @@ className={`w-full inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 pr-6 
               <label className="mb-2 block text-sm font-medium text-primaryText">保存到项目</label>
               <BaseActionMenu
                 open={isSaveDraftProjectDropdownOpen}
-                onOpenChange={(open) => { setIsSaveDraftProjectDropdownOpen(open); if (open) setIsSaveDraftTagDropdownOpen(false); }}
+                onOpenChange={setIsSaveDraftProjectDropdownOpen}
                 placement="bottom-start"
                 width="100%"
                 portal
@@ -2080,49 +2083,78 @@ className={`w-full inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 pr-6 
                 listClassName="max-h-[220px] overflow-y-auto"
               />
             </div>
-            <div ref={saveDraftTagPickerRef} className="relative">
-              <label htmlFor="save-draft-tags" className="mb-2 block text-sm font-medium text-primaryText">设置项目标签</label>
-              <div className="flex min-h-10 items-center gap-2 rounded-lg border border-[var(--color-line-subtle)] bg-white px-3 py-2 transition-colors focus-within:border-[var(--color-primary)] focus-within:ring-2 focus-within:ring-[color-mix(in_srgb,var(--color-primary)_16%,transparent)]">
-                {!saveDraftTagSearchKeyword && saveDraftTags.length === 0 && <Search size={16} className="shrink-0 text-tertiaryText" />}
-                {saveDraftTags.length > 0 && <span className="flex shrink-0 flex-wrap gap-1">
-                  {saveDraftTags.map((tag) => <span key={tag} className="inline-flex items-center gap-1 rounded-md bg-bgLight py-0.5 pl-2 pr-1 text-sm text-secondaryText">
-                    {tag}
-                    <button type="button" onClick={() => toggleSaveDraftTag(tag)} className="rounded p-0.5 text-tertiaryText transition-colors hover:bg-white hover:text-primaryText" aria-label={`移除标签 ${tag}`}><X size={12} /></button>
-                  </span>)}
-                </span>}
-                <input
-                  id="save-draft-tags"
-                  value={saveDraftTagSearchKeyword}
-                  onFocus={openSaveDraftTagDropdown}
-                  onChange={(event) => { setSaveDraftTagSearchKeyword(event.target.value); openSaveDraftTagDropdown(); }}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' && saveDraftTagSearchKeyword.trim() && !saveDraftTagOptions.includes(saveDraftTagSearchKeyword.trim())) {
-                      event.preventDefault();
-                      createSaveDraftTagFromSearch();
-                    }
-                  }}
-                  placeholder={saveDraftTags.length > 0 ? '继续搜索或新建标签' : '搜索或新建标签'}
-                  className="min-w-0 flex-1 bg-transparent text-sm text-primaryText outline-none placeholder:text-tertiaryText"
-                />
-                <button type="button" onClick={() => isSaveDraftTagDropdownOpen ? setIsSaveDraftTagDropdownOpen(false) : openSaveDraftTagDropdown()} className="shrink-0 text-tertiaryText" aria-label="切换标签列表"><ChevronDown size={16} className={`transition-transform ${isSaveDraftTagDropdownOpen ? 'rotate-180' : ''}`} /></button>
-              </div>
-              {isSaveDraftTagDropdownOpen && createPortal(<div ref={saveDraftTagMenuRef} style={saveDraftTagMenuPosition} className="overflow-hidden rounded-xl border border-[var(--color-line-subtle)] bg-white p-2 shadow-lg">
-                <div className="max-h-44 overflow-y-auto">
-                  {filteredSaveDraftTagOptions.length > 0 ? filteredSaveDraftTagOptions.map((tag) => {
-                    const isSelected = saveDraftTags.includes(tag);
-                    return <button key={tag} type="button" onClick={() => toggleSaveDraftTag(tag)} className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-primaryText hover:bg-bgLight">
-                      <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${isSelected ? 'border-[var(--color-primary)] bg-[var(--color-primary)] text-white' : 'border-[var(--color-gray-4)] bg-white'}`}>{isSelected && <Check size={12} strokeWidth={3} />}</span>
-                      {tag}
-                    </button>;
-                  }) : <div className="px-3 py-4 text-center text-sm text-tertiaryText">未找到匹配标签</div>}
-                </div>
-                {saveDraftTagSearchKeyword.trim() && !saveDraftTagOptions.includes(saveDraftTagSearchKeyword.trim()) && <div className="mt-2 border-t border-[var(--color-line-subtle)] pt-2">
-                  <button type="button" onClick={createSaveDraftTagFromSearch} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-primaryText hover:bg-bgLight">
-                    <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[var(--color-primary)] text-white"><Plus size={12} strokeWidth={2.5} /></span>
-                    新建标签「<span className="text-[var(--color-primary)]">{saveDraftTagSearchKeyword.trim()}</span>」
+            <div>
+              <label className="mb-2 block text-sm font-medium text-primaryText">设置项目标签</label>
+              <div
+                ref={saveDraftTagListRef}
+                className={`flex flex-wrap gap-2 overflow-hidden transition-[max-height] duration-200 ${
+                  isSaveDraftTagExpanded ? 'max-h-64 overflow-y-auto pr-1' : 'max-h-[72px]'
+                }`}
+              >
+                {isCreatingSaveDraftTag ? (
+                  <input
+                    autoFocus
+                    value={saveDraftTagInput}
+                    onChange={(event) => setSaveDraftTagInput(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault();
+                        createSaveDraftTag();
+                      } else if (event.key === 'Escape') {
+                        setSaveDraftTagInput('');
+                        setIsCreatingSaveDraftTag(false);
+                      }
+                    }}
+                    onBlur={() => {
+                      if (!saveDraftTagInput.trim()) setIsCreatingSaveDraftTag(false);
+                    }}
+                    placeholder="输入标签名称"
+                    className="box-border h-8 w-32 shrink-0 rounded-md border border-[var(--color-primary)] px-2 text-sm text-primaryText outline-none"
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCreatingSaveDraftTag(true);
+                      setIsSaveDraftTagExpanded(true);
+                    }}
+                    className="inline-flex box-border h-[30px] shrink-0 items-center gap-1 self-center rounded-md border border-dashed border-[var(--color-gray-3)] px-2.5 text-sm text-tertiaryText transition-colors hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
+                  >
+                    <Plus size={14} />
+                    新建标签
                   </button>
-                </div>}
-              </div>, document.body)}
+                )}
+                {saveDraftTagOptions.map((tag) => {
+                  const isSelected = saveDraftTags.includes(tag);
+                  return (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => toggleSaveDraftTag(tag)}
+                      className={`inline-flex h-8 items-center rounded-md px-2.5 text-sm transition-colors ${
+                        isSelected
+                          ? 'bg-[color-mix(in_srgb,var(--color-primary)_12%,white)] font-semibold text-[var(--color-primary)]'
+                          : 'bg-bgLight text-secondaryText hover:bg-[color-mix(in_srgb,var(--color-primary)_12%,white)] hover:font-semibold hover:text-[var(--color-primary)]'
+                      }`}
+                      aria-pressed={isSelected}
+                    >
+                      {tag}
+                    </button>
+                  );
+                })}
+              </div>
+              {showSaveDraftTagToggle && (
+                <div className="mt-5 flex justify-center">
+                  <button
+                    type="button"
+                    onClick={() => setIsSaveDraftTagExpanded((expanded) => !expanded)}
+                    className="inline-flex items-center gap-1.5 text-sm text-[var(--color-gray-5)] transition-colors hover:text-tertiaryText"
+                  >
+                    {isSaveDraftTagExpanded ? '收起标签' : '展开全部标签'}
+                    <ChevronDown size={13} className={`transition-transform ${isSaveDraftTagExpanded ? 'rotate-180' : ''}`} />
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </BaseModal>
