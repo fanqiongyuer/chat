@@ -1066,8 +1066,8 @@ className="inline-flex items-center gap-1 text-sm text-tertiaryText transition-c
                     onClick={() => toggleTemplateDocumentTag(tag.value)}
                     className={`inline-flex h-8 items-center rounded-md px-2.5 text-sm transition-colors ${
                       isSelected
-                        ? 'bg-[color-mix(in_srgb,var(--color-primary)_12%,white)] font-semibold text-[var(--color-primary)]'
-                        : 'bg-bgLight text-secondaryText hover:bg-[color-mix(in_srgb,var(--color-primary)_12%,white)] hover:font-semibold hover:text-[var(--color-primary)]'
+                        ? 'bg-primary-soft font-semibold text-[var(--color-primary)]'
+                        : 'bg-bgLight text-secondaryText hover:bg-primary-soft hover:font-semibold hover:text-[var(--color-primary)]'
                     }`}
                     aria-pressed={isSelected}
                   >
