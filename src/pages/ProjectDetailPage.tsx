@@ -18,6 +18,7 @@ import { type LayoutOutletContext } from '../components/Layout';
 
 type DetailTab = 'experiment' | 'chat';
 type MemberPermission = '浏览' | '编辑';
+type ImportMode = 'separate' | 'merge';
 
 interface ProjectMemberEntry {
   id: string;
@@ -237,6 +238,7 @@ export default function ProjectDetailPage() {
   const [previewTemplate, setPreviewTemplate] = useState<ProjectTemplate | null>(null);
   const [showMemberModal, setShowMemberModal] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [importMode, setImportMode] = useState<ImportMode>('separate');
   const [createDocError, setCreateDocError] = useState('');
   const [chatActionMenuId, setChatActionMenuId] = useState<string | null>(null);
   const [memberModalError, setMemberModalError] = useState('');
@@ -309,6 +311,7 @@ export default function ProjectDetailPage() {
 
   const resetCreateDocForm = () => {
     setSelectedFiles([]);
+    setImportMode('separate');
     setCreateDocError('');
   };
 
@@ -530,19 +533,29 @@ export default function ProjectDetailPage() {
       return;
     }
 
-    const uploadedDocs = selectedFiles.map((file) => {
-      const nameWithoutExt = getFileNameWithoutExt(file.name);
-      const extension = file.name.includes('.') ? file.name.split('.').pop()?.toLowerCase() : '';
-
-      return {
+    const ownerId = projectMembers[0]?.id ?? 'm-system';
+    const uploadedDocs = importMode === 'merge'
+      ? [{
         id: createLocalDocId(),
-        title: nameWithoutExt || file.name,
-        summary: `上传文件：${file.name}`,
-        ownerId: projectMembers[0]?.id ?? 'm-system',
+        title: `${getFileNameWithoutExt(selectedFiles[0].name) || selectedFiles[0].name} 等 ${selectedFiles.length} 个文件`,
+        summary: `合并导入 ${selectedFiles.length} 个文件：${selectedFiles.map((file) => file.name).join('、')}`,
+        ownerId,
         status: '进行中' as const,
-        tags: extension ? ['外部导入', extension.toUpperCase()] : ['外部导入'],
-      };
-    });
+        tags: ['外部导入', '合并导入'],
+      }]
+      : selectedFiles.map((file) => {
+        const nameWithoutExt = getFileNameWithoutExt(file.name);
+        const extension = file.name.includes('.') ? file.name.split('.').pop()?.toLowerCase() : '';
+
+        return {
+          id: createLocalDocId(),
+          title: nameWithoutExt || file.name,
+          summary: `上传文件：${file.name}`,
+          ownerId,
+          status: '进行中' as const,
+          tags: extension ? ['外部导入', extension.toUpperCase()] : ['外部导入'],
+        };
+      });
 
     setLocalDocs((prev) => [...uploadedDocs, ...prev]);
     closeCreateDocModal();
@@ -972,7 +985,7 @@ className="inline-flex items-center gap-1 text-sm text-tertiaryText transition-c
         okText="导入"
         onCancel={closeCreateDocModal}
         onConfirm={handleCreateDocSubmit}
-        bodyClassName="!px-6 !py-5"
+        bodyClassName={selectedFiles.length > 1 ? '!px-6 !pt-5 !pb-0' : '!px-6 !py-5'}
       >
         <div className="space-y-4">
           <div className="space-y-3">
@@ -980,10 +993,47 @@ className="inline-flex items-center gap-1 text-sm text-tertiaryText transition-c
               value={selectedFiles}
               maxCount={5}
               maxSize={20 * 1024 * 1024}
-              onChange={setSelectedFiles}
+              onChange={(files) => {
+                setSelectedFiles(files);
+                setCreateDocError('');
+              }}
               onError={(error) => setCreateDocError(error.message)}
             />
           </div>
+
+          {selectedFiles.length > 1 && (
+            <section className="-mx-6 flex items-center justify-between gap-6 border-t border-[var(--color-line-soft)] bg-[var(--color-surface-muted)] px-6 py-3">
+              <div className="shrink-0 text-[14px] font-medium text-primaryText">文件导入方式</div>
+              <div className="flex items-center gap-5">
+                <label className="inline-flex cursor-pointer items-center gap-2 text-[14px] text-primaryText">
+                  <input
+                    type="radio"
+                    name="import-mode"
+                    checked={importMode === 'separate'}
+                    onChange={() => setImportMode('separate')}
+                    className="peer sr-only"
+                  />
+                  <span className="inline-flex h-[18px] w-[18px] items-center justify-center rounded-full border border-[var(--color-gray-3)] bg-white text-transparent transition-colors peer-checked:border-[var(--color-primary)] peer-checked:bg-primary peer-checked:text-white">
+                    <Check size={11} strokeWidth={3} />
+                  </span>
+                  分别导入为文档
+                </label>
+                <label className="inline-flex cursor-pointer items-center gap-2 text-[14px] text-primaryText">
+                  <input
+                    type="radio"
+                    name="import-mode"
+                    checked={importMode === 'merge'}
+                    onChange={() => setImportMode('merge')}
+                    className="peer sr-only"
+                  />
+                  <span className="inline-flex h-[18px] w-[18px] items-center justify-center rounded-full border border-[var(--color-gray-3)] bg-white text-transparent transition-colors peer-checked:border-[var(--color-primary)] peer-checked:bg-primary peer-checked:text-white">
+                    <Check size={11} strokeWidth={3} />
+                  </span>
+                  合并为一个文档
+                </label>
+              </div>
+            </section>
+          )}
 
           {createDocError && <div className="text-sm text-[var(--color-danger)]">{createDocError}</div>}
         </div>

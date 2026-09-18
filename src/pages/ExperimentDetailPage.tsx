@@ -28,6 +28,25 @@ const DOCUMENT_TAG_CANDIDATES = [
   '临床样本', '多中心研究', '随访管理', '研究备案',
 ];
 
+type UploadDestination = 'body' | 'attachment';
+
+type UploadingAttachment = {
+  id: string;
+  name: string;
+  size: number;
+  type: string;
+  destination: UploadDestination;
+  progress: number;
+};
+
+const formatFileSize = (size: number) => {
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+const getFileExtension = (fileName: string) => fileName.split('.').pop()?.toUpperCase() || 'FILE';
+
 export default function ExperimentDetailPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -66,12 +85,16 @@ export default function ExperimentDetailPage() {
   const [customDocumentTags, setCustomDocumentTags] = useState<string[]>([]);
   const [docContent, setDocContent] = useState('');
   const [saveHint, setSaveHint] = useState<'' | 'saving' | 'saved'>('');
-  const [uploadedAttachments, setUploadedAttachments] = useState<Array<{ id: string; name: string; progress: number }>>([]);
+  const [attachmentNames, setAttachmentNames] = useState<string[]>([]);
+  const [uploadedAttachments, setUploadedAttachments] = useState<UploadingAttachment[]>([]);
   const contentScrollTimerRef = useRef<number | null>(null);
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const attachmentUploadTimersRef = useRef<Record<string, number>>({});
+  const pendingUploadFilesRef = useRef<Record<string, File>>({});
+  const bodyFileUrlsRef = useRef<string[]>([]);
   const documentTagListRef = useRef<HTMLDivElement | null>(null);
   const autoSaveTimerRef = useRef<number | null>(null);
+  const docContentRef = useRef('');
   const savedContentRef = useRef({ title: '', tags: [] as string[], content: '' });
 
   const project = useMemo(
@@ -129,12 +152,22 @@ export default function ExperimentDetailPage() {
     setDocTitle(originalTitle);
     setDocTags(originalTags);
     setDocContent(originalMarkdown);
+    docContentRef.current = originalMarkdown;
     savedContentRef.current = {
       title: originalTitle,
       tags: originalTags,
       content: originalMarkdown,
     };
   }, [originalTitle, originalTags, originalMarkdown]);
+
+  useEffect(() => () => {
+    bodyFileUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    Object.values(attachmentUploadTimersRef.current).forEach((timer) => window.clearInterval(timer));
+  }, []);
+
+  useEffect(() => {
+    setAttachmentNames(activeTimeline?.attachments ?? []);
+  }, [activeTimeline]);
 
   const persistDoc = useCallback(
     (next: { title: string; tags: string[]; content: string }) => {
@@ -167,6 +200,7 @@ export default function ExperimentDetailPage() {
   );
 
   const handleDocContentChange = (value: string) => {
+    docContentRef.current = value;
     setDocContent(value);
     scheduleAutoSave({ title: docTitle, tags: docTags, content: value });
   };
@@ -274,8 +308,44 @@ export default function ExperimentDetailPage() {
   };
 
   const handleUploadAttachmentClick = () => {
-    setShowDocActionMenu(false);
     importInputRef.current?.click();
+  };
+
+  const appendFileToDocumentBody = (file: File) => {
+    const fileUrl = URL.createObjectURL(file);
+    bodyFileUrlsRef.current.push(fileUrl);
+    const markdown = file.type.startsWith('image/')
+      ? `![${file.name}](${fileUrl})`
+      : `[${file.name}](${fileUrl})`;
+    const nextContent = docContentRef.current.trimEnd()
+      ? `${docContentRef.current.trimEnd()}\n\n${markdown}`
+      : markdown;
+    handleDocContentChange(nextContent);
+  };
+
+  const startAttachmentUpload = (attachmentId: string) => {
+    const file = pendingUploadFilesRef.current[attachmentId];
+    if (!file) return;
+
+    const timer = window.setInterval(() => {
+      setUploadedAttachments((attachments) => attachments.map((attachment) => {
+        if (attachment.id !== attachmentId || attachment.progress < 0 || attachment.progress >= 100) return attachment;
+        const progress = Math.min(100, attachment.progress + Math.max(8, Math.ceil((100 - attachment.progress) / 4)));
+        if (progress === 100) {
+          window.clearInterval(attachmentUploadTimersRef.current[attachmentId]);
+          delete attachmentUploadTimersRef.current[attachmentId];
+          delete pendingUploadFilesRef.current[attachmentId];
+          if (attachment.destination === 'body') {
+            appendFileToDocumentBody(file);
+          } else if (activeTimeline && !activeTimeline.attachments.includes(file.name)) {
+            activeTimeline.attachments.push(file.name);
+            setAttachmentNames((attachmentNames) => [...attachmentNames, file.name]);
+          }
+        }
+        return { ...attachment, progress };
+      }));
+    }, 180);
+    attachmentUploadTimersRef.current[attachmentId] = timer;
   };
 
   const handleUploadAttachmentChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -284,27 +354,54 @@ export default function ExperimentDetailPage() {
 
     files.forEach((file) => {
       const id = `${file.name}-${file.size}-${file.lastModified}`;
+      const destination: UploadDestination = file.type.startsWith('image/') ? 'body' : 'attachment';
+      pendingUploadFilesRef.current[id] = file;
       setUploadedAttachments((attachments) => attachments.some((attachment) => attachment.id === id)
         ? attachments
-        : [...attachments, { id, name: file.name, progress: 0 }]);
-
-      const timer = window.setInterval(() => {
-        setUploadedAttachments((attachments) => attachments.map((attachment) => {
-          if (attachment.id !== id || attachment.progress >= 100) return attachment;
-          const progress = Math.min(100, attachment.progress + Math.max(8, Math.ceil((100 - attachment.progress) / 4)));
-          if (progress === 100) {
-            window.clearInterval(attachmentUploadTimersRef.current[id]);
-            delete attachmentUploadTimersRef.current[id];
-            if (activeTimeline && !activeTimeline.attachments.includes(file.name)) activeTimeline.attachments.push(file.name);
-          }
-          return { ...attachment, progress };
-        }));
-      }, 180);
-      attachmentUploadTimersRef.current[id] = timer;
+        : [...attachments, {
+          id,
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          destination,
+          progress: -1,
+        }]);
     });
 
     event.target.value = '';
-  }; 
+  };
+
+  const handleAttachmentDestinationChange = (attachmentId: string, destination: UploadDestination) => {
+    setUploadedAttachments((attachments) => attachments.map((attachment) => (
+      attachment.id === attachmentId ? { ...attachment, destination } : attachment
+    )));
+  };
+
+  const handleConfirmAttachmentUploads = () => {
+    const pendingAttachments = uploadedAttachments.filter((attachment) => attachment.progress === -1);
+    if (pendingAttachments.length === 0) return;
+
+    setUploadedAttachments((attachments) => attachments.map((attachment) => (
+      attachment.progress === -1 ? { ...attachment, progress: 0 } : attachment
+    )));
+    pendingAttachments.forEach((attachment) => startAttachmentUpload(attachment.id));
+  };
+
+  const handleRemoveAttachment = (attachmentName: string) => {
+    if (!activeTimeline) return;
+    activeTimeline.attachments = activeTimeline.attachments.filter((attachment) => attachment !== attachmentName);
+    setAttachmentNames((attachments) => attachments.filter((attachment) => attachment !== attachmentName));
+  };
+
+  const handleRemoveUploadedAttachment = (attachmentId: string) => {
+    const timer = attachmentUploadTimersRef.current[attachmentId];
+    if (timer) {
+      window.clearInterval(timer);
+      delete attachmentUploadTimersRef.current[attachmentId];
+    }
+    delete pendingUploadFilesRef.current[attachmentId];
+    setUploadedAttachments((attachments) => attachments.filter((attachment) => attachment.id !== attachmentId));
+  };
 
   const handleShareClick = () => {
     setShowDocActionMenu(false);
@@ -313,7 +410,6 @@ export default function ExperimentDetailPage() {
 
   const docActionMenuItems = useMemo<BaseActionMenuItem[]>(
     () => [
-      { key: 'uploadAttachment', label: '上传附件' },
       { key: 'moveDocument', label: '移动文档' },
       { key: 'saveAsTemplate', label: '保存为模版' },
       { key: 'share', label: '分享文档' },
@@ -322,9 +418,7 @@ export default function ExperimentDetailPage() {
   );
 
   const handleDocActionMenuItemClick: BaseActionMenuProps['onItemClick'] = (item) => {
-    if (item.key === 'uploadAttachment') {
-      handleUploadAttachmentClick();
-    } else if (item.key === 'moveDocument') {
+    if (item.key === 'moveDocument') {
       setShowDocActionMenu(false);
       setMoveTargetProjectId('');
       setShowCreateMoveProjectPopover(false);
@@ -474,13 +568,6 @@ export default function ExperimentDetailPage() {
 
         {!isSharedView && (
           <div className="flex items-center gap-2">
-            <input
-              ref={importInputRef}
-              type="file"
-              multiple
-              className="hidden"
-              onChange={handleUploadAttachmentChange}
-            />
             <div className="inline-flex items-center gap-1 rounded-lg bg-bgLight p-0.5">
               <button
                 type="button"
@@ -861,23 +948,131 @@ export default function ExperimentDetailPage() {
 
               <section className="shrink-0 border-t border-[var(--color-line-subtle)] pt-5 pb-2">
                 <div className="text-sm font-medium text-primaryText">附件</div>
+                {!isSharedView && (
+                  <input
+                    ref={importInputRef}
+                    type="file"
+                    multiple
+                    className="hidden"
+                    onChange={handleUploadAttachmentChange}
+                  />
+                )}
                 <div className="mt-3 flex flex-wrap gap-2.5">
-                  {(activeTimeline?.attachments ?? []).map((attachment) => (
+                  {!isSharedView && (
+                    <button
+                      type="button"
+                      onClick={handleUploadAttachmentClick}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-line-subtle)] bg-white px-3 py-1.5 text-sm text-secondaryText transition-colors hover:border-[var(--color-primary)] hover:text-primaryText"
+                    >
+                      <Plus size={16} />
+                      上传附件
+                    </button>
+                  )}
+                  {attachmentNames.map((attachment) => (
                     <span
                       key={attachment}
-                      className="inline-flex items-center rounded-full border border-[var(--color-line-subtle)] bg-white px-3 py-1.5 text-sm text-secondaryText"
+                      className="group inline-flex items-center rounded-full border border-[var(--color-line-subtle)] bg-white px-3 py-1.5 text-sm text-secondaryText"
                     >
-                      {attachment}
-                    </span>
-                  ))}
-                  {uploadedAttachments.filter((attachment) => attachment.progress < 100).map((attachment) => (
-                    <span key={attachment.id} className="relative inline-flex items-center gap-2 overflow-hidden rounded-full border border-[var(--color-line-subtle)] bg-white px-3 py-1.5 text-sm text-secondaryText">
-                      <span className="max-w-[200px] truncate">{attachment.name}</span>
-                      <span className="tabular-nums text-xs text-tertiaryText">{attachment.progress}%</span>
-                      <span className="absolute inset-x-3 bottom-0 h-0.5 overflow-hidden rounded-full bg-[#edf0f3]"><span className="block h-full rounded-full bg-[var(--color-primary)] transition-[width] duration-150" style={{ width: `${attachment.progress}%` }} /></span>
+                      <span className="max-w-[200px] truncate">{attachment}</span>
+                      {!isSharedView && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveAttachment(attachment)}
+                          className="ml-0 grid h-4 w-0 place-items-center overflow-hidden rounded-full text-tertiaryText opacity-0 transition-all hover:bg-bgLight hover:text-primaryText group-hover:ml-1 group-hover:w-4 group-hover:opacity-100 focus-visible:ml-1 focus-visible:w-4 focus-visible:opacity-100"
+                          aria-label={`删除 ${attachment}`}
+                          title="删除附件"
+                        >
+                          <X size={13} />
+                        </button>
+                      )}
                     </span>
                   ))}
                 </div>
+                {uploadedAttachments.some((attachment) => attachment.progress === -1) && (
+                  <div className="mt-3 overflow-hidden rounded-lg border border-[var(--color-line-subtle)] bg-white">
+                    {uploadedAttachments.filter((attachment) => attachment.progress === -1).map((attachment) => (
+                      <div key={attachment.id} className="flex items-center gap-3 border-b border-[var(--color-line-subtle)] px-2.5 py-2 last:border-b-0">
+                        <span className="shrink-0 rounded bg-bgLight px-1.5 py-0.5 text-[10px] font-medium text-tertiaryText">
+                          {getFileExtension(attachment.name)}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate text-sm text-primaryText">{attachment.name}</span>
+                        <span className="shrink-0 text-xs text-tertiaryText">{formatFileSize(attachment.size)}</span>
+                        <div className="inline-flex shrink-0 overflow-hidden rounded border border-[var(--color-line-subtle)] text-xs">
+                          <button
+                            type="button"
+                            onClick={() => handleAttachmentDestinationChange(attachment.id, 'body')}
+                            className={`px-2 py-1 transition-colors ${
+                              attachment.destination === 'body'
+                                ? 'bg-primary-soft text-primary'
+                                : 'bg-white text-secondaryText hover:bg-bgLight'
+                            }`}
+                          >
+                            作为正文
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleAttachmentDestinationChange(attachment.id, 'attachment')}
+                            className={`border-l border-[var(--color-line-subtle)] px-2 py-1 transition-colors ${
+                              attachment.destination === 'attachment'
+                                ? 'bg-primary-soft text-primary'
+                                : 'bg-white text-secondaryText hover:bg-bgLight'
+                            }`}
+                          >
+                            作为附件
+                          </button>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveUploadedAttachment(attachment.id)}
+                          className="-ml-1 inline-flex shrink-0 rounded p-0.5 text-tertiaryText transition-colors hover:bg-bgLight hover:text-primaryText"
+                          aria-label={`移除 ${attachment.name}`}
+                          title="移除文件"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ))}
+                    <div className="flex items-center justify-end gap-2 border-t border-[var(--color-line-subtle)] bg-bgLight px-2.5 py-2">
+                      <span className="mr-auto text-xs text-tertiaryText">请选择文件用途后添加</span>
+                      <button
+                        type="button"
+                        onClick={() => uploadedAttachments.filter((attachment) => attachment.progress === -1).forEach((attachment) => handleRemoveUploadedAttachment(attachment.id))}
+                        className="px-2 py-1 text-xs text-secondaryText transition-colors hover:text-primaryText"
+                      >
+                        取消
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleConfirmAttachmentUploads}
+                        className="rounded bg-[var(--color-primary)] px-2.5 py-1 text-xs font-medium text-white transition-opacity hover:opacity-90"
+                      >
+                        确认添加
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {uploadedAttachments.some((attachment) => attachment.progress >= 0 && attachment.progress < 100) && (
+                  <div className="mt-3 space-y-1.5">
+                    {uploadedAttachments.filter((attachment) => attachment.progress >= 0 && attachment.progress < 100).map((attachment) => (
+                      <div key={attachment.id} className="relative flex items-center gap-3 overflow-hidden rounded-md border border-[var(--color-line-subtle)] bg-white px-2.5 py-2">
+                        <span className="min-w-0 flex-1 truncate text-sm text-primaryText">{attachment.name}</span>
+                        <span className="shrink-0 text-xs text-tertiaryText">{attachment.progress}%</span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveUploadedAttachment(attachment.id)}
+                          className="relative z-10 -ml-1 inline-flex shrink-0 rounded p-0.5 text-tertiaryText transition-colors hover:bg-bgLight hover:text-primaryText"
+                          aria-label={`取消上传 ${attachment.name}`}
+                          title="取消上传"
+                        >
+                          <X size={14} />
+                        </button>
+                        <span className="absolute inset-x-2.5 bottom-0 h-0.5 overflow-hidden rounded-full bg-[#edf0f3]">
+                          <span className="block h-full rounded-full bg-[var(--color-primary)] transition-[width] duration-150" style={{ width: `${attachment.progress}%` }} />
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </section>
             </>
           )}
